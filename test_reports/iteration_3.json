@@ -1,0 +1,22 @@
+{
+  "summary": "Verified SERVER provider end-to-end in the browser. Clearing localStorage → first-run modal auto-opens (provider=gemini, no key). Selecting provider-server + Save closes modal (no key required) and persists {provider:'server'} in localStorage. Clicking activate-recruteur-btn streams a RECRUTEUR prose response (329 chars, no bullet characters, no markdown bold) with no error toast. Reset+new session flow: activate-candidat-btn + 'Parlez-moi de vos points forts' + send-btn produces exactly 3 candidate-bullet-0/1/2 elements, each containing bolded highlight spans. After reload, the settings modal stays closed and generation continues to work in Serveur mode. Reopening Settings shows provider-server highlighted (border-indigo-500/60) and provider-gemini unselected. All 4 requested scenarios PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/server_recruteur.png", "/app/test_reports/server_candidat.png"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SettingsPanel useEffect resets local state on every `open` toggle — fine; provider selection correctly reflects saved value on reopen.",
+    "InterviewConsole first-run gate `st.provider !== 'server' && !st.geminiKey` correctly suppresses auto-open in server mode after save+reload.",
+    "streamServer parses SSE without newline reassembly of multi-line `data:` events — currently works because backend emits single-line JSON per event; if future backend chunks data across lines this will break."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "None — localStorage was cleared at test start.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "SERVER provider mode is fully working via the external preview URL. Recruteur streams prose (no bullets/bold), Candidat streams exactly 3 bullets with bold highlights. Settings persists provider='server' in localStorage under key 'settings'. First-run modal correctly suppressed after saving server provider. To reproduce: always start with localStorage.clear() to avoid stale state from previous iterations."
+}
