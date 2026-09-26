@@ -196,6 +196,21 @@ async def resolve_state(req: ResolveRequest):
     )
 
 
+@api_router.post("/extract-pdf")
+async def extract_pdf(file: UploadFile = File(...)):
+    """Extract text from an uploaded CV PDF so the candidate profile can be filled directly."""
+    from pypdf import PdfReader
+    data = await file.read()
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        text = "\n".join((p.extract_text() or "") for p in reader.pages).strip()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"PDF illisible: {e}")
+    if not text:
+        raise HTTPException(status_code=422, detail="Aucun texte extrait (PDF scanné/image ?). Copiez le texte manuellement.")
+    return {"text": text[:20000]}
+
+
 @api_router.post("/generate")
 async def generate(req: GenerateRequest):
     """Stateless generation proxy — used by the client 'Serveur' provider so the

@@ -1,11 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, FileText, Briefcase, Building2, Layers, Save } from "lucide-react";
+import { toast } from "sonner";
+import { X, FileText, Briefcase, Building2, Layers, Save, Upload, Loader2 } from "lucide-react";
+import { extractPdf } from "@/lib/api";
 
 const SECTEURS = ["Logistique", "Tech", "Finance", "Autre"];
 
 export default function ContextPanel({ open, session, onClose, onSave }) {
   const [form, setForm] = useState({ title: "", cv: "", poste: "", entreprise: "", secteur: "Autre" });
+  const [importing, setImporting] = useState(false);
+  const pdfRef = useRef(null);
 
   useEffect(() => {
     if (session) {
@@ -20,6 +24,22 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
   }, [session, open]);
 
   const field = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+
+  const importPdf = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await extractPdf(file);
+      field("cv", text);
+      toast.success("CV importé depuis le PDF");
+    } catch (err) {
+      toast.error("Import PDF échoué : " + err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -58,6 +78,20 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
               </Group>
 
               <Group icon={<FileText className="h-4 w-4" />} label="Profil candidat (CV)">
+                <div className="mb-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    data-testid="import-pdf-btn"
+                    onClick={() => pdfRef.current?.click()}
+                    disabled={importing}
+                    className="flex items-center gap-2 rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-200 transition-colors hover:bg-indigo-500/20 disabled:opacity-50"
+                  >
+                    {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {importing ? "Lecture du PDF…" : "Importer un PDF (CV)"}
+                  </button>
+                  <span className="text-[11px] text-slate-500">ou collez le texte ci-dessous</span>
+                  <input ref={pdfRef} type="file" accept="application/pdf" className="hidden" onChange={importPdf} data-testid="pdf-input" />
+                </div>
                 <textarea data-testid="ctx-cv" value={form.cv} onChange={(e) => field("cv", e.target.value)} rows={4} className="input resize-none" placeholder="Expérience, compétences, outils maîtrisés…" />
               </Group>
 

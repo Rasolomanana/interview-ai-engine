@@ -8,6 +8,19 @@ import { streamServer } from "./server";
 
 const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
 const now = () => new Date().toISOString();
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+export async function extractPdf(file) {
+  const fd = new FormData();
+  fd.append("file", file, file.name);
+  const resp = await fetch(`${BACKEND_URL}/api/extract-pdf`, { method: "POST", body: fd });
+  if (!resp.ok) {
+    let d = "";
+    try { d = (await resp.json())?.detail || ""; } catch (e) { /* ignore */ }
+    throw new Error(d || `Erreur ${resp.status}`);
+  }
+  return (await resp.json()).text;
+}
 
 const loadSessions = () => store.get("sessions", []);
 const saveSessions = (l) => store.set("sessions", l);
