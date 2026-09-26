@@ -4,6 +4,7 @@ import * as store from "./storage";
 import { resolve as resolveState } from "./stateMachine";
 import { buildSystemMessage, buildTurnMessage } from "./promptClient";
 import { streamGemini } from "./gemini";
+import { streamServer } from "./server";
 
 const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
 const now = () => new Date().toISOString();
@@ -77,7 +78,8 @@ const ALLOWED_MODELS = [
 ];
 
 export async function getSettings() {
-  const s = await store.get("settings", { geminiKey: "", model: "gemini-3.8-flash" });
+  const s = await store.get("settings", { geminiKey: "", model: "gemini-3.8-flash", provider: "gemini" });
+  if (!s.provider) s.provider = "gemini";
   if (!s.model || !ALLOWED_MODELS.includes(s.model)) {
     s.model = "gemini-3.8-flash";
     await store.set("settings", s);
@@ -121,8 +123,9 @@ export function streamMessage(sessionId, body, handlers) {
 
       if ((resolved.modules || [])[0] === "BARGE_IN") { handlers.onDone?.(""); return; }
 
-      if (!settings.geminiKey) {
-        handlers.onError?.("Clé API Gemini manquante. Ouvrez Réglages pour la saisir (gratuit via Google AI Studio).");
+      const useServer = settings.provider === "server";
+      if (!useServer && !settings.geminiKey) {
+        handlers.onError?.("Clé API Gemini manquante. Ouvrez Réglages (ou choisissez le mode Serveur).");
         return;
       }
 
@@ -138,15 +141,17 @@ export function streamMessage(sessionId, body, handlers) {
       msgs.push({ id: uid(), role: "user", content: body.text || "(image)", mode: resolved.resolved_state, created_at: now() });
 
       let full = "";
-      await streamGemini({
-        apiKey: settings.geminiKey,
-        model: settings.model || "gemini-3.8-flash",
-        systemMessage,
-        userText: turnMessage,
-        imageDataUrl: body.image_base64,
-        signal: controller.signal,
-        onDelta: (c) => { full += c; handlers.onDelta?.(c); },
-      });
+      const onDelta = (c) => { full += c; handlers.onDelta?.(c); };
+      if (useServer) {
+        await streamServer({ systemMessage, userText: turnMessage, imageDataUrl: body.image_base64, signal: controller.signal, onDelta });
+      } else {
+        await streamGemini({
+          apiKey: settings.geminiKey,
+          model: settings.model || "gemini-3.8-flash",
+          systemMessage, userText: turnMessage,
+          imageDataUrl: body.image_base64, signal: controller.signal, onDelta,
+        });
+      }
 
       msgs.push({ id: uid(), role: "assistant", content: full, mode: resolved.resolved_state, modules: resolved.modules, created_at: now() });
       await store.set("messages:" + sessionId, msgs);

@@ -34,7 +34,7 @@ export default function InterviewConsole() {
   const [pendingMode, setPendingMode] = useState(null);
   const [ctxOpen, setCtxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-3.8-flash" });
+  const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-3.8-flash", provider: "gemini" });
   const [creating, setCreating] = useState(false);
 
   const voice = useVoice();
@@ -58,7 +58,7 @@ export default function InterviewConsole() {
     (async () => {
       const st = await api.getSettings();
       setSettings(st);
-      if (!st.geminiKey) setSettingsOpen(true);
+      if (st.provider !== "server" && !st.geminiKey) setSettingsOpen(true);
       const list = await refreshSessions();
       if (list.length) selectSession(list[0].id);
       else await handleNew();
@@ -149,8 +149,8 @@ export default function InterviewConsole() {
   const send = (rawText, displayText, img) => {
     if (!active || streaming.active) return;
     if (!rawText?.trim() && !img) return;
-    if (!settings.geminiKey) {
-      toast.error("Ajoutez votre clé API Gemini (gratuite) dans Réglages");
+    if (settings.provider !== "server" && !settings.geminiKey) {
+      toast.error("Ajoutez une clé Gemini, ou choisissez le mode Serveur dans Réglages");
       setSettingsOpen(true);
       return;
     }
@@ -237,7 +237,7 @@ export default function InterviewConsole() {
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <HeaderBtn onClick={() => setSettingsOpen(true)} testid="open-settings-btn" icon={<KeyRound className="h-4 w-4" />} label="Réglages" active={!settings.geminiKey} />
+              <HeaderBtn onClick={() => setSettingsOpen(true)} testid="open-settings-btn" icon={<KeyRound className="h-4 w-4" />} label="Réglages" active={settings.provider !== "server" && !settings.geminiKey} />
               <HeaderBtn onClick={() => setCtxOpen(true)} testid="open-context-btn" icon={<SlidersHorizontal className="h-4 w-4" />} label="Contexte" />
               <HeaderBtn onClick={toggleDebug} testid="debug-toggle-btn" icon={<Bug className="h-4 w-4" />} label="Debug" active={active?.debug} />
               <HeaderBtn onClick={doReset} testid="reset-btn" icon={<RotateCcw className="h-4 w-4" />} label="Reset" />

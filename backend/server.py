@@ -98,6 +98,12 @@ class ResolveRequest(BaseModel):
     has_image: bool = False
 
 
+class GenerateRequest(BaseModel):
+    system_message: str
+    turn_message: str
+    image_base64: Optional[str] = None
+
+
 # ----------------------------- Helpers -----------------------------
 async def _get_session(session_id: str) -> dict:
     doc = await db.sessions.find_one({"id": session_id}, {"_id": 0})
@@ -188,6 +194,35 @@ async def resolve_state(req: ResolveRequest):
         barge_in=req.barge_in,
         has_image=req.has_image,
     )
+
+
+@api_router.post("/generate")
+async def generate(req: GenerateRequest):
+    """Stateless generation proxy — used by the client 'Serveur' provider so the
+    browser never contacts an external LLM directly (works even where Google/OpenAI
+    are blocked by an IT policy). State + persistence stay client-side."""
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY manquant")
+
+    async def gen():
+        try:
+            chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=req.system_message).with_model(*LLM_MODEL)
+            fc = None
+            if req.image_base64:
+                fc = [ImageContent(image_base64=_strip_data_url(req.image_base64))]
+            um = UserMessage(text=req.turn_message, file_contents=fc) if fc else UserMessage(text=req.turn_message)
+            async for ev in chat.stream_message(um):
+                if isinstance(ev, TextDelta):
+                    yield _sse("delta", {"content": ev.content})
+                elif isinstance(ev, StreamDone):
+                    break
+        except Exception as e:  # noqa: BLE001
+            logger.exception("generate failed")
+            yield _sse("error", {"detail": str(e)})
+        yield _sse("done", {})
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @api_router.post("/transcribe")
