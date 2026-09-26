@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck, Server, Sparkles } from "lucide-react";
+import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck, Server, Sparkles, AlignLeft } from "lucide-react";
 
 const MODELS = [
   { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (rapide · gratuit)" },
@@ -12,12 +12,14 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
   const [provider, setProvider] = useState("gemini");
   const [key, setKey] = useState("");
   const [model, setModel] = useState("gemini-3.8-flash");
+  const [answerStyle, setAnswerStyle] = useState("complet");
 
   useEffect(() => {
     if (open) {
       setProvider(settings?.provider || "gemini");
       setKey(settings?.geminiKey || "");
       setModel(settings?.model || "gemini-3.8-flash");
+      setAnswerStyle(settings?.answerStyle || "complet");
     }
   }, [open, settings]);
 
@@ -109,11 +111,29 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
                   <span>Mode Serveur : aucune clé requise. Votre navigateur parle uniquement à l'application (pas à Google), idéal si un pare-feu d'entreprise bloque l'API Google Gemini.</span>
                 </div>
               )}
+              {/* Answer style */}
+              <div>
+                <label className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-slate-400">
+                  <AlignLeft className="h-4 w-4 text-indigo-400" /> Style des réponses (mode Candidat)
+                </label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button data-testid="answer-complet" onClick={() => setAnswerStyle("complet")}
+                    className={`rounded-xl border p-3 text-left transition-all ${answerStyle === "complet" ? "border-emerald-500/60 bg-emerald-500/10" : "border-white/10 bg-white/[0.03] hover:border-white/20"}`}>
+                    <p className={`text-sm font-semibold ${answerStyle === "complet" ? "text-emerald-200" : "text-slate-200"}`}>Phrases complètes</p>
+                    <p className="text-[11px] text-slate-400">À lire à voix haute, sans réfléchir.</p>
+                  </button>
+                  <button data-testid="answer-concis" onClick={() => setAnswerStyle("concis")}
+                    className={`rounded-xl border p-3 text-left transition-all ${answerStyle === "concis" ? "border-indigo-500/60 bg-indigo-500/10" : "border-white/10 bg-white/[0.03] hover:border-white/20"}`}>
+                    <p className={`text-sm font-semibold ${answerStyle === "concis" ? "text-indigo-200" : "text-slate-200"}`}>Télégraphique</p>
+                    <p className="text-[11px] text-slate-400">Puces ultra-courtes (≤ 12 mots).</p>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 border-t border-white/[0.06] px-6 py-4">
               <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm text-slate-400 hover:text-white">Fermer</button>
-              <button onClick={() => onSave({ provider, geminiKey: key.trim(), model })} data-testid="settings-save-btn" className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-400">
+              <button onClick={() => onSave({ provider, geminiKey: key.trim(), model, answerStyle })} data-testid="settings-save-btn" className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-400">
                 <Save className="h-4 w-4" /> Enregistrer
               </button>
             </div>

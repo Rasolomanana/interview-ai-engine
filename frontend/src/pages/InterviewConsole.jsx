@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Send, Mic, MicOff, ImagePlus, X, Zap, RotateCcw, SlidersHorizontal,
-  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound, FileText, Headphones,
+  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound, FileText, Headphones, PictureInPicture2,
 } from "lucide-react";
 import * as api from "@/lib/api";
 import { useVoice } from "@/lib/useVoice";
@@ -15,6 +16,7 @@ import VoicePanel from "@/components/console/VoicePanel";
 import MessageBubble from "@/components/console/MessageBubble";
 import AutoListenBar from "@/components/console/AutoListenBar";
 import RecapPanel from "@/components/console/RecapPanel";
+import FloatingAnswer from "@/components/console/FloatingAnswer";
 
 const BADGE = {
   NEUTRE: "border-slate-600 bg-slate-800/80 text-slate-300",
@@ -37,10 +39,12 @@ export default function InterviewConsole() {
   const [pendingMode, setPendingMode] = useState(null);
   const [ctxOpen, setCtxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-3.8-flash", provider: "gemini" });
+  const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-3.8-flash", provider: "gemini", answerStyle: "complet" });
   const [creating, setCreating] = useState(false);
   const [showListen, setShowListen] = useState(false);
   const [recap, setRecap] = useState({ open: false, text: "", loading: false });
+  const [pipRoot, setPipRoot] = useState(null);
+  const pipWinRef = useRef(null);
   const autoQRef = useRef(null);
   const listen = useAutoListen({ onQuestion: (q) => autoQRef.current?.(q) });
 
@@ -250,8 +254,47 @@ export default function InterviewConsole() {
     }
   };
 
+  const openFloating = async () => {
+    if (!("documentPictureInPicture" in window)) {
+      toast.error("Fenêtre flottante non supportée. Utilisez Chrome/Edge récent (v116+).");
+      return;
+    }
+    if (pipWinRef.current) { try { pipWinRef.current.focus(); } catch (e) {} return; }
+    try {
+      const pip = await window.documentPictureInPicture.requestWindow({ width: 470, height: 340 });
+      [...document.styleSheets].forEach((ss) => {
+        try {
+          const css = [...ss.cssRules].map((r) => r.cssText).join("");
+          const st = pip.document.createElement("style");
+          st.textContent = css;
+          pip.document.head.appendChild(st);
+        } catch (e) {
+          if (ss.href) {
+            const l = pip.document.createElement("link");
+            l.rel = "stylesheet"; l.href = ss.href;
+            pip.document.head.appendChild(l);
+          }
+        }
+      });
+      pip.document.body.style.margin = "0";
+      pip.document.body.style.background = "#090a0f";
+      const root = pip.document.createElement("div");
+      pip.document.body.appendChild(root);
+      pip.addEventListener("pagehide", () => { setPipRoot(null); pipWinRef.current = null; });
+      pipWinRef.current = pip;
+      setPipRoot(root);
+      toast.success("Fenêtre flottante ouverte — glissez-la sous votre caméra 🎥");
+    } catch (e) {
+      toast.error("Impossible d'ouvrir la fenêtre flottante : " + e.message);
+    }
+  };
+
   const state = active?.state || "NEUTRE";
   const streamMsg = streaming.active ? { role: "assistant", content: streaming.text || "…", mode: streaming.mode, modules: streaming.meta?.modules || [] } : null;
+
+  const lastCandidate = [...messages].reverse().find((m) => m.role === "assistant" && m.mode === "CANDIDAT")?.content;
+  const pipContent = streaming.active && streaming.mode === "CANDIDAT" ? streaming.text : lastCandidate;
+  const pipMode = streaming.active ? streaming.mode : "CANDIDAT";
 
   return (
     <div className="command-bg min-h-screen w-full">
@@ -279,6 +322,7 @@ export default function InterviewConsole() {
               </span>
             </div>
             <div className="flex items-center gap-1.5">
+              <HeaderBtn onClick={openFloating} testid="floating-btn" icon={<PictureInPicture2 className="h-4 w-4" />} label="Flottant" active={!!pipRoot} />
               <HeaderBtn onClick={() => setShowListen((s) => !s)} testid="toggle-listen-btn" icon={<Headphones className="h-4 w-4" />} label="Écoute" active={listen.active} />
               <HeaderBtn onClick={doRecap} testid="recap-btn" icon={<FileText className="h-4 w-4" />} label="Récap" />
               <HeaderBtn onClick={() => setSettingsOpen(true)} testid="open-settings-btn" icon={<KeyRound className="h-4 w-4" />} label="Réglages" active={settings.provider !== "server" && !settings.geminiKey} />
@@ -392,6 +436,7 @@ export default function InterviewConsole() {
       <ContextPanel open={ctxOpen} session={active} onClose={() => setCtxOpen(false)} onSave={saveContext} />
       <SettingsPanel open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)} onSave={saveSettingsHandler} />
       <RecapPanel open={recap.open} text={recap.text} loading={recap.loading} onClose={() => setRecap((r) => ({ ...r, open: false }))} onExport={exportTranscript} />
+      {pipRoot && createPortal(<FloatingAnswer content={pipContent} streaming={streaming.active} mode={pipMode} />, pipRoot)}
     </div>
   );
 }

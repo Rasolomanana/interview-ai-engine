@@ -111,8 +111,9 @@ const ALLOWED_MODELS = [
 ];
 
 export async function getSettings() {
-  const s = await store.get("settings", { geminiKey: "", model: "gemini-3.8-flash", provider: "gemini" });
+  const s = await store.get("settings", { geminiKey: "", model: "gemini-3.8-flash", provider: "gemini", answerStyle: "complet" });
   if (!s.provider) s.provider = "gemini";
+  if (!s.answerStyle) s.answerStyle = "complet";
   if (!s.model || !ALLOWED_MODELS.includes(s.model)) {
     s.model = "gemini-3.8-flash";
     await store.set("settings", s);
@@ -166,7 +167,7 @@ export function streamMessage(sessionId, body, handlers) {
       const systemMessage = buildSystemMessage(session.context);
       const turnMessage = buildTurnMessage(
         resolved, body.text, session.context, history,
-        body.state_candidat, body.voice_confidence, session.debug, hasImage
+        body.state_candidat, body.voice_confidence, session.debug, hasImage, settings.answerStyle
       );
 
       // Persist user turn.

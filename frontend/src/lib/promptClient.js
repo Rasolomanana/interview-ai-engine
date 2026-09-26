@@ -80,6 +80,7 @@ export function buildSystemMessage(ctx) {
 const MODE_REMINDER = {
   NEUTRE: "Réponds UNIQUEMENT par une question de clarification ≤ 25 tokens. Aucun contenu, aucune puce.",
   CANDIDAT: "Génère EXACTEMENT 3 puces (• ), chacune ≤ 12 mots, 2–3 mots en **gras**. Amorce orale en puce 1. Aucune question ouverte. Style télégraphique oral.",
+  CANDIDAT_COMPLET: "Génère EXACTEMENT 3 puces (• ). CHAQUE puce est une PHRASE COMPLÈTE, naturelle et fluide, PRÊTE À ÊTRE LUE À VOIX HAUTE telle quelle (12 à 22 mots) — IGNORE la limite de 12 mots pour cette réponse. Chaque phrase doit être ancrée dans le CV du candidat et parfaitement alignée avec le poste et l'entreprise du BLOC CONTEXTE. Mets 2–3 mots en **gras**. La puce 1 commence par une amorce orale. Style parlé, confiant, zéro télégraphique, AUCUNE question ouverte. Objectif : le candidat lit sans réfléchir, sans stress.",
   RECRUTEUR: "Pose UNE SEULE question, en prose naturelle, en incarnant le recruteur. AUCUNE puce, AUCUN gras, AUCUNE liste.",
 };
 const VOICE_REMINDER = {
@@ -89,7 +90,7 @@ const VOICE_REMINDER = {
   V7_DEBIT: "DÉBIT → puces courtes 5–8 mots / liaisons orales simples.",
 };
 
-export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, voiceConfidence, debug, hasImage) {
+export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, voiceConfidence, debug, hasImage, answerStyle = "complet") {
   const mode = resolved.resolved_state;
   const parts = [
     "[CONTRÔLE APPLICATION — AUTORITÉ ABSOLUE]",
@@ -101,7 +102,9 @@ export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, vo
     `MODULES ACTIFS : ${(resolved.modules || []).join(", ")}`,
   ];
   if (debug) parts.push("[DEBUG] actif — préfixe la ligne de debug.");
-  parts.push("CONSIGNE : " + (MODE_REMINDER[mode] || MODE_REMINDER.NEUTRE));
+  let reminder = MODE_REMINDER[mode] || MODE_REMINDER.NEUTRE;
+  if (mode === "CANDIDAT") reminder = answerStyle === "concis" ? MODE_REMINDER.CANDIDAT : MODE_REMINDER.CANDIDAT_COMPLET;
+  parts.push("CONSIGNE : " + reminder);
   const vmod = resolved.voice_module;
   if (vmod && VOICE_REMINDER[vmod]) parts.push("VOIX : " + VOICE_REMINDER[vmod]);
   if (hasImage && mode === "CANDIDAT") parts.push("VISION : applique le FORMAT STRICT [RÉPONSE : X] + Logique + À prononcer.");
