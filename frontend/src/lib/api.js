@@ -22,6 +22,26 @@ export async function extractPdf(file) {
   return (await resp.json()).text;
 }
 
+export async function transcribeBlob(blob) {
+  const fd = new FormData();
+  fd.append("file", blob, "audio.webm");
+  fd.append("language", "fr");
+  const resp = await fetch(`${BACKEND_URL}/api/transcribe`, { method: "POST", body: fd });
+  if (!resp.ok) throw new Error(`Transcription ${resp.status}`);
+  return (await resp.json()).text || "";
+}
+
+// Provider-agnostic one-shot streamed generation (used for the recap).
+export async function streamRaw({ systemMessage, userText, onDelta, signal }) {
+  const settings = await getSettings();
+  if (settings.provider === "server") {
+    await streamServer({ systemMessage, userText, signal, onDelta });
+  } else {
+    if (!settings.geminiKey) throw new Error("Clé Gemini manquante (ou choisissez le mode Serveur).");
+    await streamGemini({ apiKey: settings.geminiKey, model: settings.model || "gemini-3.8-flash", systemMessage, userText, signal, onDelta });
+  }
+}
+
 const loadSessions = () => store.get("sessions", []);
 const saveSessions = (l) => store.set("sessions", l);
 

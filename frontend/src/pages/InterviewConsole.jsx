@@ -3,15 +3,18 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Send, Mic, MicOff, ImagePlus, X, Zap, RotateCcw, SlidersHorizontal,
-  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound,
+  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound, FileText, Headphones,
 } from "lucide-react";
 import * as api from "@/lib/api";
 import { useVoice } from "@/lib/useVoice";
+import { useAutoListen } from "@/lib/useAutoListen";
 import SessionSidebar from "@/components/console/SessionSidebar";
 import ContextPanel from "@/components/console/ContextPanel";
 import SettingsPanel from "@/components/console/SettingsPanel";
 import VoicePanel from "@/components/console/VoicePanel";
 import MessageBubble from "@/components/console/MessageBubble";
+import AutoListenBar from "@/components/console/AutoListenBar";
+import RecapPanel from "@/components/console/RecapPanel";
 
 const BADGE = {
   NEUTRE: "border-slate-600 bg-slate-800/80 text-slate-300",
@@ -36,6 +39,10 @@ export default function InterviewConsole() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-3.8-flash", provider: "gemini" });
   const [creating, setCreating] = useState(false);
+  const [showListen, setShowListen] = useState(false);
+  const [recap, setRecap] = useState({ open: false, text: "", loading: false });
+  const autoQRef = useRef(null);
+  const listen = useAutoListen({ onQuestion: (q) => autoQRef.current?.(q) });
 
   const voice = useVoice();
   const controllerRef = useRef(null);
@@ -208,6 +215,41 @@ export default function InterviewConsole() {
 
   const lastRecruiterQuestion = [...messages].reverse().find((m) => m.role === "assistant" && m.mode === "RECRUTEUR")?.content;
 
+  // Auto-listen -> generate a candidate answer for the heard question.
+  autoQRef.current = (q) => {
+    if (!q || streaming.active) return;
+    send("[REPONSE_ORALE] " + q, "🎧 " + q);
+  };
+
+  const exportTranscript = () => {
+    const lines = messages.map((m) => `${m.role === "user" ? "» Vous/Recruteur" : "« " + (m.mode || "IA")}: ${m.content}`);
+    const header = `ENTRETIEN — ${active?.title || ""}\nPoste: ${active?.context?.poste || "-"} | Entreprise: ${active?.context?.entreprise || "-"}\n${new Date().toLocaleString("fr-FR")}\n\n`;
+    const body = header + lines.join("\n\n") + (recap.text ? "\n\n=== RÉCAPITULATIF ===\n" + recap.text : "");
+    const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `entretien-${(active?.title || "session").replace(/\s+/g, "_")}.txt`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const doRecap = async () => {
+    if (!messages.length) { toast("Aucun échange à analyser pour l'instant"); return; }
+    setRecap({ open: true, text: "", loading: true });
+    const transcript = messages.map((m) => `${m.role === "user" ? "Candidat/Question" : (m.mode || "IA")}: ${m.content}`).join("\n");
+    const systemMessage = "Tu es un coach d'entretien senior. À partir de la transcription, rends un récapitulatif clair en français, structuré avec ces sections (en gras): 1) Questions posées, 2) Points forts, 3) Axes d'amélioration, 4) Conseils concrets pour la suite. Sois concis, orienté action, utilise des puces.";
+    try {
+      await api.streamRaw({
+        systemMessage,
+        userText: "Voici la transcription de l'entretien :\n\n" + transcript,
+        onDelta: (c) => setRecap((r) => ({ ...r, text: r.text + c })),
+      });
+    } catch (e) {
+      toast.error("Récap échoué : " + e.message);
+    } finally {
+      setRecap((r) => ({ ...r, loading: false }));
+    }
+  };
+
   const state = active?.state || "NEUTRE";
   const streamMsg = streaming.active ? { role: "assistant", content: streaming.text || "…", mode: streaming.mode, modules: streaming.meta?.modules || [] } : null;
 
@@ -237,6 +279,8 @@ export default function InterviewConsole() {
               </span>
             </div>
             <div className="flex items-center gap-1.5">
+              <HeaderBtn onClick={() => setShowListen((s) => !s)} testid="toggle-listen-btn" icon={<Headphones className="h-4 w-4" />} label="Écoute" active={listen.active} />
+              <HeaderBtn onClick={doRecap} testid="recap-btn" icon={<FileText className="h-4 w-4" />} label="Récap" />
               <HeaderBtn onClick={() => setSettingsOpen(true)} testid="open-settings-btn" icon={<KeyRound className="h-4 w-4" />} label="Réglages" active={settings.provider !== "server" && !settings.geminiKey} />
               <HeaderBtn onClick={() => setCtxOpen(true)} testid="open-context-btn" icon={<SlidersHorizontal className="h-4 w-4" />} label="Contexte" />
               <HeaderBtn onClick={toggleDebug} testid="debug-toggle-btn" icon={<Bug className="h-4 w-4" />} label="Debug" active={active?.debug} />
@@ -271,6 +315,9 @@ export default function InterviewConsole() {
               )}
             </div>
           )}
+
+          {/* Auto-listen */}
+          {showListen && <AutoListenBar listen={listen} onGenerate={(q) => { if (!streaming.active) send("[REPONSE_ORALE] " + q, "🎧 " + q); }} />}
 
           {/* Composer */}
           <div className="border-t border-white/[0.06] px-4 py-3">
@@ -344,6 +391,7 @@ export default function InterviewConsole() {
 
       <ContextPanel open={ctxOpen} session={active} onClose={() => setCtxOpen(false)} onSave={saveContext} />
       <SettingsPanel open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)} onSave={saveSettingsHandler} />
+      <RecapPanel open={recap.open} text={recap.text} loading={recap.loading} onClose={() => setRecap((r) => ({ ...r, open: false }))} onExport={exportTranscript} />
     </div>
   );
 }
