@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck, Server, Sparkles, AlignLeft, Drama } from "lucide-react";
+import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck, Server, Sparkles, AlignLeft, Drama, ListChecks } from "lucide-react";
 
 const MODELS = [
   { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (rapide · gratuit)" },
@@ -21,6 +21,7 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
   const [model, setModel] = useState("gemini-3.8-flash");
   const [answerStyle, setAnswerStyle] = useState("complet");
   const [tone, setTone] = useState("confiant");
+  const [starMode, setStarMode] = useState(true);
 
   useEffect(() => {
     if (open) {
@@ -29,6 +30,7 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
       setModel(settings?.model || "gemini-3.8-flash");
       setAnswerStyle(settings?.answerStyle || "complet");
       setTone(settings?.tone || "confiant");
+      setStarMode(settings?.starMode !== false);
     }
   }, [open, settings]);
 
@@ -153,11 +155,31 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
                   ))}
                 </div>
               </div>
+
+              {/* STAR method */}
+              <div>
+                <label className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-slate-400">
+                  <ListChecks className="h-4 w-4 text-indigo-400" /> Méthode STAR
+                </label>
+                <button
+                  data-testid="star-toggle"
+                  onClick={() => setStarMode((v) => !v)}
+                  className={`flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all ${starMode ? "border-emerald-500/60 bg-emerald-500/10" : "border-white/10 bg-white/[0.03] hover:border-white/20"}`}
+                >
+                  <span>
+                    <span className={`block text-sm font-semibold ${starMode ? "text-emerald-200" : "text-slate-200"}`}>Structurer les questions comportementales</span>
+                    <span className="block text-[11px] text-slate-400">Situation · Tâche · Action · Résultat (uniquement si la question demande un exemple vécu)</span>
+                  </span>
+                  <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${starMode ? "bg-emerald-500" : "bg-slate-600"}`}>
+                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${starMode ? "left-[22px]" : "left-0.5"}`} />
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 border-t border-white/[0.06] px-6 py-4">
               <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm text-slate-400 hover:text-white">Fermer</button>
-              <button onClick={() => onSave({ provider, geminiKey: key.trim(), model, answerStyle, tone })} data-testid="settings-save-btn" className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-400">
+              <button onClick={() => onSave({ provider, geminiKey: key.trim(), model, answerStyle, tone, starMode })} data-testid="settings-save-btn" className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-400">
                 <Save className="h-4 w-4" /> Enregistrer
               </button>
             </div>

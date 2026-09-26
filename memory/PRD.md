@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Fix qualité réponses candidat (mode « Phrases complètes »)** : le prompt génère désormais une VRAIE réponse d'entretien complète et cohérente (4 à 6 phrases fluides qui s'enchaînent, 15-28 mots chacune), répond à TOUTES les parties de la question du recruteur, ancrée CV+poste+entreprise. Fini les 2-3 puces fragmentées déconnectées. (promptClient.js: MODE_REMINDER.CANDIDAT_COMPLET). Vérifié par curl /api/generate.
+- ✅ **Méthode STAR** (toggle Réglages, activé par défaut) : en mode « Phrases complètes », l'IA détecte les questions COMPORTEMENTALES et structure la réponse en 4 puces Situation / Tâche / Action / Résultat (impact chiffré), ancrées CV. Les questions non comportementales (présentation, motivation, technique, logistique) gardent une réponse complète normale. (promptClient.js STAR_REMINDER ; settings.starMode ; SettingsPanel star-toggle). Vérifié par curl (2 cas) + screenshot.
+- ✅ **Fix qualité réponses candidat (mode « Phrases complètes »)** : le prompt génère une VRAIE réponse d'entretien complète et cohérente (4 à 6 phrases fluides), répond à TOUTES les parties de la question, ancrée CV+poste+entreprise.
 - ✅ Bouton unique **Live** (live-btn) : démarre l'écoute auto + ouvre la fenêtre flottante (PiP). Re-clic = arrête écoute + ferme flottant. Fermer le flottant (pagehide) arrête aussi l'écoute.
 - ✅ **Ton des réponses** : confiant / humble / technique / neutre (persistant, injecté dans le prompt candidat).
 - ✅ Correctif lint bloquant : `chrome` -> `globalThis.chrome` dans `storage.js` et `ext-bg.js` (0 erreur oxlint). Extension repackagée (446K, CSP MV3 propre, sans script distant).

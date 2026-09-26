@@ -100,7 +100,9 @@ const TONE_REMINDER = {
   neutre: "TON : professionnel et équilibré.",
 };
 
-export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, voiceConfidence, debug, hasImage, answerStyle = "complet", tone = "confiant") {
+const STAR_REMINDER = "MÉTHODE STAR : si la question du recruteur est COMPORTEMENTALE (elle réclame un exemple vécu ou une situation passée — « parlez-moi d'une fois où… », « décrivez une situation où… », « donnez un exemple de… », « comment avez-vous géré… »), tu DOIS structurer la réponse selon la méthode STAR avec EXACTEMENT ces 4 puces, chacune préfixée du libellé en gras : « • **Situation :** … » (contexte bref), « • **Tâche :** … » (ton objectif/responsabilité), « • **Action :** … » (ce que TU as concrètement fait, verbes d'action), « • **Résultat :** … » (impact chiffré ou concret). Chaque puce reste une phrase complète, naturelle, ancrée dans le CV. Si la question N'EST PAS comportementale (présentation, motivation, question technique factuelle ou logistique), N'UTILISE PAS STAR : réponds normalement selon la CONSIGNE ci-dessus.";
+
+export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, voiceConfidence, debug, hasImage, answerStyle = "complet", tone = "confiant", starMode = true) {
   const mode = resolved.resolved_state;
   const parts = [
     "[CONTRÔLE APPLICATION — AUTORITÉ ABSOLUE]",
@@ -115,6 +117,7 @@ export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, vo
   let reminder = MODE_REMINDER[mode] || MODE_REMINDER.NEUTRE;
   if (mode === "CANDIDAT") reminder = answerStyle === "concis" ? MODE_REMINDER.CANDIDAT : MODE_REMINDER.CANDIDAT_COMPLET;
   parts.push("CONSIGNE : " + reminder);
+  if (mode === "CANDIDAT" && starMode && answerStyle !== "concis") parts.push(STAR_REMINDER);
   if (mode === "CANDIDAT") parts.push(TONE_REMINDER[tone] || TONE_REMINDER.confiant);
   const vmod = resolved.voice_module;
   if (vmod && VOICE_REMINDER[vmod]) parts.push("VOIX : " + VOICE_REMINDER[vmod]);

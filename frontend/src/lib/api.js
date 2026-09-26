@@ -111,10 +111,11 @@ const ALLOWED_MODELS = [
 ];
 
 export async function getSettings() {
-  const s = await store.get("settings", { geminiKey: "", model: "gemini-3.8-flash", provider: "gemini", answerStyle: "complet", tone: "confiant" });
+  const s = await store.get("settings", { geminiKey: "", model: "gemini-3.8-flash", provider: "gemini", answerStyle: "complet", tone: "confiant", starMode: true });
   if (!s.provider) s.provider = "gemini";
   if (!s.answerStyle) s.answerStyle = "complet";
   if (!s.tone) s.tone = "confiant";
+  if (s.starMode === undefined) s.starMode = true;
   if (!s.model || !ALLOWED_MODELS.includes(s.model)) {
     s.model = "gemini-3.8-flash";
     await store.set("settings", s);
@@ -168,7 +169,7 @@ export function streamMessage(sessionId, body, handlers) {
       const systemMessage = buildSystemMessage(session.context);
       const turnMessage = buildTurnMessage(
         resolved, body.text, session.context, history,
-        body.state_candidat, body.voice_confidence, session.debug, hasImage, settings.answerStyle, settings.tone
+        body.state_candidat, body.voice_confidence, session.debug, hasImage, settings.answerStyle, settings.tone, settings.starMode
       );
 
       // Persist user turn.
