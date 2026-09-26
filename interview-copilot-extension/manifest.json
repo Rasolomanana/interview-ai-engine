@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Copilote Entretien IA",
+  "short_name": "Copilote IA",
+  "version": "4.0.0",
+  "description": "Assistant d'entretien IA temps réel — copilote candidat discret & simulateur recruteur immersif.",
+  "action": {
+    "default_title": "Ouvrir le Copilote Entretien IA"
+  },
+  "background": {
+    "service_worker": "ext-bg.js"
+  },
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://*.emergentagent.com/*",
+    "https://*.emergent.host/*"
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

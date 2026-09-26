@@ -1,0 +1,46 @@
+========================================================
+  COPILOTE ENTRETIEN IA — Extension Chrome (Manifest V3)
+========================================================
+
+CONTENU DE CE DOSSIER
+  manifest.json, index.html, ext-bg.js, static/, icons/
+  → C'est l'extension complète, prête à charger dans Chrome/Edge.
+
+------------------------------------------------------------
+INSTALLATION SUR UN AUTRE ORDINATEUR (Chrome ou Edge)
+------------------------------------------------------------
+1. Copiez le DOSSIER "interview-copilot-extension" sur l'ordinateur
+   cible (clé USB, e-mail, cloud...). Si vous avez un .zip, décompressez-le
+   d'abord : vous devez obtenir un dossier contenant "manifest.json".
+
+2. Ouvrez Chrome et allez à l'adresse :  chrome://extensions
+   (dans Edge :  edge://extensions )
+
+3. Activez le "Mode développeur" (interrupteur en haut à droite).
+
+4. Cliquez sur "Charger l'extension non empaquetée"
+   (Load unpacked) et sélectionnez le DOSSIER (celui qui contient
+   manifest.json).
+
+5. L'icône "Copilote Entretien IA" apparaît dans la barre d'outils.
+   Cliquez dessus → l'application s'ouvre dans un nouvel onglet.
+
+------------------------------------------------------------
+IMPORTANT — SERVEUR (BACKEND)
+------------------------------------------------------------
+L'extension est l'INTERFACE. Le moteur IA (LLM, machine d'états,
+transcription) tourne sur un serveur. Cette version est reliée à :
+
+   https://interview-ai-engine.preview.emergentagent.com
+
+⚠ Cette URL d'aperçu est TEMPORAIRE (active seulement quand l'espace
+  de travail Emergent est ouvert). Pour un usage permanent sur un autre
+  PC, il faut DÉPLOYER le backend (bouton "Publish" dans Emergent) puis
+  reconstruire l'extension avec l'URL permanente ( *.emergent.host ).
+  Demandez-moi de régénérer l'extension une fois le déploiement fait.
+
+------------------------------------------------------------
+MICRO / VOIX
+Au premier usage du micro, Chrome demandera l'autorisation du
+microphone : cliquez sur "Autoriser".
+========================================================
