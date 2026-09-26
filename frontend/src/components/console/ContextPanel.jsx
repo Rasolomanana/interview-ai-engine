@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { X, FileText, Briefcase, Building2, Layers, Save, Upload, Loader2 } from "lucide-react";
-import { extractPdf } from "@/lib/api";
+import { X, FileText, Briefcase, Building2, Layers, Save, Upload, Loader2, Globe, Sparkles } from "lucide-react";
+import { extractPdf, analyzeCompany } from "@/lib/api";
 
 const SECTEURS = ["Logistique", "Tech", "Finance", "Autre"];
 
 export default function ContextPanel({ open, session, onClose, onSave }) {
   const [form, setForm] = useState({ title: "", cv: "", poste: "", entreprise: "", secteur: "Autre" });
   const [importing, setImporting] = useState(false);
+  const [companyUrl, setCompanyUrl] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
   const pdfRef = useRef(null);
 
   useEffect(() => {
@@ -24,6 +26,26 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
   }, [session, open]);
 
   const field = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+
+  const analyzeSite = async () => {
+    const url = companyUrl.trim();
+    if (!url) { toast.error("Collez d'abord l'URL du site de l'entreprise"); return; }
+    setAnalyzing(true);
+    const header = `— Analyse de ${url} —\n`;
+    setForm((f) => ({ ...f, entreprise: (f.entreprise ? f.entreprise + "\n\n" : "") + header }));
+    try {
+      await analyzeCompany({
+        url,
+        poste: form.poste,
+        onDelta: (c) => setForm((f) => ({ ...f, entreprise: f.entreprise + c })),
+      });
+      toast.success("Site analysé — valeurs & questions ajoutées");
+    } catch (err) {
+      toast.error("Analyse échouée : " + err.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const importPdf = async (e) => {
     const file = e.target.files?.[0];
@@ -100,7 +122,31 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
               </Group>
 
               <Group icon={<Building2 className="h-4 w-4" />} label="Info entreprise & actualité">
-                <textarea data-testid="ctx-entreprise" value={form.entreprise} onChange={(e) => field("entreprise", e.target.value)} rows={3} className="input resize-none" placeholder="Culture, produits, concurrents, actus récentes…" />
+                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="flex flex-1 items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5">
+                    <Globe className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
+                    <input
+                      data-testid="company-url-input"
+                      value={companyUrl}
+                      onChange={(e) => setCompanyUrl(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); analyzeSite(); } }}
+                      placeholder="https://careers.exemple.com …"
+                      className="flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="analyze-company-btn"
+                    onClick={analyzeSite}
+                    disabled={analyzing}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+                  >
+                    {analyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    {analyzing ? "Analyse…" : "Analyser le site"}
+                  </button>
+                </div>
+                <p className="mb-2 text-[11px] text-slate-500">Récupère les valeurs, la culture et les questions d'entretien probables depuis le site de l'entreprise.</p>
+                <textarea data-testid="ctx-entreprise" value={form.entreprise} onChange={(e) => field("entreprise", e.target.value)} rows={5} className="input resize-none" placeholder="Culture, produits, concurrents, actus récentes… (ou analysez un site ci-dessus)" />
               </Group>
 
               <Group icon={<Layers className="h-4 w-4" />} label="Secteur">

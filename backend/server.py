@@ -104,6 +104,11 @@ class GenerateRequest(BaseModel):
     image_base64: Optional[str] = None
 
 
+class CompanyAnalyzeRequest(BaseModel):
+    url: str
+    poste: str = ""
+
+
 # ----------------------------- Helpers -----------------------------
 async def _get_session(session_id: str) -> dict:
     doc = await db.sessions.find_one({"id": session_id}, {"_id": 0})
@@ -233,6 +238,71 @@ async def generate(req: GenerateRequest):
                     break
         except Exception as e:  # noqa: BLE001
             logger.exception("generate failed")
+            yield _sse("error", {"detail": str(e)})
+        yield _sse("done", {})
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@api_router.post("/analyze-company")
+async def analyze_company(req: CompanyAnalyzeRequest):
+    """Fetch a company / careers page, extract its text and use the LLM to produce
+    a briefing: values, culture, and the interview questions those values imply."""
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY manquant")
+    import httpx
+    from bs4 import BeautifulSoup
+    import re as _re
+
+    url = req.url.strip()
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=25, headers={"User-Agent": ua}) as hc:
+            r = await hc.get(url)
+            r.raise_for_status()
+            html = r.text
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Impossible de charger la page: {e}")
+
+    soup = BeautifulSoup(html, "html.parser")
+    title = (soup.title.string if soup.title else "") or ""
+    for t in soup(["script", "style", "noscript", "svg", "header", "footer", "nav"]):
+        t.decompose()
+    text = _re.sub(r"\s+", " ", soup.get_text(" ")).strip()[:12000]
+    if len(text) < 120:
+        raise HTTPException(status_code=422, detail="Page trop pauvre en texte (site dynamique ?). Collez le contenu manuellement.")
+
+    poste_line = f"Poste visé par le candidat : {req.poste}\n" if req.poste else ""
+    system_message = (
+        "Tu es un expert senior en recrutement. À partir du contenu d'une page carrière/entreprise, "
+        "tu prépares une fiche de préparation d'entretien concise et actionnable, en français."
+    )
+    user_text = (
+        f"URL analysée : {url}\nTitre de la page : {title}\n{poste_line}\n"
+        f"CONTENU EXTRAIT DU SITE :\n{text}\n\n"
+        "Produis une fiche STRUCTURÉE en français, concise (puces courtes), avec EXACTEMENT ces sections :\n"
+        "**VALEURS & CULTURE** : les valeurs et la culture de l'entreprise (5-7 puces).\n"
+        "**MISSION & PRIORITÉS** : mission, priorités et ce qui compte pour eux (3-5 puces).\n"
+        "**QUESTIONS D'ENTRETIEN PROBABLES** : 8 à 10 questions que le recruteur pourrait poser, "
+        "ancrées dans ces valeurs (comportementales et sur les valeurs). "
+        + ("Adapte-les au poste visé. " if req.poste else "")
+        + "Base-toi sur le contenu extrait ; complète prudemment avec ta connaissance de l'entreprise "
+        "sans inventer de faits chiffrés précis."
+    )
+
+    async def gen():
+        try:
+            chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(*LLM_MODEL)
+            async for ev in chat.stream_message(UserMessage(text=user_text)):
+                if isinstance(ev, TextDelta):
+                    yield _sse("delta", {"content": ev.content})
+                elif isinstance(ev, StreamDone):
+                    break
+        except Exception as e:  # noqa: BLE001
+            logger.exception("analyze-company failed")
             yield _sse("error", {"detail": str(e)})
         yield _sse("done", {})
 

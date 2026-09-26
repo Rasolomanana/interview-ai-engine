@@ -31,6 +31,42 @@ export async function transcribeBlob(blob) {
   return (await resp.json()).text || "";
 }
 
+// Analyze a company / careers URL -> streamed briefing (values, culture, likely questions).
+export async function analyzeCompany({ url, poste, onDelta, signal }) {
+  const resp = await fetch(`${BACKEND_URL}/api/analyze-company`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, poste: poste || "" }),
+    signal,
+  });
+  if (!resp.ok) {
+    let d = "";
+    try { d = (await resp.json())?.detail || ""; } catch (e) { /* ignore */ }
+    throw new Error(d || `Erreur ${resp.status}`);
+  }
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const events = buf.split("\n\n");
+    buf = events.pop();
+    for (const chunk of events) {
+      let ev = "message"; let data = "";
+      for (const l of chunk.split("\n")) {
+        if (l.startsWith("event:")) ev = l.slice(6).trim();
+        else if (l.startsWith("data:")) data += l.slice(5).trim();
+      }
+      if (!data) continue;
+      const p = JSON.parse(data);
+      if (ev === "delta") onDelta(p.content);
+      else if (ev === "error") throw new Error(p.detail || "Erreur serveur");
+    }
+  }
+}
+
 // Provider-agnostic one-shot streamed generation (used for the recap).
 export async function streamRaw({ systemMessage, userText, onDelta, signal }) {
   const settings = await getSettings();

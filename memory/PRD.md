@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Méthode STAR** (toggle Réglages, activé par défaut) : en mode « Phrases complètes », l'IA détecte les questions COMPORTEMENTALES et structure la réponse en 4 puces Situation / Tâche / Action / Résultat (impact chiffré), ancrées CV. Les questions non comportementales (présentation, motivation, technique, logistique) gardent une réponse complète normale. (promptClient.js STAR_REMINDER ; settings.starMode ; SettingsPanel star-toggle). Vérifié par curl (2 cas) + screenshot.
+- ✅ **Analyse du site entreprise** (`/api/analyze-company`) : dans le Contexte, un champ URL + bouton « Analyser le site » récupère la page (httpx + BeautifulSoup) et l'IA produit une fiche — VALEURS & CULTURE, MISSION & PRIORITÉS, QUESTIONS D'ENTRETIEN PROBABLES (adaptées au poste) — injectée dans « Info entreprise ». Vérifié par curl (careers.rtx.com) + screenshot. Dép. ajoutée : beautifulsoup4.
+- ✅ **Méthode STAR** (toggle Réglages, activé par défaut) : structure les réponses aux questions comportementales en Situation/Tâche/Action/Résultat.
 - ✅ **Fix qualité réponses candidat (mode « Phrases complètes »)** : le prompt génère une VRAIE réponse d'entretien complète et cohérente (4 à 6 phrases fluides), répond à TOUTES les parties de la question, ancrée CV+poste+entreprise.
 - ✅ Bouton unique **Live** (live-btn) : démarre l'écoute auto + ouvre la fenêtre flottante (PiP). Re-clic = arrête écoute + ferme flottant. Fermer le flottant (pagehide) arrête aussi l'écoute.
 - ✅ **Ton des réponses** : confiant / humble / technique / neutre (persistant, injecté dans le prompt candidat).
