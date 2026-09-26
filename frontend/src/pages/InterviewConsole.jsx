@@ -282,7 +282,7 @@ export default function InterviewConsole() {
       pip.document.body.style.background = "#090a0f";
       const root = pip.document.createElement("div");
       pip.document.body.appendChild(root);
-      pip.addEventListener("pagehide", () => { setPipRoot(null); pipWinRef.current = null; });
+      pip.addEventListener("pagehide", () => { setPipRoot(null); pipWinRef.current = null; listen.stop(); });
       pipWinRef.current = pip;
       setPipRoot(root);
       toast.success("Fenêtre flottante ouverte — glissez-la sous votre caméra 🎥");
@@ -293,7 +293,7 @@ export default function InterviewConsole() {
 
   const state = active?.state || "NEUTRE";
 
-  const liveActive = listen.active && !!pipRoot;
+  const liveActive = listen.active || !!pipRoot;
   const startLive = async () => {
     if (liveActive) {
       listen.stop();

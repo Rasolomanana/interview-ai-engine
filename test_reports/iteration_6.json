@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only testing of Live button + Tone selector features in SERVER mode via preview URL. All 5 requested scenarios PASS. (1) No regression: provider-server saved; empty-state activate-recruteur-btn streamed a recruiter question in 3s; activate-candidat-btn + typed question + send-btn produced EXACTLY 3 candidate-bullet-{0,1,2}, no crash overlay, no page errors. (2) Tone persistence: tone-technique persisted through save+reopen (localStorage settings.tone === 'technique'); also verified tone-humble persistence. (3) Tone affects generation: same candidate question re-generated after switching to tone-humble produced visibly different wording — humble version added measured/nuanced markers ('une situation qui m\\'a vraiment marqué', 'Honnêtement, ce n\\'était pas simple tous les jours', 'reste pour moi une vraie fierté') versus confiant's assertive register ('coordonné', 'maintenu le cap', 'salué par les parties prenantes', 'à l\\'aise dans des environnements complexes et exigeants'). Both cases produced EXACTLY 3 bullets. (4) Live button (live-btn) present with text 'Live'; documentPictureInPicture IS available in headless Chromium; click triggered BOTH toasts 'Mode Live activé — parlez…' and 'Fenêtre flottante ouverte…', button switched to 'Live actif' with red pulse-ring classes, PiP opened successfully, NO crash overlay, NO page errors. Second click toggled off — button returned to 'Live' state and 'Mode Live arrêté' toast appeared. (5) Header overflow at 1920px: scrollWidth==clientWidth (974/974) — no overflow. At 390px: document scrollWidth (390) == clientWidth (390) — no page horizontal scroll; buttons wrap cleanly via flex-wrap. NOTE: at 390px the inner header row measured sw=392 cw=356 which reflects flex-wrap gap but does NOT cause page overflow (doc dimensions match).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "InterviewConsole.jsx is now ~514 lines with 4 orthogonal concerns (session/messages, streaming, PiP, live+auto-listen). Extract usePipWindow() and useLive() hooks — openFloating logic (styleSheet cloning, pagehide handler, ref bookkeeping) and startLive coupling are separately testable.",
+    "startLive (line 297) computes liveActive from listen.active && !!pipRoot. If PiP window is closed by the user (pagehide fires and sets pipRoot=null), listen.active remains true but liveActive becomes false — clicking live-btn again will call listen.start again instead of stopping. Suggest also stopping listen when pipRoot is externally cleared, or read raw listen state for toggle check.",
+    "startLive does not await openFloating (line 310 does await, good) but toast 'Live activé' fires even if openFloating threw silently (it swallows via its own catch/toast). Consider propagating failure from openFloating so the outer toast is suppressed on PiP error.",
+    "SettingsPanel: tone buttons list has no aria-label/aria-pressed for accessibility. answer-style + tone are grouped visually but not as radiogroup semantics.",
+    "FloatingAnswer receives listening + transcript props but component was not visually verified in this run (PiP window opened in headless — visual check limited).",
+    "openFloating cleanup on unmount was added in useEffect (line 89) — good, addresses prior-iteration comment.",
+    "Duplicate React key warnings from previous iteration were not re-observed in this run; may be intermittent — worth grepping map((x,i)=>...key={i}) in MessageBubble/parse."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (5/5 scenarios)"},
+  "test_credentials": "None required — SERVER mode uses server-side key.",
+  "seed_data_creation": "localStorage['settings'] preset to {provider:'server', model:'gemini-3.8-flash', answerStyle:'complet', tone:'confiant'} before load to skip first-run modal.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Live button + tone selector all verified in SERVER mode. In headless Chromium the preview env exposes window.documentPictureInPicture so the graceful-toast-only fallback branch was NOT exercised — to validate the toast branch, `delete window.documentPictureInPicture` before clicking live-btn. Note: getUserMedia/Web Speech DID work here — listen.start('mic') succeeded, hence full success path (both toasts + Live actif state) was observed rather than the graceful degradation. Confiant bullets ~24/28/28 words; Humble bullets used softer register with 'Honnêtement…' hedges. Header at 390 has minor inner row width 392 vs container 356 due to flex-wrap gap accounting but document has no horizontal scroll.",
+  "rca of the issue": "n/a — no failing scenarios"
+}
