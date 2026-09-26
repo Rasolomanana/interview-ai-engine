@@ -78,7 +78,10 @@ const ALLOWED_MODELS = [
 
 export async function getSettings() {
   const s = await store.get("settings", { geminiKey: "", model: "gemini-3.8-flash" });
-  if (!s.model || !ALLOWED_MODELS.includes(s.model)) s.model = "gemini-3.8-flash";
+  if (!s.model || !ALLOWED_MODELS.includes(s.model)) {
+    s.model = "gemini-3.8-flash";
+    await store.set("settings", s);
+  }
   return s;
 }
 export async function saveSettings(s) {

@@ -1,0 +1,39 @@
+{
+  "summary": "Frontend-only verification of the reported 'Erreur LLM : Failed to fetch' bug after the model was switched from deprecated gemini-2.5-flash to gemini-3.8-flash. End-to-end Gemini streaming from browser confirmed working with provided key across Recruteur and Candidat modes; no 'Failed to fetch' toast. Settings modal, model list, save flow, and runtime migration of deprecated model all verified.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "First Recruteur activation right after saving key",
+        "issue": "First activate-recruteur-btn click occasionally does not render an assistant-message-RECRUTEUR (browser console shows a transient 503 from generativelanguage.googleapis.com). Second attempt (used in migration test) worked reliably. Likely Gemini free-tier transient; not the reported bug. Consider showing a retry hint in the error toast on 5xx.",
+        "affected_selectors": ["assistant-message-RECRUTEUR"]
+      },
+      {
+        "flow": "Deprecated-model migration persistence",
+        "issue": "getSettings() normalises an unknown/deprecated model to gemini-3.8-flash in memory so generation works, but the corrected value is not written back to localStorage. localStorage still shows the deprecated 'gemini-2.5-flash' after a reload. Generation works (no Failed to fetch), so the reported bug is fixed, but persisting the migrated value would keep storage clean.",
+        "affected_selectors": []
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Optional) In api.js getSettings(), persist normalised model back to storage via store.set('settings', s) when migration occurs so localStorage stays in sync.",
+    "(Optional) On 5xx from Gemini, surface a friendlier retry message rather than the raw status."
+  ],
+  "critical_code_review_comments": [
+    "gemini.js: reader.releaseLock() is not called; minor resource cleanup improvement.",
+    "api.js streamMessage: user message is pushed into local msgs but never persisted if stream errors (only saved after onDone) - acceptable but means aborted turns lose the user echo from storage.",
+    "getSettings does not persist migrated model to storage (see integration issue above).",
+    "InterviewConsole send(): after onError, user message stays in UI thread with no visual error indicator besides toast; consider inline error state."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% for reported bug regression; 3/3 Candidate bullets with bold; Recruteur prose renders (no bullet/no **); Settings + migration functional"},
+  "test_credentials": "Gemini API key provided in review_request used only in-browser localStorage during test; cleared between tests. Verified via curl HTTP 200 against gemini-3.8-flash.",
+  "seed_data_creation": "Pre-seeded localStorage 'settings' with deprecated model gemini-2.5-flash to validate migration path.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "App is fully client-side. Enter Gemini key via data-testid gemini-key-input + settings-save-btn or preseed localStorage 'settings'. Regression bug (Failed to fetch on deprecated gemini-2.5-flash) is fixed: gemini-3.8-flash streams successfully. Watch for transient 503s on Gemini free tier — retry once.",
+  "rca of the issue": "Root cause: model 'gemini-2.5-flash' is no longer served to new Google accounts on the v1beta streamGenerateContent endpoint, so fetch() to /v1beta/models/gemini-2.5-flash:streamGenerateContent returned an error before the SSE stream established, surfacing as 'TypeError: Failed to fetch' / non-ok response. Fix in code: SettingsPanel.MODELS updated to gemini-3.8-flash / gemini-flash-latest / gemini-3.5-flash; api.js ALLOWED_MODELS updated with 3.8-flash default; getSettings() normalises unknown/deprecated stored models to gemini-3.8-flash so previously-saved user settings continue working. Verified via curl (HTTP 200 on gemini-3.8-flash) and via end-to-end UI test: Recruteur prose question and 3 Candidate bullets both stream successfully without any 'Failed to fetch' error toast."
+}
