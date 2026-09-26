@@ -86,6 +86,8 @@ export default function InterviewConsole() {
     if (voice.listening && voice.transcript) setInput(voice.transcript);
   }, [voice.transcript, voice.listening]);
 
+  useEffect(() => () => { try { pipWinRef.current?.close(); } catch (e) {} }, []);
+
   const selectSession = async (id) => {
     const data = await api.getSession(id);
     if (!data.session) return;

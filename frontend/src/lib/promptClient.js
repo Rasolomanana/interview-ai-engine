@@ -80,7 +80,7 @@ export function buildSystemMessage(ctx) {
 const MODE_REMINDER = {
   NEUTRE: "Réponds UNIQUEMENT par une question de clarification ≤ 25 tokens. Aucun contenu, aucune puce.",
   CANDIDAT: "Génère EXACTEMENT 3 puces (• ), chacune ≤ 12 mots, 2–3 mots en **gras**. Amorce orale en puce 1. Aucune question ouverte. Style télégraphique oral.",
-  CANDIDAT_COMPLET: "Génère EXACTEMENT 3 puces (• ). CHAQUE puce est une PHRASE COMPLÈTE, naturelle et fluide, PRÊTE À ÊTRE LUE À VOIX HAUTE telle quelle (12 à 22 mots) — IGNORE la limite de 12 mots pour cette réponse. Chaque phrase doit être ancrée dans le CV du candidat et parfaitement alignée avec le poste et l'entreprise du BLOC CONTEXTE. Mets 2–3 mots en **gras**. La puce 1 commence par une amorce orale. Style parlé, confiant, zéro télégraphique, AUCUNE question ouverte. Objectif : le candidat lit sans réfléchir, sans stress.",
+  CANDIDAT_COMPLET: "En mode COMPLET, la règle C1 (≤ 12 mots) est SUSPENDUE. Génère EXACTEMENT 3 puces (• ). CHAQUE puce est une PHRASE COMPLÈTE, naturelle et fluide, PRÊTE À ÊTRE LUE À VOIX HAUTE telle quelle (12 à 22 mots). Chaque phrase doit être ancrée dans le CV du candidat et parfaitement alignée avec le poste et l'entreprise du BLOC CONTEXTE. Mets 2–3 mots en **gras**. La puce 1 commence par une amorce orale. Style parlé, confiant, zéro télégraphique, AUCUNE question ouverte. Objectif : le candidat lit sans réfléchir, sans stress.",
   RECRUTEUR: "Pose UNE SEULE question, en prose naturelle, en incarnant le recruteur. AUCUNE puce, AUCUN gras, AUCUNE liste.",
 };
 const VOICE_REMINDER = {

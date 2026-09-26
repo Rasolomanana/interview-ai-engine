@@ -1,3 +1,4 @@
+/* global chrome */
 // Storage abstraction: chrome.storage.local in the extension, localStorage in dev/preview.
 const hasChrome = typeof chrome !== "undefined" && chrome.storage && chrome.storage.local;
 
