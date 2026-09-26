@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck, Server, Sparkles, AlignLeft } from "lucide-react";
+import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck, Server, Sparkles, AlignLeft, Drama } from "lucide-react";
 
 const MODELS = [
   { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (rapide · gratuit)" },
@@ -8,11 +8,19 @@ const MODELS = [
   { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
 ];
 
+const TONES = [
+  { id: "confiant", label: "Confiant" },
+  { id: "humble", label: "Humble" },
+  { id: "technique", label: "Technique" },
+  { id: "neutre", label: "Neutre" },
+];
+
 export default function SettingsPanel({ open, settings, onClose, onSave }) {
   const [provider, setProvider] = useState("gemini");
   const [key, setKey] = useState("");
   const [model, setModel] = useState("gemini-3.8-flash");
   const [answerStyle, setAnswerStyle] = useState("complet");
+  const [tone, setTone] = useState("confiant");
 
   useEffect(() => {
     if (open) {
@@ -20,6 +28,7 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
       setKey(settings?.geminiKey || "");
       setModel(settings?.model || "gemini-3.8-flash");
       setAnswerStyle(settings?.answerStyle || "complet");
+      setTone(settings?.tone || "confiant");
     }
   }, [open, settings]);
 
@@ -129,11 +138,26 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
                   </button>
                 </div>
               </div>
+
+              {/* Tone */}
+              <div>
+                <label className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-slate-400">
+                  <Drama className="h-4 w-4 text-indigo-400" /> Ton des réponses
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {TONES.map((t) => (
+                    <button key={t.id} data-testid={`tone-${t.id}`} onClick={() => setTone(t.id)}
+                      className={`rounded-lg border px-3 py-1.5 text-sm transition-all ${tone === t.id ? "border-indigo-500/60 bg-indigo-500/15 text-indigo-100" : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-white"}`}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 border-t border-white/[0.06] px-6 py-4">
               <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm text-slate-400 hover:text-white">Fermer</button>
-              <button onClick={() => onSave({ provider, geminiKey: key.trim(), model, answerStyle })} data-testid="settings-save-btn" className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-400">
+              <button onClick={() => onSave({ provider, geminiKey: key.trim(), model, answerStyle, tone })} data-testid="settings-save-btn" className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-400">
                 <Save className="h-4 w-4" /> Enregistrer
               </button>
             </div>

@@ -90,7 +90,14 @@ const VOICE_REMINDER = {
   V7_DEBIT: "DÉBIT → puces courtes 5–8 mots / liaisons orales simples.",
 };
 
-export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, voiceConfidence, debug, hasImage, answerStyle = "complet") {
+const TONE_REMINDER = {
+  confiant: "TON : assuré et positif, affirmations nettes, énergie maîtrisée.",
+  humble: "TON : humble et mesuré ; reconnais tes limites avec honnêteté, sans arrogance.",
+  technique: "TON : précis et technique ; vocabulaire métier, chiffres et faits concrets.",
+  neutre: "TON : professionnel et équilibré.",
+};
+
+export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, voiceConfidence, debug, hasImage, answerStyle = "complet", tone = "confiant") {
   const mode = resolved.resolved_state;
   const parts = [
     "[CONTRÔLE APPLICATION — AUTORITÉ ABSOLUE]",
@@ -105,6 +112,7 @@ export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, vo
   let reminder = MODE_REMINDER[mode] || MODE_REMINDER.NEUTRE;
   if (mode === "CANDIDAT") reminder = answerStyle === "concis" ? MODE_REMINDER.CANDIDAT : MODE_REMINDER.CANDIDAT_COMPLET;
   parts.push("CONSIGNE : " + reminder);
+  if (mode === "CANDIDAT") parts.push(TONE_REMINDER[tone] || TONE_REMINDER.confiant);
   const vmod = resolved.voice_module;
   if (vmod && VOICE_REMINDER[vmod]) parts.push("VOIX : " + VOICE_REMINDER[vmod]);
   if (hasImage && mode === "CANDIDAT") parts.push("VISION : applique le FORMAT STRICT [RÉPONSE : X] + Logique + À prononcer.");

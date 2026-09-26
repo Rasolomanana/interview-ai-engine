@@ -3,7 +3,7 @@ import { parseCandidate, segmentsFor } from "@/lib/parse";
 // Rendered inside a Document Picture-in-Picture window (always-on-top, floats over
 // Teams/Zoom/WhatsApp). Shows the current answer in large, readable text to place
 // right under the webcam.
-export default function FloatingAnswer({ content, streaming, mode }) {
+export default function FloatingAnswer({ content, streaming, mode, listening, transcript }) {
   const { alert, response, bullets } = parseCandidate(content || "");
   const isCandidate = mode === "CANDIDAT" || bullets.length > 0;
 
@@ -13,7 +13,17 @@ export default function FloatingAnswer({ content, streaming, mode }) {
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "#10b981" }}>
           ● Copilote — à lire {streaming ? "…" : ""}
         </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: listening ? "#f87171" : "#64748b" }}>
+          <span style={{ width: 8, height: 8, borderRadius: 999, background: listening ? "#ef4444" : "#475569", display: "inline-block", animation: listening ? "caret-blink 1s step-end infinite" : "none" }} />
+          {listening ? "Écoute voix" : "Voix off"}
+        </span>
       </div>
+
+      {listening && (
+        <div style={{ marginBottom: 10, borderRadius: 8, border: "1px solid rgba(255,255,255,.06)", background: "rgba(0,0,0,.3)", padding: "5px 9px", fontSize: 12, color: "#94a3b8", minHeight: 26 }}>
+          {transcript ? `🎤 ${transcript}` : "🎤 En attente de la question du recruteur…"}
+        </div>
+      )}
 
       {alert && (
         <div style={{ marginBottom: 10, borderRadius: 8, border: "1px solid rgba(251,191,36,.3)", background: "rgba(69,26,3,.4)", padding: "6px 10px", fontSize: 13, color: "#fde68a" }}>

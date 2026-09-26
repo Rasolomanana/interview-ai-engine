@@ -39,7 +39,7 @@ export default function InterviewConsole() {
   const [pendingMode, setPendingMode] = useState(null);
   const [ctxOpen, setCtxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-3.8-flash", provider: "gemini", answerStyle: "complet" });
+  const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-3.8-flash", provider: "gemini", answerStyle: "complet", tone: "confiant" });
   const [creating, setCreating] = useState(false);
   const [showListen, setShowListen] = useState(false);
   const [recap, setRecap] = useState({ open: false, text: "", loading: false });
@@ -292,6 +292,24 @@ export default function InterviewConsole() {
   };
 
   const state = active?.state || "NEUTRE";
+
+  const liveActive = listen.active && !!pipRoot;
+  const startLive = async () => {
+    if (liveActive) {
+      listen.stop();
+      try { pipWinRef.current?.close(); } catch (e) {}
+      toast("Mode Live arrêté");
+      return;
+    }
+    if (settings.provider !== "server" && !settings.geminiKey) {
+      toast.error("Ajoutez une clé Gemini, ou choisissez le mode Serveur dans Réglages");
+      setSettingsOpen(true);
+      return;
+    }
+    try { await listen.start("mic"); } catch (e) { toast.error(e.message); return; }
+    await openFloating();
+    toast.success("Mode Live activé — parlez : la réponse apparaît dans la fenêtre flottante 🎥");
+  };
   const streamMsg = streaming.active ? { role: "assistant", content: streaming.text || "…", mode: streaming.mode, modules: streaming.meta?.modules || [] } : null;
 
   const lastCandidate = [...messages].reverse().find((m) => m.role === "assistant" && m.mode === "CANDIDAT")?.content;
@@ -324,6 +342,11 @@ export default function InterviewConsole() {
               </span>
             </div>
             <div className="flex items-center gap-1.5">
+              <button onClick={startLive} data-testid="live-btn"
+                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${liveActive ? "border-red-500/50 bg-red-500/20 text-red-300 pulse-ring" : "border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"}`}>
+                <span className={`h-2 w-2 rounded-full ${liveActive ? "bg-red-500 animate-pulse" : "bg-emerald-400"}`} />
+                {liveActive ? "Live actif" : "Live"}
+              </button>
               <HeaderBtn onClick={openFloating} testid="floating-btn" icon={<PictureInPicture2 className="h-4 w-4" />} label="Flottant" active={!!pipRoot} />
               <HeaderBtn onClick={() => setShowListen((s) => !s)} testid="toggle-listen-btn" icon={<Headphones className="h-4 w-4" />} label="Écoute" active={listen.active} />
               <HeaderBtn onClick={doRecap} testid="recap-btn" icon={<FileText className="h-4 w-4" />} label="Récap" />
@@ -438,7 +461,7 @@ export default function InterviewConsole() {
       <ContextPanel open={ctxOpen} session={active} onClose={() => setCtxOpen(false)} onSave={saveContext} />
       <SettingsPanel open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)} onSave={saveSettingsHandler} />
       <RecapPanel open={recap.open} text={recap.text} loading={recap.loading} onClose={() => setRecap((r) => ({ ...r, open: false }))} onExport={exportTranscript} />
-      {pipRoot && createPortal(<FloatingAnswer content={pipContent} streaming={streaming.active} mode={pipMode} />, pipRoot)}
+      {pipRoot && createPortal(<FloatingAnswer content={pipContent} streaming={streaming.active} mode={pipMode} listening={listen.active} transcript={listen.transcript} />, pipRoot)}
     </div>
   );
 }
