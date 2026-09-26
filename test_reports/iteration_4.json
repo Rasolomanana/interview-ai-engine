@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend-only regression + new-feature testing in SERVER mode via preview URL. All 5 requested scenarios PASS. (1) No regression: activate-recruteur-btn streams a RECRUTEUR prose question (261 chars, e.g. 'Très bien, installez-vous confortablement…'); activate-candidat-btn + typed question + send yields exactly 3 candidate bullets (candidate-bullet-0/1/2, no bullet-3). No crash overlay, no page errors. (2) Recap: clicking recap-btn opens recap-panel modal and streams a structured French summary into recap-text (975 chars with sections 'Question posée', bold headings, bullets); recap-export-btn is present and visible. Works with no key in server mode. (3) Écoute Auto UI: toggle-listen-btn reveals auto-listen-bar with listen-tab-btn + listen-mic-btn + 'Auto-répondre' controls; clicking listen-mic-btn does not crash the app (permission error handled gracefully, no crash overlay). (4) Header layout: no horizontal overflow at 1920px or 390px width (scrollWidth==clientWidth on both). Header wraps cleanly on mobile. (5) Settings provider: open-settings-btn → provider-server → settings-save-btn closes modal and persists provider='server' to localStorage['settings']; after reload the modal stays closed and provider remains 'server'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AutoListenBar error handling uses `window.__toast?.(e.message) || alert(e.message)` — falls back to native alert() blocking dialog, which is jarring UX. Prefer using the imported sonner `toast.error` directly.",
+    "InterviewConsole.jsx has grown to ~440 lines; consider splitting stream/generation logic (send, doRecap, exportTranscript) into a hook to keep the page component lean.",
+    "doRecap does not attach an AbortController — if the user closes the modal mid-stream, the SSE keeps streaming into state; consider abort-on-close.",
+    "exportTranscript relies on messages state only; recap.text is appended if present but recap-open state is not required — fine, but the download filename uses raw title which may contain unsafe chars beyond whitespace (colons, slashes). Consider a stricter sanitizer.",
+    "autoQRef.current is reassigned on every render (line 219) — safe here but slightly wasteful; useCallback + attaching in useEffect would be cleaner."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (5/5 scenarios)"},
+  "test_credentials": "None required — SERVER mode uses EMERGENT_LLM_KEY server-side.",
+  "seed_data_creation": "None — localStorage preset with {provider:'server'} to skip first-run modal, then verified persistence after reload.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "SERVER mode continues to work end-to-end. New features Recap (recap-btn → recap-panel → recap-text streaming + recap-export-btn) and Écoute Auto (toggle-listen-btn → auto-listen-bar with listen-tab-btn / listen-mic-btn / listen-auto-toggle) are wired correctly. Chrome Side Panel intentionally not tested (extension-only). No horizontal overflow at 1920 or 390. To reproduce quickly: set localStorage['settings']='{\"provider\":\"server\",\"geminiKey\":\"\",\"model\":\"gemini-3.8-flash\"}' before load to avoid first-run modal."
+}

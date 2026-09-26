@@ -228,7 +228,7 @@ export default function InterviewConsole() {
     const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `entretien-${(active?.title || "session").replace(/\s+/g, "_")}.txt`;
+    a.href = url; a.download = `entretien-${(active?.title || "session").replace(/[^a-z0-9_-]+/gi, "_")}.txt`;
     a.click(); URL.revokeObjectURL(url);
   };
 

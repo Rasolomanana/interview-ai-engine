@@ -1,10 +1,11 @@
 import { Headphones, MonitorSpeaker, Mic, Square, Loader2, Send, Zap } from "lucide-react";
+import { toast } from "sonner";
 
 export default function AutoListenBar({ listen, onGenerate }) {
   const { active, source, transcript, busy, auto, setAuto, start, stop, supported } = listen;
 
   const startSrc = async (src) => {
-    try { await start(src); } catch (e) { window.__toast?.(e.message) || alert(e.message); }
+    try { await start(src); } catch (e) { toast.error(e.message); }
   };
 
   return (

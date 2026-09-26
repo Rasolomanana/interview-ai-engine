@@ -1,27 +1,30 @@
 # PRD — Copilote Entretien IA
 
-## Deux livrables
-1. **App web** (React + FastAPI + MongoDB) — version serveur, dans /app/backend + /app/frontend.
-2. **Extension Chrome autonome GRATUITE** — version 100% navigateur, sans serveur :
-   - Machine d'états portée en JS (`frontend/src/lib/stateMachine.js`) — 12 tests PASS.
-   - Génération directe Google Gemini (`frontend/src/lib/gemini.js`) avec la clé gratuite de l'utilisateur.
-   - Persistance locale via `chrome.storage`/`localStorage` (`frontend/src/lib/storage.js`, `api.js`).
-   - Voix : Web Speech API (fr-FR) + prosodie côté client. Vision : image inline Gemini.
-   - Réglages (clé + modèle) : `components/console/SettingsPanel.jsx`.
-   - Empaquetée : `/app/interview-copilot-extension/` (+ `.zip`), Manifest V3, CSP MV3-safe.
+## Livrables
+1. App web (React) + backend FastAPI (proxy IA + PDF + Whisper).
+2. Extension Chrome (Manifest V3) 100% client-side, empaquetée : /app/interview-copilot-extension/ (+ .zip).
 
-## Modèle IA
-- Extension : Gemini 2.5 Flash (défaut, gratuit) / 2.5 Pro / 2.0 Flash — clé Google AI Studio de l'utilisateur.
-- App web serveur : Anthropic claude-sonnet-4-6 via EMERGENT_LLM_KEY.
+## Architecture
+- Machine d'états déterministe en JS (frontend/src/lib/stateMachine.js) — 12 tests PASS.
+- Deux fournisseurs IA (Réglages) :
+  - Gemini : navigateur -> Google Gemini (clé gratuite utilisateur, gemini-3.8-flash). 100% local.
+  - Serveur : navigateur -> backend /api/generate (Emergent key, Anthropic). Marche si Google bloqué.
+- Persistance locale (chrome.storage/localStorage). Backend Mongo présent mais non utilisé par le chat.
 
-## État (2026-06-26)
-- ✅ Machine d'états déterministe (NEUTRE/CANDIDAT/RECRUTEUR), TM3/5/6/7, compteur → NEUTRE à n=3.
-- ✅ 12 tests non-régression PASS (backend pytest + port JS node).
-- ✅ Mode CANDIDAT (3 puces ≤12 mots, gras, reveal), RECRUTEUR (prose, 1 question), vision, barge-in.
-- ✅ Extension Chrome autonome gratuite construite, CSP nettoyée (scripts inline/distants retirés).
-- ✅ Guide d'installation FR inclus (`GUIDE-INSTALLATION.txt`).
+## Fonctionnalités (2026-06-26)
+- ✅ Modes NEUTRE / CANDIDAT (3 puces ≤12 mots, gras, reveal) / RECRUTEUR (prose, 1 question).
+- ✅ Machine d'états + TM3/5/6/7 + compteur NEUTRE à n=3 + barge-in.
+- ✅ Provider Gemini (gratuit) + Serveur (secours, sans clé) — testés 100%.
+- ✅ Import CV en PDF (backend /api/extract-pdf via pypdf).
+- ✅ Écoute Auto : source Micro (Web Speech, téléphone à proximité) + source Onglet Teams/Zoom (getDisplayMedia + Whisper /api/transcribe), auto-génération de la réponse.
+- ✅ Récapitulatif d'entretien (résumé structuré via provider) + export .txt.
+- ✅ Panneau latéral Chrome (manifest side_panel + chrome.sidePanel).
+- ✅ Voix/prosodie (stress/monotone/débit/confiance), vision image, mode DEBUG.
+
+## Modèles
+- Gemini : gemini-3.8-flash (défaut) / gemini-flash-latest / gemini-3.5-flash.
+- Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Backlog
-- P1 : side panel Chrome (chrome.sidePanel) pour usage discret pendant l'entretien.
-- P1 : layout mobile en onglets.
-- P2 : feedback flash post-simulation (R3), export/score de session, escalade UI.
+- P1 : Écoute Auto — abort du récap à la fermeture ; détection auto Gemini bloqué -> bascule Serveur.
+- P2 : audio de l'entretien enregistré/exporté ; scores ; refactor InterviewConsole en hooks.
