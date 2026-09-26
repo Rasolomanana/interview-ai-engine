@@ -1,0 +1,302 @@
+import os
+import io
+import base64
+import logging
+import uuid
+from pathlib import Path
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
+from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, Field, ConfigDict
+
+from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent, TextDelta, StreamDone
+from emergentintegrations.llm.openai import OpenAISpeechToText
+
+import state_machine as sm
+import prompt as P
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / ".env")
+
+mongo_url = os.environ["MONGO_URL"]
+client = AsyncIOMotorClient(mongo_url)
+db = client[os.environ["DB_NAME"]]
+
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
+LLM_MODEL = ("anthropic", "claude-sonnet-4-6")
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+app = FastAPI()
+api_router = APIRouter(prefix="/api")
+
+
+# ----------------------------- Models -----------------------------
+class SessionContext(BaseModel):
+    cv: str = ""
+    poste: str = ""
+    entreprise: str = ""
+    secteur: str = "Autre"
+
+
+class SessionCreate(BaseModel):
+    title: str = "Nouvelle session"
+    context: SessionContext = Field(default_factory=SessionContext)
+    debug: bool = False
+
+
+class ContextUpdate(BaseModel):
+    title: Optional[str] = None
+    context: Optional[SessionContext] = None
+    debug: Optional[bool] = None
+
+
+class Session(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str = "Nouvelle session"
+    context: SessionContext = Field(default_factory=SessionContext)
+    debug: bool = False
+    state: str = sm.NEUTRE
+    prev_state: str = sm.NEUTRE
+    tours_sans_marqueur: int = 0
+    incomprehension: int = 0
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class Message(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+    mode: str = sm.NEUTRE
+    modules: List[str] = Field(default_factory=list)
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class TurnRequest(BaseModel):
+    text: str = ""
+    state_candidat: Optional[str] = "NORMAL"
+    voice_confidence: Optional[float] = 0.0
+    image_base64: Optional[str] = None  # data URL or raw b64
+    barge_in: bool = False
+
+
+class ResolveRequest(BaseModel):
+    current_state: str = sm.NEUTRE
+    prev_state: str = sm.NEUTRE
+    text: str = ""
+    tours_sans_marqueur: int = 0
+    voice_confidence: Optional[float] = None
+    state_candidat: Optional[str] = None
+    barge_in: bool = False
+    has_image: bool = False
+
+
+# ----------------------------- Helpers -----------------------------
+async def _get_session(session_id: str) -> dict:
+    doc = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Session introuvable")
+    return doc
+
+
+def _strip_data_url(b64: str) -> str:
+    if b64 and b64.startswith("data:"):
+        return b64.split(",", 1)[1]
+    return b64
+
+
+# ----------------------------- Routes -----------------------------
+@api_router.get("/")
+async def root():
+    return {"message": "Interview AI Engine v4"}
+
+
+@api_router.post("/sessions", response_model=Session)
+async def create_session(payload: SessionCreate):
+    s = Session(title=payload.title, context=payload.context, debug=payload.debug)
+    await db.sessions.insert_one(s.model_dump())
+    return s
+
+
+@api_router.get("/sessions", response_model=List[Session])
+async def list_sessions():
+    docs = await db.sessions.find({}, {"_id": 0}).sort("updated_at", -1).to_list(200)
+    return docs
+
+
+@api_router.get("/sessions/{session_id}")
+async def get_session(session_id: str):
+    s = await _get_session(session_id)
+    msgs = await db.messages.find({"session_id": session_id}, {"_id": 0}).sort("created_at", 1).to_list(1000)
+    return {"session": s, "messages": msgs}
+
+
+@api_router.put("/sessions/{session_id}", response_model=Session)
+async def update_session(session_id: str, payload: ContextUpdate):
+    s = await _get_session(session_id)
+    update = {}
+    if payload.title is not None:
+        update["title"] = payload.title
+    if payload.context is not None:
+        update["context"] = payload.context.model_dump()
+    if payload.debug is not None:
+        update["debug"] = payload.debug
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.sessions.update_one({"id": session_id}, {"$set": update})
+    s.update(update)
+    return s
+
+
+@api_router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    await db.sessions.delete_one({"id": session_id})
+    await db.messages.delete_many({"session_id": session_id})
+    return {"ok": True}
+
+
+@api_router.post("/sessions/{session_id}/reset")
+async def reset_session(session_id: str):
+    await _get_session(session_id)
+    await db.sessions.update_one(
+        {"id": session_id},
+        {"$set": {
+            "state": sm.NEUTRE, "prev_state": sm.NEUTRE,
+            "tours_sans_marqueur": 0, "incomprehension": 0,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "state": sm.NEUTRE}
+
+
+@api_router.post("/state/resolve")
+async def resolve_state(req: ResolveRequest):
+    """Pure deterministic resolution — used by the non-regression tests."""
+    return sm.resolve(
+        current_state=req.current_state,
+        prev_state=req.prev_state,
+        text=req.text,
+        tours_in=req.tours_sans_marqueur,
+        voice_confidence=req.voice_confidence,
+        state_candidat=req.state_candidat,
+        barge_in=req.barge_in,
+        has_image=req.has_image,
+    )
+
+
+@api_router.post("/transcribe")
+async def transcribe(file: UploadFile = File(...), language: str = Form("fr")):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY manquant")
+    data = await file.read()
+    buf = io.BytesIO(data)
+    buf.name = file.filename or "audio.webm"
+    stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
+    try:
+        resp = await stt.transcribe(file=buf, model="whisper-1", response_format="json", language=language)
+        return {"text": resp.text}
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Whisper failed")
+        raise HTTPException(status_code=502, detail=f"Transcription échouée: {e}")
+
+
+@api_router.post("/sessions/{session_id}/message")
+async def send_message(session_id: str, req: TurnRequest):
+    s = await _get_session(session_id)
+    has_image = bool(req.image_base64)
+
+    resolved = sm.resolve(
+        current_state=s["state"],
+        prev_state=s["prev_state"],
+        text=req.text,
+        tours_in=s.get("tours_sans_marqueur", 0),
+        voice_confidence=req.voice_confidence,
+        state_candidat=req.state_candidat,
+        barge_in=req.barge_in,
+        has_image=has_image,
+        incomprehension_in=s.get("incomprehension", 0),
+    )
+
+    # Barge-in: no generation, state untouched.
+    if resolved.get("no_content") and resolved.get("modules") == ["BARGE_IN"]:
+        async def _empty():
+            yield _sse("meta", resolved)
+            yield _sse("done", {"content": ""})
+        return StreamingResponse(_empty(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    history = await db.messages.find({"session_id": session_id}, {"_id": 0}).sort("created_at", 1).to_list(1000)
+    hist_for_prompt = [{"role": ("Recruteur" if m["mode"] == sm.RECRUTEUR else ("Copilote" if m["mode"] == sm.CANDIDAT else "Assistant")) if m["role"] == "assistant" else "Utilisateur", "content": m["content"]} for m in history]
+
+    system_message = P.build_system_message(s["context"])
+    turn_message = P.build_turn_message(
+        resolved, req.text, s["context"], hist_for_prompt,
+        req.state_candidat, req.voice_confidence, s.get("debug", False), has_image,
+    )
+
+    # Persist the user turn.
+    user_msg = Message(role="user", content=req.text or "(image)", mode=resolved["resolved_state"])
+    await db.messages.insert_one({**user_msg.model_dump(), "session_id": session_id})
+
+    async def event_generator():
+        yield _sse("meta", resolved)
+        full = ""
+        try:
+            chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=session_id, system_message=system_message).with_model(*LLM_MODEL)
+            file_contents = None
+            if has_image:
+                file_contents = [ImageContent(image_base64=_strip_data_url(req.image_base64))]
+            um = UserMessage(text=turn_message, file_contents=file_contents) if file_contents else UserMessage(text=turn_message)
+            async for ev in chat.stream_message(um):
+                if isinstance(ev, TextDelta):
+                    full += ev.content
+                    yield _sse("delta", {"content": ev.content})
+                elif isinstance(ev, StreamDone):
+                    break
+        except Exception as e:  # noqa: BLE001
+            logger.exception("LLM stream failed")
+            yield _sse("error", {"detail": str(e)})
+
+        # Persist assistant turn + new state.
+        assistant_msg = Message(role="assistant", content=full, mode=resolved["resolved_state"], modules=resolved.get("modules", []))
+        await db.messages.insert_one({**assistant_msg.model_dump(), "session_id": session_id})
+        await db.sessions.update_one(
+            {"id": session_id},
+            {"$set": {
+                "state": resolved["resolved_state"],
+                "prev_state": s["state"],
+                "tours_sans_marqueur": resolved["tours"],
+                "incomprehension": resolved.get("incomprehension", 0),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        yield _sse("done", {"content": full})
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+def _sse(event: str, data: dict) -> str:
+    import json
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+app.include_router(api_router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()

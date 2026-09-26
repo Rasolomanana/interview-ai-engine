@@ -1,0 +1,109 @@
+{
+  "project_title": "Assistant d'entretien IA - Real-Time Interview Companion",
+  "app_type": "hybrid_fullstack",
+  "language": "fr",
+  "theme": {
+    "default_mode": "dark",
+    "theme_toggle": true,
+    "archetype": "THE PERFORMANCE PRO (Tactical Precision & High-Focus Live Companion)",
+    "colors": {
+      "background_dark": "#090a0f",
+      "surface_dark": "#121520",
+      "surface_elevated": "#1a1e2e",
+      "border_dark": "rgba(255, 255, 255, 0.08)",
+      "border_highlight": "rgba(99, 102, 241, 0.3)",
+      "foreground_dark": "#f8fafc",
+      "muted_dark": "#94a3b8",
+      "primary_indigo": "#6366f1",
+      "candidate_stealth_emerald": "#10b981",
+      "candidate_stealth_gold": "#fbbf24",
+      "recruiter_violet": "#8b5cf6",
+      "neutral_slate": "#64748b",
+      "danger_interruption": "#ef4444",
+      "card_bg_glass": "rgba(18, 21, 32, 0.75)"
+    }
+  },
+  "typography": {
+    "font_family_heading": "Cabinet Grotesk, Plus Jakarta Sans, sans-serif",
+    "font_family_body": "Plus Jakarta Sans, -apple-system, sans-serif",
+    "font_family_mono": "JetBrains Mono, monospace",
+    "font_sizes": {
+      "hero_title": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight",
+      "section_heading": "text-xl sm:text-2xl font-bold tracking-tight",
+      "candidate_bullet_text": "text-lg sm:text-xl font-medium leading-snug tracking-wide",
+      "candidate_bold_highlight": "font-black text-amber-300 bg-amber-950/40 px-1 py-0.5 rounded border border-amber-500/30",
+      "recruiter_prose": "text-base sm:text-lg leading-relaxed text-slate-200",
+      "metric_label": "text-xs font-mono uppercase tracking-widest text-slate-400"
+    }
+  },
+  "layout_and_structure": {
+    "spacing_philosophy": "Generous tactical spacing. High visual contrast between control zones and live stream output.",
+    "layout_grid": "3-Column Responsive Grid on Desktop (Left: Session Context & History, Center: Live Copilot/Simulator Workspace, Right: Live Voice Analytics & State Inspector)",
+    "responsive_breakpoints": {
+      "mobile": "Single column view with tabbed panels for Context / Live Assistant / Voice Stats",
+      "tablet": "2-column layout with collapsible context sidebar",
+      "desktop": "Full 3-column command center with floating barge-in controls"
+    }
+  },
+  "modes_and_state_machine": {
+    "NEUTRE": {
+      "badge_color": "bg-slate-800 text-slate-300 border-slate-600",
+      "description": "Initial clarification state asking candidate to confirm role/mode",
+      "ui_element": "Prompt card with dual CTA buttons: 'Activer Mode Candidat' (Live Copilot) & 'Activer Mode Recruteur' (Simulation)"
+    },
+    "CANDIDAT": {
+      "badge_color": "bg-emerald-950/80 text-emerald-400 border-emerald-500/40",
+      "description": "Live stealth copilot mode for candidate during interview",
+      "rules": "3 telegraphic bullet points <= 12 words per bullet. 2-3 bolded words per bullet. Progressive reveal 1->2->3 with 0.15s staggering.",
+      "reading_speed": "0.2s zero cognitive effort scan"
+    },
+    "RECRUTEUR": {
+      "badge_color": "bg-violet-950/80 text-violet-400 border-violet-500/40",
+      "description": "Immersive interview simulator. One question at a time, natural prose. Zero bullets, zero bold."
+    }
+  },
+  "key_features_and_components": {
+    "session_context_panel": "Tabbed card containing Candidate CV summary, Job Description (Fiche de poste), Company Info (Entreprise), and Sector intelligence (Secteur). Allows inline editing/upload.",
+    "live_voice_analytics": {
+      "realtime_stt": "Live French speech-to-text transcript banner with waveform audio visualizer",
+      "gauges": "Stress level meter, Monotone index gauge, Speaking rate (mots/min), Voice Confidence % gauge"
+    },
+    "visual_logic_parser": {
+      "file_upload": "Image drag-and-drop zone for logical matrix tests or domino puzzles",
+      "response_format": "[RÉPONSE: X] bold badge output with breakdown of logic pattern"
+    },
+    "turn_counter_and_barge_in": {
+      "turn_badge": "Turn counter badge (Tour #X)",
+      "barge_in_button": "Red alert 'Interrompre / Reprendre la parole' button for instant candidate takeover"
+    },
+    "debug_overlay": {
+      "toggle": "Floating 'Mode DEBUG' switch",
+      "drawer": "Exposes raw state machine telemetry, LLM latency (ms), token consumption, STT raw buffer, and confidence scores"
+    },
+    "session_history": "Collapsible sidebar listing previous interview sessions with score summary, date, role title, and export options"
+  },
+  "image_urls": {
+    "job_interview_banner": "https://images.unsplash.com/photo-1521791136064-7986c2920216?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODh8MHwxfHNlYXJjaHwzfHxqb2IlMjBpbnRlcnZpZXd8ZW58MHx8fHwxNzkwNDQ1MjI2fDA&ixlib=rb-4.1.0&q=85",
+    "resume_reading": "https://images.unsplash.com/photo-1698047681432-006d2449c631?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODh8MHwxfHNlYXJjaHw0fHxqb2IlMjBpbnRlcnZpZXd8ZW58MHx8fHwxNzkwNDQ1MjI2fDA&ixlib=rb-4.1.0&q=85",
+    "candidate_interview_handshake": "https://images.unsplash.com/photo-1698047682091-782b1e5c6536?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODh8MHwxfHNlYXJjaHwyfHxqb2IlMjBpbnRlcnZpZXd8ZW58MHx8fHwxNzkwNDQ1MjI2fDA&ixlib=rb-4.1.0&q=85",
+    "recruiter_avatar_corporate": "https://images.unsplash.com/photo-1544723495-432537d12f6c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwxfHxjb3Jwb3JhdGUlMjBhdmF0YXIlMjBvZmZpY2V8ZW58MHx8fHwxNzkwNDQ1MjI2fDA&ixlib=rb-4.1.0&q=85"
+  },
+  "instructions_to_main_agent": [
+    "Read this design guidelines JSON before implementing front-end React code.",
+    "Implement the UI using Tailwind CSS, standard Lucide icons, and Shadcn UI components located at src/components/ui/.",
+    "Ensure all interactive elements have data-testid attributes (e.g. data-testid='mode-candidat-btn', data-testid='voice-input-toggle', data-testid='barge-in-btn').",
+    "Enforce French language throughout all user-facing labels, badges, buttons, tooltips, and placeholder text.",
+    "Implement the deterministic state machine transitions smoothly with visual feedback: NEUTRE -> CANDIDAT or RECRUTEUR.",
+    "In Mode CANDIDAT, enforce the 3-bullet constraint with progressive reveal (1->2->3) and bold keywords highlight styling.",
+    "Include real-time voice gauge simulation (stress, monotone, rate, confidence) with audio animation effects.",
+    "Provide image drag and drop for visual logic tests with immediate AI breakdown and [RÉPONSE: X] tag.",
+    "Provide a toggleable Debug overlay displaying real-time state machine logs and telemetry.",
+    "Preserve responsive layout with dark glassmorphism surfaces and crisp contrast."
+  ]
+},
+overwrite: true,
+path: "/app/design_guidelines.json"
+}
+}/*
+  Note: mcp_create_file writes the raw file content directly.
+*/
