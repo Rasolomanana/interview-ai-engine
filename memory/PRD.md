@@ -26,9 +26,15 @@
 - Gemini : gemini-3.8-flash / gemini-flash-latest / gemini-3.5-flash.
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
+## Fonctionnalités (2026-06-27)
+- ✅ Bouton unique **Live** (live-btn) : démarre l'écoute auto + ouvre la fenêtre flottante (PiP). Re-clic = arrête écoute + ferme flottant. Fermer le flottant (pagehide) arrête aussi l'écoute.
+- ✅ **Ton des réponses** : confiant / humble / technique / neutre (persistant, injecté dans le prompt candidat).
+- ✅ Correctif lint bloquant : `chrome` -> `globalThis.chrome` dans `storage.js` et `ext-bg.js` (0 erreur oxlint). Extension repackagée (446K, CSP MV3 propre, sans script distant).
+
 ## Vérifications
-- iteration_1..5 : 100% (state machine, deux providers, recap, écoute UI, style de réponse, flottant, pas d'overflow).
+- iteration_1..6 : 100% (state machine, deux providers, recap, écoute UI, style de réponse, flottant, Live+ton).
+- iteration_7 : 100% (5/5) — mode Serveur sans régression, persistance du ton, impact confiant vs humble, Live start/stop. Note : le trigger pagehide (fermeture flottant -> stop écoute) n'est pas pilotable en headless mais le handler code est correct (InterviewConsole.jsx l.285).
 
 ## Backlog (P1/P2)
 - P1 : détection auto « Gemini bloqué » -> bascule Serveur ; abort du récap à la fermeture.
-- P2 : audio de l'entretien enregistré/exporté ; scores ; refactor InterviewConsole (hooks usePip/useStream) ; warning React clé dupliquée (dev only).
+- P2 : audio de l'entretien enregistré/exporté ; scores ; refactor InterviewConsole (hooks usePip/useLive) ; accessibilité radiogroup/aria-pressed sur groupes de boutons (ton/style).
