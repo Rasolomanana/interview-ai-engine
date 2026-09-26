@@ -38,6 +38,9 @@ export default function InterviewConsole() {
   const controllerRef = useRef(null);
   const threadRef = useRef(null);
   const fileRef = useRef(null);
+  const streamInfoRef = useRef({ mode: "NEUTRE", modules: [] });
+
+  const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Math.random()));
 
   const refreshSessions = useCallback(async () => {
     const list = await api.listSessions();
@@ -66,7 +69,7 @@ export default function InterviewConsole() {
   const selectSession = async (id) => {
     const data = await api.getSession(id);
     setActive(data.session);
-    setMessages(data.messages.map((m) => ({ ...m, content: m.role === "user" ? cleanDisplay(m.content) || "(image)" : m.content })));
+    setMessages(data.messages.map((m) => ({ ...m, id: uid(), content: m.role === "user" ? cleanDisplay(m.content) || "(image)" : m.content })));
     setMeta({ resolved_state: data.session.state, prev_state: data.session.prev_state, tours: data.session.tours_sans_marqueur, modules: ["—"] });
     setPendingMode(null);
   };
@@ -129,9 +132,10 @@ export default function InterviewConsole() {
   const send = (rawText, displayText, img) => {
     if (!active || streaming.active) return;
     if (!rawText?.trim() && !img) return;
-    const userMsg = { role: "user", content: displayText ?? cleanDisplay(rawText) ?? "(image)", mode: active.state };
+    const userMsg = { id: uid(), role: "user", content: displayText ?? cleanDisplay(rawText) ?? "(image)", mode: active.state };
     setMessages((m) => [...m, userMsg]);
     setStreaming({ active: true, text: "", meta: null, mode: active.state });
+    streamInfoRef.current = { mode: active.state, modules: [] };
     setInput("");
     setImage(null);
     if (voice.listening) voice.stop();
@@ -149,16 +153,16 @@ export default function InterviewConsole() {
       {
         onMeta: (m) => {
           setMeta(m);
+          streamInfoRef.current = { mode: m.resolved_state, modules: m.modules || [] };
           setStreaming((s) => ({ ...s, meta: m, mode: m.resolved_state }));
           setActive((a) => ({ ...a, state: m.resolved_state, tours_sans_marqueur: m.tours }));
         },
         onDelta: (c) => setStreaming((s) => ({ ...s, text: s.text + c })),
         onDone: (full) => {
           setLatency(Date.now() - t0);
-          setStreaming((s) => {
-            setMessages((m) => [...m, { role: "assistant", content: full, mode: s.mode, modules: s.meta?.modules || [] }]);
-            return { active: false, text: "", meta: null, mode: s.mode };
-          });
+          const info = streamInfoRef.current;
+          setMessages((m) => [...m, { id: uid(), role: "assistant", content: full, mode: info.mode, modules: info.modules }]);
+          setStreaming({ active: false, text: "", meta: null, mode: info.mode });
           refreshSessions();
         },
         onError: (d) => {
@@ -222,8 +226,8 @@ export default function InterviewConsole() {
             {messages.length === 0 && !streamMsg && (
               <EmptyState onCandidat={() => { setPendingMode("CANDIDAT"); toast("Mode Candidat prêt — saisissez la question du recruteur"); }} onRecruteur={() => send("[MODE_SIMULATION] Démarre la simulation d'entretien.", "▶ Simulation démarrée")} />
             )}
-            {messages.map((m, i) => (
-              <MessageBubble key={i} msg={m} streaming={false} />
+            {messages.map((m) => (
+              <MessageBubble key={m.id} msg={m} streaming={false} />
             ))}
             {streamMsg && <MessageBubble msg={streamMsg} streaming />}
           </div>

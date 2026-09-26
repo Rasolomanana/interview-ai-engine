@@ -1,0 +1,30 @@
+{
+  "summary": "Backend (22/22 pytest passing): all 12 non-regression state-machine tests, counter forces NEUTRE at n=3, barge-in, session CRUD (create/list/get/update/reset/delete), SSE streaming with RECRUTEUR prose (no bullet/no bold) and CANDIDAT bullets (with **bold**, <=12 words each). State persists across turns. Frontend: app loads at NEUTRE, empty-state CTA buttons work, Mode Recruteur triggers RECRUTEUR badge + prose message, Context modal saves, debug-toggle-btn reveals debug-overlay, reset-btn returns to NEUTRE, new-session-btn creates new sidebar item, CANDIDAT flow renders bullets with bold. Turn counter + mode badge reflect state correctly.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "InterviewConsole (onDone)", "issue": "Assistant message appears DUPLICATED after streaming completes (6 candidate-bullet items instead of 3). setMessages([...m, assistant]) is nested inside setStreaming functional updater; React 18 StrictMode invokes functional updaters twice → duplicate insert. Also triggers 'Encountered two children with the same key' console errors from index-based keys.", "selector": "[data-testid^=candidate-bullet-]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Move setMessages([...m, assistant]) OUT of the setStreaming functional updater in InterviewConsole.jsx onDone handler; call it as a normal state update (or use a ref-guard) to avoid StrictMode double-execution duplicating messages.",
+    "Use stable message id (uuid) instead of array index as React key to avoid 'same key' warnings and mis-mounting."
+  ],
+  "critical_code_review_comments": [
+    "InterviewConsole.jsx onDone: nesting setMessages inside setStreaming updater is a React anti-pattern; functional updaters must be pure. Causes visible message duplication in StrictMode/dev.",
+    "MessageBubble list uses index `i` as key — brittle when list grows.",
+    "server.py update_session: after `s.update(update)`, returns a mongo dict validated as Session; if the stored doc misses fields it may raise. Currently OK but consider re-fetching.",
+    "server.py send_message: uses raw dict from Mongo for `s['state']` etc without Pydantic validation; acceptable but could benefit from a helper.",
+    "prompt.build_turn_message includes history but not filtered by role/mode; consider truncating long CV strings for token safety."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100%", "frontend": "90% (1 duplication bug)"},
+  "test_credentials": "N/A (no auth)",
+  "seed_data_creation": "Test sessions prefixed TEST_ created and cleaned up during pytest fixture teardown.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest at /app/backend/tests/backend_test.py is stable and covers state machine + SSE. Frontend duplication bug is deterministic in dev StrictMode; after fix re-run playwright candidate flow and expect exactly 3 candidate-bullet-* items."
+}
