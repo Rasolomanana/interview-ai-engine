@@ -71,8 +71,15 @@ export async function resetSession(id) {
   return { ok: true, state: "NEUTRE" };
 }
 
+const ALLOWED_MODELS = [
+  "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash",
+  "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.1-pro-preview",
+];
+
 export async function getSettings() {
-  return store.get("settings", { geminiKey: "", model: "gemini-2.5-flash" });
+  const s = await store.get("settings", { geminiKey: "", model: "gemini-3.8-flash" });
+  if (!s.model || !ALLOWED_MODELS.includes(s.model)) s.model = "gemini-3.8-flash";
+  return s;
 }
 export async function saveSettings(s) {
   await store.set("settings", s);
@@ -130,7 +137,7 @@ export function streamMessage(sessionId, body, handlers) {
       let full = "";
       await streamGemini({
         apiKey: settings.geminiKey,
-        model: settings.model || "gemini-2.5-flash",
+        model: settings.model || "gemini-3.8-flash",
         systemMessage,
         userText: turnMessage,
         imageDataUrl: body.image_base64,

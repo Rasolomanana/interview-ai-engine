@@ -3,19 +3,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck } from "lucide-react";
 
 const MODELS = [
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (rapide · gratuit)" },
-  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (qualité max)" },
-  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (rapide · gratuit)" },
+  { id: "gemini-flash-latest", label: "Gemini Flash (toujours à jour)" },
+  { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
 ];
 
 export default function SettingsPanel({ open, settings, onClose, onSave }) {
   const [key, setKey] = useState("");
-  const [model, setModel] = useState("gemini-2.5-flash");
+  const [model, setModel] = useState("gemini-3.8-flash");
 
   useEffect(() => {
     if (open) {
       setKey(settings?.geminiKey || "");
-      setModel(settings?.model || "gemini-2.5-flash");
+      setModel(settings?.model || "gemini-3.8-flash");
     }
   }, [open, settings]);
 
