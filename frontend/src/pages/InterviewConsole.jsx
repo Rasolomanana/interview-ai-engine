@@ -3,12 +3,13 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Send, Mic, MicOff, ImagePlus, X, Zap, RotateCcw, SlidersHorizontal,
-  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle,
+  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound,
 } from "lucide-react";
 import * as api from "@/lib/api";
 import { useVoice } from "@/lib/useVoice";
 import SessionSidebar from "@/components/console/SessionSidebar";
 import ContextPanel from "@/components/console/ContextPanel";
+import SettingsPanel from "@/components/console/SettingsPanel";
 import VoicePanel from "@/components/console/VoicePanel";
 import MessageBubble from "@/components/console/MessageBubble";
 
@@ -32,6 +33,8 @@ export default function InterviewConsole() {
   const [image, setImage] = useState(null);
   const [pendingMode, setPendingMode] = useState(null);
   const [ctxOpen, setCtxOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-2.5-flash" });
   const [creating, setCreating] = useState(false);
 
   const voice = useVoice();
@@ -39,6 +42,7 @@ export default function InterviewConsole() {
   const threadRef = useRef(null);
   const fileRef = useRef(null);
   const streamInfoRef = useRef({ mode: "NEUTRE", modules: [] });
+  const initRef = useRef(false);
 
   const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Math.random()));
 
@@ -49,7 +53,12 @@ export default function InterviewConsole() {
   }, []);
 
   useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
     (async () => {
+      const st = await api.getSettings();
+      setSettings(st);
+      if (!st.geminiKey) setSettingsOpen(true);
       const list = await refreshSessions();
       if (list.length) selectSession(list[0].id);
       else await handleNew();
@@ -68,6 +77,7 @@ export default function InterviewConsole() {
 
   const selectSession = async (id) => {
     const data = await api.getSession(id);
+    if (!data.session) return;
     setActive(data.session);
     setMessages(data.messages.map((m) => ({ ...m, id: uid(), content: m.role === "user" ? cleanDisplay(m.content) || "(image)" : m.content })));
     setMeta({ resolved_state: data.session.state, prev_state: data.session.prev_state, tours: data.session.tours_sans_marqueur, modules: ["—"] });
@@ -123,6 +133,13 @@ export default function InterviewConsole() {
     toast("État réinitialisé → NEUTRE");
   };
 
+  const saveSettingsHandler = async (s) => {
+    const saved = await api.saveSettings(s);
+    setSettings(saved);
+    setSettingsOpen(false);
+    toast.success(saved.geminiKey ? "Clé Gemini enregistrée" : "Réglages enregistrés");
+  };
+
   const bargeIn = () => {
     if (!streaming.active) return;
     controllerRef.current?.abort();
@@ -132,6 +149,11 @@ export default function InterviewConsole() {
   const send = (rawText, displayText, img) => {
     if (!active || streaming.active) return;
     if (!rawText?.trim() && !img) return;
+    if (!settings.geminiKey) {
+      toast.error("Ajoutez votre clé API Gemini (gratuite) dans Réglages");
+      setSettingsOpen(true);
+      return;
+    }
     const userMsg = { id: uid(), role: "user", content: displayText ?? cleanDisplay(rawText) ?? "(image)", mode: active.state };
     setMessages((m) => [...m, userMsg]);
     setStreaming({ active: true, text: "", meta: null, mode: active.state });
@@ -215,6 +237,7 @@ export default function InterviewConsole() {
               </span>
             </div>
             <div className="flex items-center gap-1.5">
+              <HeaderBtn onClick={() => setSettingsOpen(true)} testid="open-settings-btn" icon={<KeyRound className="h-4 w-4" />} label="Réglages" active={!settings.geminiKey} />
               <HeaderBtn onClick={() => setCtxOpen(true)} testid="open-context-btn" icon={<SlidersHorizontal className="h-4 w-4" />} label="Contexte" />
               <HeaderBtn onClick={toggleDebug} testid="debug-toggle-btn" icon={<Bug className="h-4 w-4" />} label="Debug" active={active?.debug} />
               <HeaderBtn onClick={doReset} testid="reset-btn" icon={<RotateCcw className="h-4 w-4" />} label="Reset" />
@@ -320,6 +343,7 @@ export default function InterviewConsole() {
       </div>
 
       <ContextPanel open={ctxOpen} session={active} onClose={() => setCtxOpen(false)} onSave={saveContext} />
+      <SettingsPanel open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)} onSave={saveSettingsHandler} />
     </div>
   );
 }

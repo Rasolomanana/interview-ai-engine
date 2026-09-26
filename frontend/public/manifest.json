@@ -12,8 +12,7 @@
   },
   "permissions": ["storage"],
   "host_permissions": [
-    "https://*.emergentagent.com/*",
-    "https://*.emergent.host/*"
+    "https://generativelanguage.googleapis.com/*"
   ],
   "icons": {
     "16": "icons/icon-16.png",
