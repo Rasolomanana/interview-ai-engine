@@ -12,7 +12,7 @@ export default function AutoListenBar({ listen, onGenerate }) {
     <div className="border-t border-white/[0.06] px-4 py-2.5" data-testid="auto-listen-bar">
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-slate-400">
-          <Headphones className="h-3.5 w-3.5 text-indigo-400" /> Écoute auto
+          <Headphones className="h-3.5 w-3.5 text-indigo-400" /> Écoute auto <span className="text-slate-600 normal-case">— capte le recruteur</span>
         </span>
 
         {!active ? (
@@ -46,7 +46,7 @@ export default function AutoListenBar({ listen, onGenerate }) {
 
       <div className="mt-2">
           <div className="mb-1 flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-500">Question captée (modifiable · redimensionnable ↕)</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-500">Question captée du recruteur (modifiable · redimensionnable ↕)</span>
             {transcript && (
               <button data-testid="listen-clear-btn" onClick={clearTranscript} className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[11px] text-slate-400 hover:text-white">
                 <Eraser className="h-3 w-3" /> Effacer

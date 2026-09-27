@@ -391,6 +391,9 @@ export default function InterviewConsole() {
 
           {/* Composer */}
           <div className="border-t border-white/[0.06] px-4 py-3">
+            <div className="mb-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-slate-500" data-testid="composer-label">
+              <Send className="h-3 w-3 text-indigo-400" /> Votre saisie — tapez ou dictez (micro vert), puis « Envoyer »
+            </div>
             {pendingMode === "CANDIDAT" && (
               <div className="mb-2 flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-1.5 text-xs text-emerald-300">
                 <ClipboardList className="h-3.5 w-3.5" /> Mode Candidat — saisissez la question posée par le recruteur.
@@ -434,10 +437,10 @@ export default function InterviewConsole() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitInput(); } }}
-                rows={1}
+                rows={2}
                 data-testid="message-input"
                 placeholder={state === "RECRUTEUR" ? "Votre réponse au recruteur…" : "Question du recruteur à traiter…"}
-                className="max-h-32 flex-1 resize-none rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-[15px] text-slate-100 outline-none transition-colors placeholder:text-slate-600 focus:border-indigo-500/60"
+                className="min-h-[48px] max-h-40 flex-1 resize-y rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-[15px] leading-relaxed text-slate-100 outline-none transition-colors placeholder:text-slate-600 focus:border-indigo-500/60"
               />
 
               {streaming.active ? (
