@@ -1,6 +1,15 @@
 # PRD — Copilote Entretien IA
 
-## Fix DÉFINITIF (juin 2026) — 502 / "Analyse incomplète" : JOB + POLLING
+## Fix DÉFINITIF (juin 2026) — Question parasite NEUTRE "simuler ou aider ?" éliminée
+- Symptôme récurrent : coller/saisir une question du recruteur en session neuve (état NEUTRE) faisait répondre le copilote par « Souhaitez-vous que je joue le recruteur en simulation ou que je vous aide à répondre ? » au lieu de générer une réponse.
+- Cause racine : entrée libre sans marqueur en NEUTRE → l'état restait NEUTRE → reminder de clarification. Les correctifs précédents ne visaient qu'une variante du message.
+- Fix SOURCE UNIQUE dans `stateMachine.js` (§4.5) : si l'état résolu est NEUTRE, sans reset, et que le texte est substantiel (≥ 4 mots, pas un simple accusé « ok/oui »), on force CANDIDAT (copilote par défaut = aider à répondre). Couvre TOUTES les voies d'entrée (composer, Live, auto-listen, futures). La simulation reste opt-in via les marqueurs explicites [MODE_SIMULATION]/"simule un entretien"/boutons.
+- Vérifié navigateur : question recruteur saisie en session neuve → ÉTAT RÉSOLU CANDIDAT, réponse complète en 6 puces ancrées dans le poste, plus AUCUNE question méta.
+
+## Fix (juin 2026) — Récap qui se coupe (Gemini 503/429)
+- `streamRaw` (récap) : ajout du repli automatique vers le mode Serveur si Gemini échoue avant tout contenu (503 surcharge / 429 quota). Toast d'info. Chemin serveur vérifié (récap complet).
+
+
 - Le streaming SSE ne suffisait pas : une connexion unique de ~40s est tronquée par les proxys d'entreprise / passerelles (échec récurrent 3x).
 - Backend : POST /api/analyze-application crée un job (Mongo `analysis_jobs`), lance `asyncio.create_task(_run_application_analysis)`, renvoie `{job_id}` immédiatement. GET /api/analyze-application/{job_id} → `{status, result, error}`. Le worker fait fetch site + LLM (Claude→OpenAI→DeepSeek) + parse JSON puis persiste.
 - Client `analyzeApplication` : POST puis polling toutes les 2s (requêtes <1s), tolérant aux coupures, timeout global 3 min → immunisé contre tout timeout de connexion longue.

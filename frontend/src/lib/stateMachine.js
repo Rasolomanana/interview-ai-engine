@@ -100,6 +100,14 @@ export function resolve({
   if (current_state === RECRUTEUR && !hasRecr && !reset) {
     if (isCandidateTone(text) && state !== NEUTRE) { state = CANDIDAT; modules.push("TM5"); trace.push("§8 TM5 : ton candidat en RECRUTEUR → CANDIDAT"); }
   }
+  // COPILOTE PAR DÉFAUT — ne JAMAIS retomber sur la question méta "simuler ou aider ?".
+  // Toute entrée substantielle (une vraie question/phrase) en NEUTRE signifie que
+  // l'utilisateur veut de l'aide pour répondre → on force CANDIDAT. La simulation
+  // reste opt-in via les marqueurs explicites ([MODE_SIMULATION], "simule un entretien"…).
+  if (state === NEUTRE && !reset && !isShortAck(text) && wordCount(text) >= 4) {
+    state = CANDIDAT;
+    trace.push("§4.5 NEUTRE + contenu substantiel → CANDIDAT (copilote par défaut)");
+  }
   // TM6 — voice
   const vmod = voiceModule(state, voice_confidence, state_candidat);
   if (vmod) { modules.push(vmod); trace.push(`§9 TM6 : module voix ${vmod} actif (conf>=0.7)`); }
