@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Analyse du site entreprise** (`/api/analyze-company`) : dans le Contexte, un champ URL + bouton « Analyser le site » récupère la page (httpx + BeautifulSoup) et l'IA produit une fiche — VALEURS & CULTURE, MISSION & PRIORITÉS, QUESTIONS D'ENTRETIEN PROBABLES (adaptées au poste) — injectée dans « Info entreprise ». Vérifié par curl (careers.rtx.com) + screenshot. Dép. ajoutée : beautifulsoup4.
+- ✅ **Transcript éditable** (AutoListenBar) : la question captée par l'Écoute Auto est désormais un `<textarea>` modifiable (corriger/supprimer mots ou tout le texte) + bouton **« Effacer »** (listen-clear-btn) pour vider instantanément. « Générer la réponse » utilise le texte corrigé.
+- ✅ **Analyse site + réponses STAR prêtes** (`/api/analyze-company`) : sections VALEURS & CULTURE, MISSION & PRIORITÉS, QUESTIONS PROBABLES, et **RÉPONSES STAR PRÊTES** — pour les 4 questions clés, une réponse STAR complète ancrée dans le CV (transmis) ET reliée explicitement aux valeurs (sécurité, innovation, collaboration) pour montrer les recherches. Vérifié par curl E2E (RTX + CV → STAR personnalisé chiffré).
 - ✅ **Méthode STAR** (toggle Réglages, activé par défaut) : structure les réponses aux questions comportementales en Situation/Tâche/Action/Résultat.
 - ✅ **Fix qualité réponses candidat (mode « Phrases complètes »)** : le prompt génère une VRAIE réponse d'entretien complète et cohérente (4 à 6 phrases fluides), répond à TOUTES les parties de la question, ancrée CV+poste+entreprise.
 - ✅ Bouton unique **Live** (live-btn) : démarre l'écoute auto + ouvre la fenêtre flottante (PiP). Re-clic = arrête écoute + ferme flottant. Fermer le flottant (pagehide) arrête aussi l'écoute.

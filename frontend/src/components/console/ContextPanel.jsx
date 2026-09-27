@@ -37,6 +37,7 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
       await analyzeCompany({
         url,
         poste: form.poste,
+        cv: form.cv,
         onDelta: (c) => setForm((f) => ({ ...f, entreprise: f.entreprise + c })),
       });
       toast.success("Site analysé — valeurs & questions ajoutées");

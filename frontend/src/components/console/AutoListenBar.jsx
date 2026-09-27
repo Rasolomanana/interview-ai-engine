@@ -1,8 +1,8 @@
-import { Headphones, MonitorSpeaker, Mic, Square, Loader2, Send, Zap } from "lucide-react";
+import { Headphones, MonitorSpeaker, Mic, Square, Loader2, Zap, Eraser } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AutoListenBar({ listen, onGenerate }) {
-  const { active, source, transcript, busy, auto, setAuto, start, stop, supported } = listen;
+  const { active, source, transcript, busy, auto, setAuto, start, stop, supported, setTranscript } = listen;
 
   const startSrc = async (src) => {
     try { await start(src); } catch (e) { toast.error(e.message); }
@@ -45,15 +45,28 @@ export default function AutoListenBar({ listen, onGenerate }) {
       </div>
 
       {(active || transcript) && (
-        <div className="mt-2 flex items-start gap-2">
-          <div className="flex-1 rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 text-sm text-slate-300" data-testid="listen-transcript">
-            {transcript || <span className="text-slate-600">En attente de la question du recruteur…</span>}
+        <div className="mt-2">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-500">Question captée (modifiable)</span>
+            {transcript && (
+              <button data-testid="listen-clear-btn" onClick={() => setTranscript("")} className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[11px] text-slate-400 hover:text-white">
+                <Eraser className="h-3 w-3" /> Effacer
+              </button>
+            )}
           </div>
-          {transcript && (
-            <button data-testid="listen-generate-btn" onClick={() => onGenerate(transcript)} className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-400">
+          <div className="flex items-start gap-2">
+            <textarea
+              data-testid="listen-transcript"
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              rows={2}
+              placeholder="En attente de la question du recruteur… (corrigez ou effacez le texte capté ici)"
+              className="flex-1 resize-none rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-indigo-500/40"
+            />
+            <button data-testid="listen-generate-btn" onClick={() => onGenerate(transcript)} disabled={!transcript.trim()} className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-40">
               <Zap className="h-3.5 w-3.5" /> Générer la réponse
             </button>
-          )}
+          </div>
         </div>
       )}
     </div>

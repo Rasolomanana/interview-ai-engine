@@ -107,6 +107,7 @@ class GenerateRequest(BaseModel):
 class CompanyAnalyzeRequest(BaseModel):
     url: str
     poste: str = ""
+    cv: str = ""
 
 
 # ----------------------------- Helpers -----------------------------
@@ -276,21 +277,30 @@ async def analyze_company(req: CompanyAnalyzeRequest):
         raise HTTPException(status_code=422, detail="Page trop pauvre en texte (site dynamique ?). Collez le contenu manuellement.")
 
     poste_line = f"Poste visé par le candidat : {req.poste}\n" if req.poste else ""
+    cv_block = f"\nPROFIL / CV DU CANDIDAT (utilise-le pour personnaliser les réponses STAR) :\n{req.cv[:4000]}\n" if req.cv.strip() else ""
     system_message = (
-        "Tu es un expert senior en recrutement. À partir du contenu d'une page carrière/entreprise, "
-        "tu prépares une fiche de préparation d'entretien concise et actionnable, en français."
+        "Tu es un expert senior en recrutement et coach d'entretien. À partir du contenu d'une page "
+        "carrière/entreprise, tu prépares une fiche actionnable en français : tu identifies les valeurs, "
+        "puis tu rédiges des réponses d'entretien prêtes à dire, avec la méthode STAR, ancrées dans ces valeurs."
     )
     user_text = (
-        f"URL analysée : {url}\nTitre de la page : {title}\n{poste_line}\n"
+        f"URL analysée : {url}\nTitre de la page : {title}\n{poste_line}{cv_block}\n"
         f"CONTENU EXTRAIT DU SITE :\n{text}\n\n"
-        "Produis une fiche STRUCTURÉE en français, concise (puces courtes), avec EXACTEMENT ces sections :\n"
-        "**VALEURS & CULTURE** : les valeurs et la culture de l'entreprise (5-7 puces).\n"
-        "**MISSION & PRIORITÉS** : mission, priorités et ce qui compte pour eux (3-5 puces).\n"
-        "**QUESTIONS D'ENTRETIEN PROBABLES** : 8 à 10 questions que le recruteur pourrait poser, "
-        "ancrées dans ces valeurs (comportementales et sur les valeurs). "
-        + ("Adapte-les au poste visé. " if req.poste else "")
-        + "Base-toi sur le contenu extrait ; complète prudemment avec ta connaissance de l'entreprise "
-        "sans inventer de faits chiffrés précis."
+        "Produis une fiche STRUCTURÉE en français, concise, avec EXACTEMENT ces sections :\n\n"
+        "## VALEURS & CULTURE\n(5-7 puces : valeurs et culture de l'entreprise — ex. sécurité, innovation, collaboration…)\n\n"
+        "## MISSION & PRIORITÉS\n(3-5 puces : mission, priorités, ce qui compte pour eux)\n\n"
+        "## QUESTIONS D'ENTRETIEN PROBABLES\n(6 à 8 questions que le recruteur pourrait poser, ancrées dans ces valeurs, "
+        "comportementales et sur les valeurs" + (", adaptées au poste visé" if req.poste else "") + ")\n\n"
+        "## RÉPONSES STAR PRÊTES\n"
+        "Pour les 4 questions les plus probables ci-dessus, rédige une réponse COMPLÈTE prête à dire, "
+        "structurée avec la méthode STAR (puces préfixées **Situation :**, **Tâche :**, **Action :**, **Résultat :** "
+        "avec un impact chiffré ou concret). CHAQUE réponse doit démontrer que le candidat a fait des recherches "
+        "sur l'entreprise : relie-la EXPLICITEMENT à une valeur/mission de l'entreprise (sécurité, innovation, "
+        "collaboration, etc.). "
+        + ("Ancre chaque réponse dans le CV réel du candidat fourni ci-dessus (expériences, chiffres). "
+           if req.cv.strip() else "Utilise des exemples génériques mais crédibles pour le poste. ")
+        + "Format : « **Q1 : <la question>** » puis les 4 puces STAR.\n\n"
+        "Base-toi sur le contenu extrait ; complète prudemment avec ta connaissance de l'entreprise sans inventer de faits chiffrés précis."
     )
 
     async def gen():

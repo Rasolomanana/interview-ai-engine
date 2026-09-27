@@ -32,11 +32,11 @@ export async function transcribeBlob(blob) {
 }
 
 // Analyze a company / careers URL -> streamed briefing (values, culture, likely questions).
-export async function analyzeCompany({ url, poste, onDelta, signal }) {
+export async function analyzeCompany({ url, poste, cv, onDelta, signal }) {
   const resp = await fetch(`${BACKEND_URL}/api/analyze-company`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, poste: poste || "" }),
+    body: JSON.stringify({ url, poste: poste || "", cv: cv || "" }),
     signal,
   });
   if (!resp.ok) {
