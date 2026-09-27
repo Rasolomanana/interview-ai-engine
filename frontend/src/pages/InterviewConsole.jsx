@@ -213,7 +213,7 @@ export default function InterviewConsole() {
   const submitInput = () => {
     let raw = input;
     let display = cleanDisplay(input) || "(image)";
-    if (pendingMode === "CANDIDAT" && !/\[/.test(input)) {
+    if ((pendingMode === "CANDIDAT" || active?.state === "CANDIDAT") && !/\[/.test(input)) {
       raw = "[REPONSE_ORALE] " + input;
       setPendingMode(null);
     }
