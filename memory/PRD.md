@@ -27,7 +27,9 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Robustesse candidat (anti-question + bruit)** : le copilote ne demande PLUS jamais quel format/style utiliser (règle CANDIDAT_ROBUSTNESS + garde-fou système) et répond toujours de façon complète/cohérente. Questions bruitées/mal transcrites → il extrait les mots-clés et répond quand même ; question totalement incompréhensible → phrase unique « Je suis désolé, j'ai mal compris la question — pourriez-vous la reformuler ? ». Vérifié par curl E2E (2 cas).
+- ✅ **Cadre « Question captée » redimensionnable** (`resize: vertical`, min 56px / max 288px) — l'utilisateur ajuste la hauteur à la main pour voir tout le texte capté. Label : « modifiable · redimensionnable ↕ ». Vérifié (CSS + screenshot).
+- ✅ **Version courte polie si question incomprise** : rule (4) renvoie 2 courtes phrases (≤15 mots) préfixées « [À DIRE] » à dire au recruteur pour demander de reformuler. Vérifié curl E2E.
+- ✅ **Robustesse candidat (anti-question + bruit)** : ne demande plus jamais le format, extrait les mots-clés des questions bruitées.
 - ✅ **Bug corrigé — vidage auto de la question captée** (testing_agent iteration_8, 4/4).
 - ✅ **Panneau Analyse vocale fixe (sticky)** : reste épinglé à l'écran pendant le scroll.
 - ✅ **Transcript éditable + toujours visible** (AutoListenBar) : champ modifiable affiché en permanence (taper/coller/corriger/effacer) + bouton « Effacer ».
