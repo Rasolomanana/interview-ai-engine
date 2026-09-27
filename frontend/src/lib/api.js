@@ -57,18 +57,46 @@ export async function transcribeBlob(blob) {
 }
 
 // Full recruiter-grade analysis: ATS CV + score + gaps + missing keywords + red flags + company.
-export async function analyzeApplication({ cv, poste, url }) {
+// Streamed (SSE) so a 40-70s LLM run never trips the gateway idle timeout (502).
+export async function analyzeApplication({ cv, poste, url, onProgress, signal }) {
   const resp = await fetch(`${BACKEND_URL}/api/analyze-application`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cv: cv || "", poste: poste || "", url: url || "" }),
+    signal,
   });
   if (!resp.ok) {
     let d = "";
     try { d = (await resp.json())?.detail || ""; } catch (e) { /* ignore */ }
     throw new Error(d || `Erreur ${resp.status}`);
   }
-  return resp.json();
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  let result = null;
+  let errMsg = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const events = buf.split("\n\n");
+    buf = events.pop();
+    for (const chunk of events) {
+      let ev = "message"; let data = "";
+      for (const l of chunk.split("\n")) {
+        if (l.startsWith("event:")) ev = l.slice(6).trim();
+        else if (l.startsWith("data:")) data += l.slice(5).trim();
+      }
+      if (!data) continue;
+      const p = JSON.parse(data);
+      if (ev === "progress") onProgress?.();
+      else if (ev === "result") result = p;
+      else if (ev === "error") errMsg = p.detail || "Erreur serveur";
+    }
+  }
+  if (errMsg) throw new Error(errMsg);
+  if (!result) throw new Error("Analyse incomplète");
+  return result;
 }
 
 // Analyze a company / careers URL -> streamed briefing (values, culture, likely questions).

@@ -374,29 +374,89 @@ async def analyze_application(req: ApplicationAnalyzeRequest):
         "}\n"
         "Le JSON doit être parsable directement."
     )
-    raw = (await _generate_text(system_message, user_text)).strip()
-    # Strip accidental markdown fences.
-    if raw.startswith("```"):
-        raw = raw.strip("`")
-        if raw[:4].lower() == "json":
-            raw = raw[4:]
     import json as _json
     import re as _re
-    try:
-        data = _json.loads(raw)
-    except Exception:
-        m = _re.search(r"\{.*\}", raw, _re.DOTALL)
-        if not m:
-            raise HTTPException(status_code=502, detail="Réponse d'analyse illisible")
-        data = _json.loads(m.group(0))
-    return {
-        "ats_cv": str(data.get("ats_cv", "")),
-        "score": int(data.get("score", 0)) if str(data.get("score", "")).strip().isdigit() else data.get("score", 0),
-        "gaps": data.get("gaps", []),
-        "missing_keywords": data.get("missing_keywords", []),
-        "red_flags": data.get("red_flags", []),
-        "company": str(data.get("company", "")),
-    }
+
+    def _parse(raw: str):
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.strip("`")
+            if raw[:4].lower() == "json":
+                raw = raw[4:]
+        try:
+            return _json.loads(raw)
+        except Exception:
+            m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+            if not m:
+                return None
+            return _json.loads(m.group(0))
+
+    async def gen():
+        """Stream raw deltas (keeps the gateway connection alive so a 40-70s
+        LLM run never trips the ingress idle timeout -> 502), then emit the
+        parsed structured JSON as a final 'result' event."""
+        acc = []
+        emitted = False
+        errors = []
+        if EMERGENT_LLM_KEY:
+            for provider, model in SERVER_CHAIN:
+                try:
+                    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
+                    async for ev in chat.stream_message(UserMessage(text=user_text)):
+                        if isinstance(ev, TextDelta):
+                            emitted = True
+                            acc.append(ev.content)
+                            yield _sse("progress", {})
+                        elif isinstance(ev, StreamDone):
+                            break
+                    if emitted:
+                        break
+                except Exception as e:  # noqa: BLE001
+                    errors.append(f"{provider}: {str(e)[:160]}")
+                    logger.warning("analyze provider %s failed: %s", provider, e)
+                    if emitted:
+                        break
+        if not emitted and DEEPSEEK_API_KEY:
+            try:
+                from openai import AsyncOpenAI
+                ds = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
+                stream = await ds.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=[{"role": "system", "content": system_message}, {"role": "user", "content": user_text}],
+                    stream=True,
+                )
+                async for chunk in stream:
+                    delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
+                    if delta:
+                        emitted = True
+                        acc.append(delta)
+                        yield _sse("progress", {})
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"deepseek: {str(e)[:160]}")
+                logger.exception("deepseek analyze failed")
+
+        raw = "".join(acc).strip()
+        if not raw:
+            yield _sse("error", {"detail": "Analyse indisponible (fournisseurs LLM). " + " | ".join(errors[-2:])})
+            yield _sse("done", {})
+            return
+        data = _parse(raw)
+        if data is None:
+            yield _sse("error", {"detail": "Réponse d'analyse illisible"})
+            yield _sse("done", {})
+            return
+        yield _sse("result", {
+            "ats_cv": str(data.get("ats_cv", "")),
+            "score": int(data.get("score", 0)) if str(data.get("score", "")).strip().isdigit() else data.get("score", 0),
+            "gaps": data.get("gaps", []),
+            "missing_keywords": data.get("missing_keywords", []),
+            "red_flags": data.get("red_flags", []),
+            "company": str(data.get("company", "")),
+        })
+        yield _sse("done", {})
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @api_router.post("/analyze-company")
