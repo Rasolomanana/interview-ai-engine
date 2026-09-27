@@ -10,6 +10,11 @@ const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now())
 const now = () => new Date().toISOString();
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
+// Once Gemini has failed/hung in this browsing session, stop trying it and go
+// straight to the reliable Server provider — so a live interview never eats a
+// repeated 9s timeout on every turn.
+let geminiUnavailable = false;
+
 import * as pdfjsLib from "pdfjs-dist";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ""}/pdf.worker.min.js`;
@@ -137,12 +142,7 @@ export async function analyzeCompany({ url, poste, cv, onDelta, signal }) {
 // to the managed Server provider so the recap always completes.
 export async function streamRaw({ systemMessage, userText, onDelta, onFallback, signal }) {
   const settings = await getSettings();
-  if (settings.provider === "server") {
-    await streamServer({ systemMessage, userText, signal, onDelta });
-    return;
-  }
-  if (!settings.geminiKey) {
-    // No Gemini key configured — just use the Server provider.
+  if (settings.provider === "server" || geminiUnavailable || !settings.geminiKey) {
     await streamServer({ systemMessage, userText, signal, onDelta });
     return;
   }
@@ -152,6 +152,7 @@ export async function streamRaw({ systemMessage, userText, onDelta, onFallback, 
     await streamGemini({ apiKey: settings.geminiKey, model: settings.model || "gemini-3.8-flash", systemMessage, userText, signal, onDelta: wrapped });
   } catch (err) {
     if (!emitted && err.name !== "AbortError") {
+      geminiUnavailable = true;
       onFallback?.(String(err?.message || ""));
       await streamServer({ systemMessage, userText, signal, onDelta });
     } else {
@@ -278,7 +279,7 @@ export function streamMessage(sessionId, body, handlers) {
 
       if ((resolved.modules || [])[0] === "BARGE_IN") { handlers.onDone?.(""); return; }
 
-      const useServer = settings.provider === "server";
+      const useServer = settings.provider === "server" || geminiUnavailable;
       if (!useServer && !settings.geminiKey) {
         handlers.onError?.("Clé API Gemini manquante. Ouvrez Réglages (ou choisissez le mode Serveur).");
         return;
@@ -310,6 +311,7 @@ export function streamMessage(sessionId, body, handlers) {
           });
         } catch (err) {
           if (!emitted && err.name !== "AbortError") {
+            geminiUnavailable = true;
             handlers.onFallback?.(String(err?.message || ""));
             full = "";
             await streamServer({ systemMessage, userText: turnMessage, imageDataUrl: body.image_base64, signal: controller.signal, onDelta });

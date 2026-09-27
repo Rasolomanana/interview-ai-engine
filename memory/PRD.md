@@ -1,6 +1,13 @@
 # PRD — Copilote Entretien IA
 
-## Fix DÉFINITIF (juin 2026) — Question parasite NEUTRE "simuler ou aider ?" éliminée
+## Fix DÉFINITIF (juin 2026) — Blocage Gemini en début d'entretien (réseau bloque Google)
+- Symptôme : en mode Gemini, la 1re génération « bloquait » ; passer en Serveur (sans clé) débloquait.
+- Cause racine : `gemini.js` n'avait AUCUN timeout. Un réseau d'entreprise qui bloque Google en laissant la connexion pendante (sans erreur) fige `fetch` indéfiniment → le repli auto (déclenché par une erreur) ne partait jamais.
+- Fix 1 — chien de garde `gemini.js` : timeout « temps jusqu'au 1er token » de 9s. Sans réponse, on abandonne via une erreur normale (non-AbortError) → `streamMessage`/`streamRaw` basculent automatiquement sur le Serveur. Le barge-in utilisateur reste distingué (AbortError).
+- Fix 2 — mémoire de session `api.js` (`geminiUnavailable`) : dès le 1er échec/timeout Gemini, tous les tours suivants passent DIRECTEMENT au Serveur (plus jamais d'attente de 9s en plein entretien). Réinitialisé au rechargement.
+- Vérifié navigateur : clé Gemini invalide → toast « Gemini indisponible — bascule automatique sur le mode Serveur » + réponse STAR générée immédiatement, état CANDIDAT.
+
+
 - Symptôme récurrent : coller/saisir une question du recruteur en session neuve (état NEUTRE) faisait répondre le copilote par « Souhaitez-vous que je joue le recruteur en simulation ou que je vous aide à répondre ? » au lieu de générer une réponse.
 - Cause racine : entrée libre sans marqueur en NEUTRE → l'état restait NEUTRE → reminder de clarification. Les correctifs précédents ne visaient qu'une variante du message.
 - Fix SOURCE UNIQUE dans `stateMachine.js` (§4.5) : si l'état résolu est NEUTRE, sans reset, et que le texte est substantiel (≥ 4 mots, pas un simple accusé « ok/oui »), on force CANDIDAT (copilote par défaut = aider à répondre). Couvre TOUTES les voies d'entrée (composer, Live, auto-listen, futures). La simulation reste opt-in via les marqueurs explicites [MODE_SIMULATION]/"simule un entretien"/boutons.
