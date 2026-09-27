@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Transcript éditable** (AutoListenBar) : la question captée par l'Écoute Auto est désormais un `<textarea>` modifiable (corriger/supprimer mots ou tout le texte) + bouton **« Effacer »** (listen-clear-btn) pour vider instantanément. « Générer la réponse » utilise le texte corrigé.
+- ✅ **Panneau Analyse vocale fixe (sticky)** : le panneau droit (Analyse vocale + Inspecteur d'état) reste épinglé à l'écran pendant le scroll (`lg:sticky lg:top-4 lg:self-start`, scroll interne si trop haut) — il ne disparaît plus. Vérifié (position:sticky, 0 overflow). NB : masqué sous 1024px (vue étroite / side panel).
+- ✅ **Transcript éditable + toujours visible** (AutoListenBar) : champ modifiable affiché en permanence (taper/coller/corriger/effacer) + bouton « Effacer ».
 - ✅ **Analyse site + réponses STAR prêtes** (`/api/analyze-company`) : sections VALEURS & CULTURE, MISSION & PRIORITÉS, QUESTIONS PROBABLES, et **RÉPONSES STAR PRÊTES** — pour les 4 questions clés, une réponse STAR complète ancrée dans le CV (transmis) ET reliée explicitement aux valeurs (sécurité, innovation, collaboration) pour montrer les recherches. Vérifié par curl E2E (RTX + CV → STAR personnalisé chiffré).
 - ✅ **Méthode STAR** (toggle Réglages, activé par défaut) : structure les réponses aux questions comportementales en Situation/Tâche/Action/Résultat.
 - ✅ **Fix qualité réponses candidat (mode « Phrases complètes »)** : le prompt génère une VRAIE réponse d'entretien complète et cohérente (4 à 6 phrases fluides), répond à TOUTES les parties de la question, ancrée CV+poste+entreprise.

@@ -453,7 +453,7 @@ export default function InterviewConsole() {
         </div>
 
         {/* RIGHT */}
-        <div className="hidden lg:block">
+        <div className="hidden lg:block lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pr-1">
           <VoicePanel metrics={voice.metrics} listening={voice.listening} meta={meta} debug={active?.debug} latency={latency} />
         </div>
       </div>
