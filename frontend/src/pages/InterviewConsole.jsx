@@ -225,6 +225,7 @@ export default function InterviewConsole() {
   autoQRef.current = (q) => {
     if (!q || streaming.active) return;
     send("[REPONSE_ORALE] " + q, "🎧 " + q);
+    listen.clearTranscript();
   };
 
   const exportTranscript = () => {
@@ -386,7 +387,7 @@ export default function InterviewConsole() {
           )}
 
           {/* Auto-listen */}
-          {showListen && <AutoListenBar listen={listen} onGenerate={(q) => { if (!streaming.active) send("[REPONSE_ORALE] " + q, "🎧 " + q); }} />}
+          {showListen && <AutoListenBar listen={listen} onGenerate={(q) => { if (!streaming.active) { send("[REPONSE_ORALE] " + q, "🎧 " + q); listen.clearTranscript(); } }} />}
 
           {/* Composer */}
           <div className="border-t border-white/[0.06] px-4 py-3">

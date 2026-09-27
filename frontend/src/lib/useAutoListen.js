@@ -17,8 +17,22 @@ export function useAutoListen({ onQuestion }) {
   const streamRef = useRef(null);
   const recRef = useRef(null);
   const speechRef = useRef(null);
+  const bufRef = useRef("");
 
   useEffect(() => { autoRef.current = auto; }, [auto]);
+
+  // Reset the captured question (buffer + field). Used after each generation.
+  const clearTranscript = useCallback(() => {
+    bufRef.current = "";
+    setTranscript("");
+  }, []);
+
+  // Manual edits from the UI must stay in sync with the internal buffer,
+  // otherwise the next recognition result would overwrite the user's change.
+  const editTranscript = useCallback((value) => {
+    bufRef.current = value;
+    setTranscript(value);
+  }, []);
 
   const emit = useCallback((text) => {
     const t = (text || "").trim();
@@ -41,19 +55,19 @@ export function useAutoListen({ onQuestion }) {
     if (!SR) throw new Error("Reconnaissance vocale non supportée par ce navigateur.");
     const rec = new SR();
     rec.lang = "fr-FR"; rec.continuous = true; rec.interimResults = true;
-    let finalBuf = "";
+    bufRef.current = "";
     rec.onresult = (e) => {
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
         if (r.isFinal) {
           const seg = r[0].transcript.trim();
-          finalBuf = (finalBuf ? finalBuf + " " : "") + seg;
-          setTranscript(finalBuf + " ");
+          bufRef.current = (bufRef.current ? bufRef.current + " " : "") + seg;
+          setTranscript(bufRef.current + " ");
           if (autoRef.current && /[?.!]$/.test(seg)) emit(seg);
         } else interim += r[0].transcript;
       }
-      setTranscript((finalBuf ? finalBuf + " " : "") + interim);
+      setTranscript((bufRef.current ? bufRef.current + " " : "") + interim);
     };
     rec.onend = () => { if (activeRef.current) { try { rec.start(); } catch (e) {} } };
     speechRef.current = rec;
@@ -75,7 +89,8 @@ export function useAutoListen({ onQuestion }) {
         try {
           const text = (await transcribeBlob(blob)).trim();
           if (text) {
-            setTranscript((p) => (p ? p + " " : "") + text);
+            bufRef.current = (bufRef.current ? bufRef.current + " " : "") + text;
+            setTranscript(bufRef.current);
             if (autoRef.current && text.includes("?")) emit(text);
           }
         } catch (e) {} finally { setBusy(false); }
@@ -87,7 +102,7 @@ export function useAutoListen({ onQuestion }) {
   }, [emit]);
 
   const start = useCallback(async (src) => {
-    setTranscript(""); setSource(src); activeRef.current = true; setActive(true);
+    bufRef.current = ""; setTranscript(""); setSource(src); activeRef.current = true; setActive(true);
     try {
       if (src === "tab") {
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
@@ -112,5 +127,5 @@ export function useAutoListen({ onQuestion }) {
 
   useEffect(() => () => stop(), [stop]);
   const supported = typeof navigator !== "undefined" && !!navigator.mediaDevices;
-  return { active, source, transcript, busy, auto, setAuto, start, stop, supported, setTranscript };
+  return { active, source, transcript, busy, auto, setAuto, start, stop, supported, setTranscript: editTranscript, clearTranscript };
 }

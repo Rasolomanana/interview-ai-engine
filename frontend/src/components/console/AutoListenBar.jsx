@@ -2,7 +2,7 @@ import { Headphones, MonitorSpeaker, Mic, Square, Loader2, Zap, Eraser } from "l
 import { toast } from "sonner";
 
 export default function AutoListenBar({ listen, onGenerate }) {
-  const { active, source, transcript, busy, auto, setAuto, start, stop, supported, setTranscript } = listen;
+  const { active, source, transcript, busy, auto, setAuto, start, stop, supported, setTranscript, clearTranscript } = listen;
 
   const startSrc = async (src) => {
     try { await start(src); } catch (e) { toast.error(e.message); }
@@ -48,7 +48,7 @@ export default function AutoListenBar({ listen, onGenerate }) {
           <div className="mb-1 flex items-center justify-between">
             <span className="font-mono text-[10px] uppercase tracking-widest text-slate-500">Question captée (modifiable)</span>
             {transcript && (
-              <button data-testid="listen-clear-btn" onClick={() => setTranscript("")} className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[11px] text-slate-400 hover:text-white">
+              <button data-testid="listen-clear-btn" onClick={clearTranscript} className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[11px] text-slate-400 hover:text-white">
                 <Eraser className="h-3 w-3" /> Effacer
               </button>
             )}
