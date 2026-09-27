@@ -1,0 +1,31 @@
+{
+  "summary": "Validated the NEW recruiter-grade candidature analysis feature (POST /api/analyze-application + right-hand analysis column in ContextPanel). Backend: 7/7 pytest cases pass (status 200, response shape with all 6 keys ats_cv/score/gaps/missing_keywords/red_flags/company, ATS CV >200 chars, score integer 0-100, missing_keywords count within tolerance 3-7, empty-CV edge case does not 500). Frontend: e2e flow via Playwright — opened context panel (open-context-btn), pasted CV + poste, clicked analyze-company-btn, waited 39s for the LLM, verified score '68/100' rendered in ats-score, ATS CV populated (2999 chars) in ats-cv textarea, exactly 5 missing-keywords chips (SAP, production, aéronautique, anglais, opérateurs), 5 red_flags items, 5 gaps items. Score format 'NN/100' confirmed via regex. Screenshot captured.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global (persistent from iter 11)", "issues": ["React duplicate-key console warning still present on initial load and while context panel is open (fires ~5x). Not blocking analysis flow but should be resolved by main agent."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_analyze_application.py",
+    "/app/test_reports/pytest/analyze_application.xml"
+  ],
+  "action_items": [
+    "Fix persistent React 'Encountered two children with the same key' warning (unrelated to this feature but visible in every session)."
+  ],
+  "critical_code_review_comments": [
+    "server.py analyze_application: the score coercion `int(data.get('score', 0)) if str(data.get('score','')).strip().isdigit() else data.get('score', 0)` will pass through non-digit strings unchanged (e.g. '68/100' as string). LLM prompt is strict enough that this hasn't triggered, but a safer path is to coerce via float() then int() with try/except and clamp to [0,100]. Non-blocking.",
+    "ContextPanel.jsx line 40: `entreprise: r.company ? (companyUrl ? '— ' + companyUrl + ' —\\n' : '') + r.company : f.entreprise` — if a user re-runs analyse the entreprise field is overwritten (no append, no confirmation). Minor UX consideration.",
+    "The analyze-application endpoint has no timeout guard/user-facing retry — a 40s LLM call ties up the request; consider streaming or a job pattern if adoption grows. For MVP this is fine."
+  ],
+  "updated_files": ["/app/backend/tests/test_analyze_application.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (analyse-candidature e2e)"},
+  "test_credentials": "none — no auth (V1 app, anonymous sessions)",
+  "seed_data_creation": "Session created fresh via UI during Playwright test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "To retest: open app, click open-context-btn, fill ctx-cv + ctx-poste (or optionally company-url-input), click analyze-company-btn. Wait ~30-45s. Expect ats-score to show 'NN/100', ats-cv textarea populated, missing-keywords with ~5 chips, red-flags and gaps-list with items. Backend test at /app/backend/tests/test_analyze_application.py — full LLM call takes ~85s for 7 tests (single shared fixture).",
+  "rca of the issue": "N/A — new feature validation, not a bug fix. Feature works as specified: LLM within 15-40s budget (measured 39s), score format NN/100, structured JSON parsing robust (endpoint strips ``` fences and uses regex fallback for JSON extraction)."
+}

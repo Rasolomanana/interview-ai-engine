@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Chaîne de secours multi-fournisseurs** (option c) : `/api/generate` essaie dans l'ordre **Claude (Emergent) → OpenAI gpt-5.4 (Emergent) → DeepSeek (clé user, dernier recours)**. N'avance au fournisseur suivant que si aucun token n'a encore été streamé. Combinée au fallback client Gemini→Serveur, la chaîne complète est : Gemini(user) → Claude → OpenAI → DeepSeek. Clé DeepSeek stockée dans backend/.env (`DEEPSEEK_API_KEY`), jamais dans le code/frontend. Vérifié curl (Claude streame). ⚠️ La clé DeepSeek est valide mais le compte a un **solde insuffisant (402)** → DeepSeek ne répondra qu'après recharge ; sans impact car Claude/OpenAI fonctionnent.
+- ✅ **Analyse de candidature « recruteur senior » (plein écran)** : le Contexte est désormais **plein écran, 2 colonnes**. Gauche = CV + offre + URL site. Bouton **« Analyser (CV + offre + site) »** → `/api/analyze-application` (JSON) qui produit à droite : **CV optimisé ATS éditable** (réalisations chiffrées, valeurs `[à confirmer]` rectifiables), **score de compatibilité /100**, **lacunes**, **5 mots-clés manquants**, **signaux d'alerte** vus par un recruteur, + récap valeurs/questions entreprise. Le **CV amélioré (`atsCv`) est prioritaire dans le BLOC CONTEXTE** → les réponses STAR d'entretien s'appuient dessus. Utilise la chaîne de secours Claude→OpenAI→DeepSeek. Vérifié testing_agent iteration_13 (backend 7/7, frontend e2e : score 68/100, CV ATS ~3000 car., 5 mots-clés, 5 alertes, 5 lacunes).
+- ✅ **Chaîne de secours multi-fournisseurs** (Claude→OpenAI→DeepSeek).
 - ✅ **Bug corrigé — Gemini 429/quota** : bascule auto Gemini→Serveur (iteration_12).
 - ✅ **Bug corrigé — import PDF Android** (extraction client pdfjs, iteration_11).
 - ✅ **Bug corrigé (récurrent) — question de format** (iteration_10).
