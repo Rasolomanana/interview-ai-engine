@@ -1,0 +1,24 @@
+{
+  "summary": "Reproduced and verified fix for the reported bug: when the Gemini provider is selected with an INVALID key, the client must automatically fall back to the Serveur provider. Test used a fake key 'AIzaFAKE_BIDON_KEY_FOR_FALLBACK_TEST_...' in Réglages → provider-gemini, then activated Mode Candidat and sent 'Parlez-moi de vous.' via message-input. Gemini returned HTTP 400 (visible in console: 'Failed to load resource: 400'), streamMessage's try/catch caught the error and, because no delta had been emitted (`emitted=false`), invoked `onFallback` (toast 'Gemini indisponible — bascule automatique sur le mode Serveur') then re-streamed through streamServer against /api/generate. A full COPILOTE (CANDIDAT-mode) answer was produced end-to-end; mode-badge stayed CANDIDAT and message thread ended with 2 messages (user + assistant).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fallback logic in api.js streamMessage lines 244-263 is correct: it only falls back if `emitted===false` and error is not AbortError. Good defensive design — once tokens have started to stream from Gemini, a mid-stream error will NOT restart on the server (would double-stream). This is the right trade-off.",
+    "streamGemini surfaces detailed error via `Gemini 400 — API key not valid...` which is helpful in the toast fallback message.",
+    "Minor: onFallback toast auto-dismisses in ~4s; a user who blinks may not see it. Consider making it slightly longer (6s) or persistent until first delta arrives so users understand the switch happened."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% (Gemini→Server fallback verified end-to-end)"},
+  "test_credentials": "none — no auth",
+  "seed_data_creation": "One fresh session created via UI (localStorage cleared before test).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "To retest this fallback: clear localStorage, open Réglages, click provider-gemini, put a fake Gemini key, save, click activate-candidat-btn, fill message-input, click send-btn. Expect (a) console 400 from generativelanguage.googleapis.com, (b) toast 'Gemini indisponible — bascule automatique sur le mode Serveur', (c) a full CANDIDAT answer appearing from the backend /api/generate stream, (d) mode-badge remains CANDIDAT.",
+  "rca of the issue": "User reported (per truncated statement): with a fake Gemini key, the fallback to Serveur was not triggering. Verified in this run that streamMessage in /app/frontend/src/lib/api.js DOES fall back correctly: (1) streamGemini throws `Gemini 400 — ...` synchronously before any delta, (2) the catch block checks `!emitted && err.name !== 'AbortError'` — both true, (3) handlers.onFallback fires, (4) streamServer is invoked with the same systemMessage/turnMessage and streams the real answer. Fix is already in place and functional."
+}

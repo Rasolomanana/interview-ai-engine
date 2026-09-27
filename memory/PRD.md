@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Bug corrigé — import PDF échoue sur Android** : cause = l'upload multipart vers le proxy est tronqué/bloqué sur mobile (PDF plus lourds). Corrigé : extraction du texte PDF **100% côté navigateur** avec `pdfjs-dist` (worker servi à `/pdf.worker.min.js`, copié dans public/ + build/ + racine extension), repli serveur `/api/extract-pdf` si l'extraction client échoue/vide. `accept=".pdf,application/pdf"`. Vérifié testing_agent iteration_11 (100%, champ CV auto-rempli, aucune dépendance backend). ZIP extension → 828K (worker inclus).
+- ✅ **Bug corrigé — Erreur Gemini 429 (quota) / Gemini bloqué** : au lieu de bloquer, l'app **bascule automatiquement sur le mode Serveur** dès que Gemini échoue (429 quota, clé invalide, politique d'entreprise, réseau) AVANT le premier token — le tour est régénéré via `/api/generate`, avec un toast « bascule automatique sur le mode Serveur » (6s). Aucune perte de tour. Vérifié testing_agent iteration_12 (100%, clé bidon → 400 → fallback → réponse complète, mode conservé).
+- ✅ **Bug corrigé — import PDF Android** (extraction client pdfjs, iteration_11).
 - ✅ **Bug corrigé (récurrent) — question de format** (iteration_10).
 - ✅ **Bug corrigé — « Bonjour » répété** (iteration_9).
 - ✅ **Clarté des deux zones de saisie** (Écoute Auto recruteur en haut / Votre saisie en bas).
