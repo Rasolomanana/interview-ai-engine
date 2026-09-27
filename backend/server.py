@@ -113,6 +113,12 @@ class CompanyAnalyzeRequest(BaseModel):
     cv: str = ""
 
 
+class ApplicationAnalyzeRequest(BaseModel):
+    cv: str = ""
+    poste: str = ""
+    url: str = ""
+
+
 # ----------------------------- Helpers -----------------------------
 async def _get_session(session_id: str) -> dict:
     doc = await db.sessions.find_one({"id": session_id}, {"_id": 0})
@@ -288,6 +294,109 @@ async def _stream_with_fallback(system_message: str, turn_message: str, image_ba
     if not emitted:
         yield _sse("error", {"detail": "Tous les fournisseurs ont échoué. " + " | ".join(errors[-3:])})
     yield _sse("done", {})
+
+
+async def _generate_text(system_message: str, user_text: str) -> str:
+    """Non-streaming aggregate generation with the same fallback chain."""
+    if EMERGENT_LLM_KEY:
+        for provider, model in SERVER_CHAIN:
+            try:
+                chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
+                out = []
+                async for ev in chat.stream_message(UserMessage(text=user_text)):
+                    if isinstance(ev, TextDelta):
+                        out.append(ev.content)
+                    elif isinstance(ev, StreamDone):
+                        break
+                if out:
+                    return "".join(out)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("analyze provider %s failed: %s", provider, e)
+    if DEEPSEEK_API_KEY:
+        try:
+            from openai import AsyncOpenAI
+            ds = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
+            r = await ds.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "system", "content": system_message}, {"role": "user", "content": user_text}],
+                stream=False,
+            )
+            return r.choices[0].message.content or ""
+        except Exception as e:  # noqa: BLE001
+            logger.exception("deepseek analyze failed")
+    raise HTTPException(status_code=502, detail="Analyse indisponible (fournisseurs LLM)")
+
+
+async def _fetch_page_text(url: str) -> str:
+    import httpx
+    from bs4 import BeautifulSoup
+    import re as _re
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
+    async with httpx.AsyncClient(follow_redirects=True, timeout=25, headers={"User-Agent": ua}) as hc:
+        r = await hc.get(url)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        for t in soup(["script", "style", "noscript", "svg", "header", "footer", "nav"]):
+            t.decompose()
+        return _re.sub(r"\s+", " ", soup.get_text(" ")).strip()[:9000]
+
+
+@api_router.post("/analyze-application")
+async def analyze_application(req: ApplicationAnalyzeRequest):
+    """Full recruiter-grade analysis: ATS-optimized CV + fit score + gaps +
+    missing keywords + red flags + company briefing. Returns structured JSON."""
+    site_text = ""
+    if req.url.strip():
+        try:
+            site_text = await _fetch_page_text(req.url.strip())
+        except Exception as e:  # noqa: BLE001
+            logger.warning("site fetch failed: %s", e)
+
+    system_message = (
+        "Tu es un recruteur senior et un expert des systèmes ATS (Applicant Tracking System). "
+        "Tu réécris des CV pour maximiser le score ATS et l'attractivité, et tu évalues objectivement "
+        "l'adéquation candidat/poste. Tu réponds STRICTEMENT en JSON valide, en français."
+    )
+    user_text = (
+        f"CV DU CANDIDAT :\n{req.cv[:6000]}\n\n"
+        f"OFFRE / POSTE :\n{req.poste[:4000]}\n\n"
+        f"CONTENU DU SITE ENTREPRISE (peut être vide) :\n{site_text}\n\n"
+        "Analyse et renvoie UNIQUEMENT un objet JSON (aucun texte hors JSON, pas de balises markdown) avec EXACTEMENT ces clés :\n"
+        "{\n"
+        '  "ats_cv": "CV RÉÉCRIT optimisé ATS, en texte markdown, tel qu\'un recruteur senior de cette entreprise voudrait le lire : sections claires (Résumé, Expériences, Compétences), verbes d\'action, et des RÉALISATIONS CHIFFRÉES (%, montants, volumes, délais) — invente des ordres de grandeur plausibles à partir du CV et marque-les [à confirmer] pour que le candidat puisse les rectifier. Intègre naturellement les mots-clés de l\'offre.",\n'
+        '  "score": 0-100 (entier : compatibilité globale CV vs offre),\n'
+        '  "gaps": ["lacune 1", "lacune 2", ...] (écarts concrets entre le CV et les exigences du poste),\n'
+        '  "missing_keywords": ["mot1","mot2","mot3","mot4","mot5"] (EXACTEMENT 5 mots-clés importants de l\'offre absents du CV),\n'
+        '  "red_flags": ["signal 1", "signal 2", ...] (ce qu\'un recruteur remarquerait immédiatement : trous, incohérences, formulations faibles),\n'
+        '  "company": "bref récap markdown : VALEURS & CULTURE + 5-6 QUESTIONS D\'ENTRETIEN PROBABLES liées à ces valeurs"\n'
+        "}\n"
+        "Le JSON doit être parsable directement."
+    )
+    raw = (await _generate_text(system_message, user_text)).strip()
+    # Strip accidental markdown fences.
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw[:4].lower() == "json":
+            raw = raw[4:]
+    import json as _json
+    import re as _re
+    try:
+        data = _json.loads(raw)
+    except Exception:
+        m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+        if not m:
+            raise HTTPException(status_code=502, detail="Réponse d'analyse illisible")
+        data = _json.loads(m.group(0))
+    return {
+        "ats_cv": str(data.get("ats_cv", "")),
+        "score": int(data.get("score", 0)) if str(data.get("score", "")).strip().isdigit() else data.get("score", 0),
+        "gaps": data.get("gaps", []),
+        "missing_keywords": data.get("missing_keywords", []),
+        "red_flags": data.get("red_flags", []),
+        "company": str(data.get("company", "")),
+    }
 
 
 @api_router.post("/analyze-company")

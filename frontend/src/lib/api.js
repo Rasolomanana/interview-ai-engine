@@ -56,6 +56,21 @@ export async function transcribeBlob(blob) {
   return (await resp.json()).text || "";
 }
 
+// Full recruiter-grade analysis: ATS CV + score + gaps + missing keywords + red flags + company.
+export async function analyzeApplication({ cv, poste, url }) {
+  const resp = await fetch(`${BACKEND_URL}/api/analyze-application`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cv: cv || "", poste: poste || "", url: url || "" }),
+  });
+  if (!resp.ok) {
+    let d = "";
+    try { d = (await resp.json())?.detail || ""; } catch (e) { /* ignore */ }
+    throw new Error(d || `Erreur ${resp.status}`);
+  }
+  return resp.json();
+}
+
 // Analyze a company / careers URL -> streamed briefing (values, culture, likely questions).
 export async function analyzeCompany({ url, poste, cv, onDelta, signal }) {
   const resp = await fetch(`${BACKEND_URL}/api/analyze-company`, {

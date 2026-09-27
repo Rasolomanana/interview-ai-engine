@@ -75,7 +75,7 @@ Si [DEBUG] actif, préfixe par :
 Sinon → sortie texte pur.`;
 
 export function buildContextBlock(ctx = {}) {
-  return `\n# 📦 BLOC CONTEXTE (session)\n1. PROFIL CANDIDAT : ${ctx.cv || "[non fourni]"}\n2. POSTE : ${ctx.poste || "[non fourni]"}\n3. INFO ENTREPRISE & ACTU : ${ctx.entreprise || "[non fourni]"}\n4. SECTEUR : ${ctx.secteur || "Autre"}\n`;
+  return `\n# 📦 BLOC CONTEXTE (session)\n1. PROFIL CANDIDAT : ${ctx.atsCv || ctx.cv || "[non fourni]"}\n2. POSTE : ${ctx.poste || "[non fourni]"}\n3. INFO ENTREPRISE & ACTU : ${ctx.entreprise || "[non fourni]"}\n4. SECTEUR : ${ctx.secteur || "Autre"}\n`;
 }
 export function buildSystemMessage(ctx) {
   return SYSTEM_PROMPT + buildContextBlock(ctx);

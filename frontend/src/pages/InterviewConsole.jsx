@@ -121,7 +121,7 @@ export default function InterviewConsole() {
   const saveContext = async (form) => {
     const updated = await api.updateSession(active.id, {
       title: form.title,
-      context: { cv: form.cv, poste: form.poste, entreprise: form.entreprise, secteur: form.secteur },
+      context: { cv: form.cv, poste: form.poste, entreprise: form.entreprise, secteur: form.secteur, atsCv: form.atsCv, score: form.score, gaps: form.gaps, missingKeywords: form.missingKeywords, redFlags: form.redFlags },
     });
     setActive((a) => ({ ...a, ...updated }));
     await refreshSessions();
