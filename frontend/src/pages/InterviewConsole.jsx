@@ -327,7 +327,7 @@ export default function InterviewConsole() {
         </div>
 
         {/* CENTER */}
-        <div className="glass flex min-h-[80vh] flex-col overflow-hidden rounded-2xl">
+        <div className="glass flex min-h-[80vh] flex-col overflow-hidden rounded-2xl lg:h-[calc(100vh-2rem)] lg:min-h-0">
           {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-3">
             <div className="flex items-center gap-3">
