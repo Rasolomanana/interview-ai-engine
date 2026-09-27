@@ -1,0 +1,23 @@
+{
+  "summary": "Validated the fix for the 'Souhaitez-vous une réponse télégraphique (3 puces) ou en phrases complètes ?' bug. Sent 5 recruiter questions in a row via message-input while in CANDIDAT mode using the Server provider. Each turn produced a real candidate answer (STAR / complete-sentence style). None of the responses contained the forbidden format/style/length question. The mode badge stayed CANDIDAT for all 5 turns and TOURS_SS_MARQ remained at 0 (the auto-injected [REPONSE_ORALE] marker keeps the counter reset, preventing the §4.4 drift to NEUTRE). Regression check passed: [MODE_SIMULATION] switches to RECRUTEUR, and a subsequent [REPONSE_ORALE] input switches back to CANDIDAT.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "InterviewConsole.jsx is ~520 lines and getting large — could be split into hooks (useSessionThread, useStreamingTurn) for maintainability.",
+    "submitInput relies on `active?.state` which is updated after onMeta; because onMeta runs synchronously before generation, sequential rapid sends are safe, but a stale-closure risk exists if state updates are batched — consider passing session state via a ref."
+  ],
+  "updated_files": [],
+  "success_rate": {"frontend": "100%"},
+  "test_credentials": "none (Server provider)",
+  "seed_data_creation": "New session created via UI; used to send 5 candidate turns then 2 regression turns.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Fix verified: submitInput prefixes '[REPONSE_ORALE]' when session already in CANDIDAT, and MODE_REMINDER.NEUTRE no longer asks for format. Test flow: open Settings → provider-server → save → activate-candidat-btn → send >=4 questions → assert mode-badge stays CANDIDAT and no reply matches /télégraphique|puces ou phrases|format/i.",
+  "rca of the issue": "Before fix: after 3 consecutive candidate replies without an explicit marker, stateMachine §4.4 (tours>=3) forced NEUTRE; the NEUTRE reminder then asked the user to choose between télégraphique/puces or phrases complètes. Fix: submitInput auto-injects '[REPONSE_ORALE]' whenever pendingMode==='CANDIDAT' OR active.state==='CANDIDAT' (unless the user already typed a marker), which the state machine detects → tours reset to 0 → state stays CANDIDAT → NEUTRE reminder is never used. Additionally, MODE_REMINDER.NEUTRE was updated to explicitly forbid asking about format/style/length as a defense-in-depth measure."
+}

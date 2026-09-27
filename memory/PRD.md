@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Bug corrigé — « Bonjour » répété** : à partir de la 2e réponse candidat, le prompt interdit toute salutation/re-présentation (règle `CANDIDAT_NO_GREETING` déclenchée dès que l'historique contient un tour « Copilote »). La 1re réponse salue, les suivantes non. Vérifié testing_agent iteration_9 (100%). Bonus : `resetSession` vide aussi l'historique → un vrai nouveau départ salue de nouveau.
+- ✅ **Bug corrigé (récurrent) — question de format « télégraphique/puces ou phrases complètes »** : cause = dérive §4.4 (3 tours sans marqueur → NEUTRE, qui posait la question de format). Corrigé : `submitInput` injecte `[REPONSE_ORALE]` dès que la session est en CANDIDAT (compteur remis à 0, plus de dérive NEUTRE) + `MODE_REMINDER.NEUTRE` interdit désormais de demander le format/style/longueur. Vérifié testing_agent iteration_10 (100%, 5 tours consécutifs, état reste CANDIDAT, régression Recruteur OK).
+- ✅ **Bug corrigé — « Bonjour » répété** (iteration_9).
 - ✅ **Clarté des deux zones de saisie** (Écoute Auto recruteur en haut / Votre saisie en bas).
 - ✅ **Cadre « Question captée » redimensionnable** (`resize: vertical`).
 - ✅ **Version courte polie si question incomprise** : rule (4) renvoie 2 courtes phrases (≤15 mots) préfixées « [À DIRE] » à dire au recruteur pour demander de reformuler. Vérifié curl E2E.
