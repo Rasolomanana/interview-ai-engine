@@ -205,6 +205,9 @@ export default function InterviewConsole() {
           setStreaming({ active: false, text: "", meta: null, mode: active.state });
           toast.error("Erreur LLM : " + d);
         },
+        onFallback: () => {
+          toast("Gemini indisponible — bascule automatique sur le mode Serveur", { icon: "🔁" });
+        },
         onAbort: () => setStreaming((s) => ({ ...s, active: false })),
       }
     );
