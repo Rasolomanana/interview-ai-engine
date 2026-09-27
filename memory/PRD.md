@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Bug corrigé (récurrent) — question de format « télégraphique/puces ou phrases complètes »** : cause = dérive §4.4 (3 tours sans marqueur → NEUTRE, qui posait la question de format). Corrigé : `submitInput` injecte `[REPONSE_ORALE]` dès que la session est en CANDIDAT (compteur remis à 0, plus de dérive NEUTRE) + `MODE_REMINDER.NEUTRE` interdit désormais de demander le format/style/longueur. Vérifié testing_agent iteration_10 (100%, 5 tours consécutifs, état reste CANDIDAT, régression Recruteur OK).
+- ✅ **Bug corrigé — import PDF échoue sur Android** : cause = l'upload multipart vers le proxy est tronqué/bloqué sur mobile (PDF plus lourds). Corrigé : extraction du texte PDF **100% côté navigateur** avec `pdfjs-dist` (worker servi à `/pdf.worker.min.js`, copié dans public/ + build/ + racine extension), repli serveur `/api/extract-pdf` si l'extraction client échoue/vide. `accept=".pdf,application/pdf"`. Vérifié testing_agent iteration_11 (100%, champ CV auto-rempli, aucune dépendance backend). ZIP extension → 828K (worker inclus).
+- ✅ **Bug corrigé (récurrent) — question de format** (iteration_10).
 - ✅ **Bug corrigé — « Bonjour » répété** (iteration_9).
 - ✅ **Clarté des deux zones de saisie** (Écoute Auto recruteur en haut / Votre saisie en bas).
 - ✅ **Cadre « Question captée » redimensionnable** (`resize: vertical`).
