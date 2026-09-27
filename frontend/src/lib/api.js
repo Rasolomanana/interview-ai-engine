@@ -132,13 +132,31 @@ export async function analyzeCompany({ url, poste, cv, onDelta, signal }) {
 }
 
 // Provider-agnostic one-shot streamed generation (used for the recap).
-export async function streamRaw({ systemMessage, userText, onDelta, signal }) {
+// Mirrors streamMessage's resilience: if the direct Gemini call fails before any
+// content is streamed (e.g. 503 high-demand, 429 quota), transparently fall back
+// to the managed Server provider so the recap always completes.
+export async function streamRaw({ systemMessage, userText, onDelta, onFallback, signal }) {
   const settings = await getSettings();
   if (settings.provider === "server") {
     await streamServer({ systemMessage, userText, signal, onDelta });
-  } else {
-    if (!settings.geminiKey) throw new Error("Clé Gemini manquante (ou choisissez le mode Serveur).");
-    await streamGemini({ apiKey: settings.geminiKey, model: settings.model || "gemini-3.8-flash", systemMessage, userText, signal, onDelta });
+    return;
+  }
+  if (!settings.geminiKey) {
+    // No Gemini key configured — just use the Server provider.
+    await streamServer({ systemMessage, userText, signal, onDelta });
+    return;
+  }
+  let emitted = false;
+  const wrapped = (c) => { emitted = true; onDelta?.(c); };
+  try {
+    await streamGemini({ apiKey: settings.geminiKey, model: settings.model || "gemini-3.8-flash", systemMessage, userText, signal, onDelta: wrapped });
+  } catch (err) {
+    if (!emitted && err.name !== "AbortError") {
+      onFallback?.(String(err?.message || ""));
+      await streamServer({ systemMessage, userText, signal, onDelta });
+    } else {
+      throw err;
+    }
   }
 }
 

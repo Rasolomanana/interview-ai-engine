@@ -253,6 +253,7 @@ export default function InterviewConsole() {
         systemMessage,
         userText: "Voici la transcription de l'entretien :\n\n" + transcript,
         onDelta: (c) => setRecap((r) => ({ ...r, text: r.text + c })),
+        onFallback: () => toast("Gemini surchargé — bascule sur le mode Serveur…"),
       });
     } catch (e) {
       toast.error("Récap échoué : " + e.message);
