@@ -44,8 +44,7 @@ export default function AutoListenBar({ listen, onGenerate }) {
         )}
       </div>
 
-      {(active || transcript) && (
-        <div className="mt-2">
+      <div className="mt-2">
           <div className="mb-1 flex items-center justify-between">
             <span className="font-mono text-[10px] uppercase tracking-widest text-slate-500">Question captée (modifiable)</span>
             {transcript && (
@@ -60,7 +59,7 @@ export default function AutoListenBar({ listen, onGenerate }) {
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               rows={2}
-              placeholder="En attente de la question du recruteur… (corrigez ou effacez le texte capté ici)"
+              placeholder="Tapez ou collez la question du recruteur ici — ou lancez l'écoute ci-dessus pour la capter automatiquement (vous pourrez toujours la corriger)."
               className="flex-1 resize-none rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-indigo-500/40"
             />
             <button data-testid="listen-generate-btn" onClick={() => onGenerate(transcript)} disabled={!transcript.trim()} className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-40">
@@ -68,7 +67,6 @@ export default function AutoListenBar({ listen, onGenerate }) {
             </button>
           </div>
         </div>
-      )}
     </div>
   );
 }
