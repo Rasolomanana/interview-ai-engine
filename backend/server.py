@@ -28,7 +28,10 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 LLM_MODEL = ("anthropic", "claude-sonnet-4-6")
+# Server-side fallback chain: free/Emergent first, user's paid DeepSeek key strictly last.
+SERVER_CHAIN = [("anthropic", "claude-sonnet-4-6"), ("openai", "gpt-5.4")]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -221,29 +224,70 @@ async def extract_pdf(file: UploadFile = File(...)):
 async def generate(req: GenerateRequest):
     """Stateless generation proxy — used by the client 'Serveur' provider so the
     browser never contacts an external LLM directly (works even where Google/OpenAI
-    are blocked by an IT policy). State + persistence stay client-side."""
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY manquant")
+    are blocked by an IT policy). Multi-provider fallback chain, DeepSeek last resort."""
+    if not EMERGENT_LLM_KEY and not DEEPSEEK_API_KEY:
+        raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
 
-    async def gen():
+    return StreamingResponse(
+        _stream_with_fallback(req.system_message, req.turn_message, req.image_base64),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+async def _stream_with_fallback(system_message: str, turn_message: str, image_base64: Optional[str]):
+    """Try Emergent providers (Claude, then OpenAI) first — free/managed — and only
+    fall back to the user's paid DeepSeek key as a last resort. Only advance to the
+    next provider if NOTHING has been streamed yet (avoids duplicated output)."""
+    emitted = False
+    errors = []
+    if EMERGENT_LLM_KEY:
+        for provider, model in SERVER_CHAIN:
+            try:
+                chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
+                fc = [ImageContent(image_base64=_strip_data_url(image_base64))] if image_base64 else None
+                um = UserMessage(text=turn_message, file_contents=fc) if fc else UserMessage(text=turn_message)
+                async for ev in chat.stream_message(um):
+                    if isinstance(ev, TextDelta):
+                        emitted = True
+                        yield _sse("delta", {"content": ev.content})
+                    elif isinstance(ev, StreamDone):
+                        break
+                if emitted:
+                    yield _sse("done", {})
+                    return
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"{provider}: {str(e)[:160]}")
+                logger.warning("Provider %s failed, trying next: %s", provider, e)
+                if emitted:
+                    yield _sse("done", {})
+                    return
+
+    # Last resort: DeepSeek (OpenAI-compatible), user's own key.
+    if DEEPSEEK_API_KEY and not emitted:
         try:
-            chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=req.system_message).with_model(*LLM_MODEL)
-            fc = None
-            if req.image_base64:
-                fc = [ImageContent(image_base64=_strip_data_url(req.image_base64))]
-            um = UserMessage(text=req.turn_message, file_contents=fc) if fc else UserMessage(text=req.turn_message)
-            async for ev in chat.stream_message(um):
-                if isinstance(ev, TextDelta):
-                    yield _sse("delta", {"content": ev.content})
-                elif isinstance(ev, StreamDone):
-                    break
+            from openai import AsyncOpenAI
+            ds = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
+            stream = await ds.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "system", "content": system_message}, {"role": "user", "content": turn_message}],
+                stream=True,
+            )
+            async for chunk in stream:
+                delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
+                if delta:
+                    emitted = True
+                    yield _sse("delta", {"content": delta})
+            if emitted:
+                yield _sse("done", {})
+                return
         except Exception as e:  # noqa: BLE001
-            logger.exception("generate failed")
-            yield _sse("error", {"detail": str(e)})
-        yield _sse("done", {})
+            errors.append(f"deepseek: {str(e)[:160]}")
+            logger.exception("DeepSeek fallback failed")
 
-    return StreamingResponse(gen(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    if not emitted:
+        yield _sse("error", {"detail": "Tous les fournisseurs ont échoué. " + " | ".join(errors[-3:])})
+    yield _sse("done", {})
 
 
 @api_router.post("/analyze-company")

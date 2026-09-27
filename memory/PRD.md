@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Bug corrigé — Erreur Gemini 429 (quota) / Gemini bloqué** : au lieu de bloquer, l'app **bascule automatiquement sur le mode Serveur** dès que Gemini échoue (429 quota, clé invalide, politique d'entreprise, réseau) AVANT le premier token — le tour est régénéré via `/api/generate`, avec un toast « bascule automatique sur le mode Serveur » (6s). Aucune perte de tour. Vérifié testing_agent iteration_12 (100%, clé bidon → 400 → fallback → réponse complète, mode conservé).
+- ✅ **Chaîne de secours multi-fournisseurs** (option c) : `/api/generate` essaie dans l'ordre **Claude (Emergent) → OpenAI gpt-5.4 (Emergent) → DeepSeek (clé user, dernier recours)**. N'avance au fournisseur suivant que si aucun token n'a encore été streamé. Combinée au fallback client Gemini→Serveur, la chaîne complète est : Gemini(user) → Claude → OpenAI → DeepSeek. Clé DeepSeek stockée dans backend/.env (`DEEPSEEK_API_KEY`), jamais dans le code/frontend. Vérifié curl (Claude streame). ⚠️ La clé DeepSeek est valide mais le compte a un **solde insuffisant (402)** → DeepSeek ne répondra qu'après recharge ; sans impact car Claude/OpenAI fonctionnent.
+- ✅ **Bug corrigé — Gemini 429/quota** : bascule auto Gemini→Serveur (iteration_12).
 - ✅ **Bug corrigé — import PDF Android** (extraction client pdfjs, iteration_11).
 - ✅ **Bug corrigé (récurrent) — question de format** (iteration_10).
 - ✅ **Bug corrigé — « Bonjour » répété** (iteration_9).
