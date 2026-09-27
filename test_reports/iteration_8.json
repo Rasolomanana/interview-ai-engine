@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend-only bug retest for AutoListenBar auto-clear behavior. Configured MODE SERVEUR via settings, opened Écoute bar, and validated 4 scenarios: (1) transcript auto-clears after clicking Générer, (2) typing a second question shows only new text (no accumulation), (3) auto-clear works again on 2nd generation, (4) manual Effacer button clears the field and it stays empty. Assistant response also rendered correctly in the thread (no regression). All 4 scenarios PASSED.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "useAutoListen.js: clearTranscript and editTranscript correctly synchronize bufRef with state — the fix is well-implemented.",
+    "InterviewConsole.jsx: both onGenerate handlers (line ~225 autoQRef and line ~390 AutoListenBar prop) call listen.clearTranscript() after send() — consistent behavior."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bug fix for the 'Question captée' auto-clear on AutoListenBar is verified working. Server provider mode works without a key for candidate response generation.",
+  "rca of the issue": "Original bug: transcript accumulated because internal bufRef was not reset when clearTranscript ran, so subsequent speech recognition appended to old buffer. Fix in useAutoListen.js: (a) bufRef is now the single source of truth, (b) clearTranscript resets both bufRef and setTranscript, (c) editTranscript syncs manual edits into bufRef. In InterviewConsole.jsx, listen.clearTranscript() is invoked after send() on both generation paths."
+}
