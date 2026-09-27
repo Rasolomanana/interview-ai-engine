@@ -16,6 +16,7 @@ de ta propre initiative.
 - Ne JAMAIS mélanger les styles CANDIDAT et RECRUTEUR dans une réponse.
 - Ne JAMAIS afficher de puces ni de gras en mode RECRUTEUR.
 - Ne JAMAIS poser de questions ouvertes en mode CANDIDAT (sauf relance).
+- Ne JAMAIS demander au candidat quel format ou style de réponse utiliser : le style est déjà imposé par l'application. Produis TOUJOURS directement une réponse complète et cohérente.
 - En cas d'ambiguïté insoluble → NEUTRE (≤ 25 tokens).
 
 ## PRIORITÉS EN CAS DE CONFLIT
@@ -102,6 +103,8 @@ const TONE_REMINDER = {
 
 const STAR_REMINDER = "MÉTHODE STAR : si la question du recruteur est COMPORTEMENTALE (elle réclame un exemple vécu ou une situation passée — « parlez-moi d'une fois où… », « décrivez une situation où… », « donnez un exemple de… », « comment avez-vous géré… »), tu DOIS structurer la réponse selon la méthode STAR avec EXACTEMENT ces 4 puces, chacune préfixée du libellé en gras : « • **Situation :** … » (contexte bref), « • **Tâche :** … » (ton objectif/responsabilité), « • **Action :** … » (ce que TU as concrètement fait, verbes d'action), « • **Résultat :** … » (impact chiffré ou concret). Chaque puce reste une phrase complète, naturelle, ancrée dans le CV. Si la question N'EST PAS comportementale (présentation, motivation, question technique factuelle ou logistique), N'UTILISE PAS STAR : réponds normalement selon la CONSIGNE ci-dessus.";
 
+const CANDIDAT_ROBUSTNESS = "RÈGLES ABSOLUES (CANDIDAT) — respecte-les avant tout : (1) Ne pose JAMAIS de question au candidat et ne lui demande JAMAIS quel format/style/longueur de réponse il souhaite (jamais de « voulez-vous des puces ou des phrases complètes ? ») : le style est DÉJÀ imposé par la CONSIGNE ci-dessus — produis directement la réponse. (2) Ta réponse doit TOUJOURS être complète, cohérente et immédiatement lisible à voix haute, sans aucune incohérence. (3) Si la question du recruteur est partielle, bruitée, mal transcrite ou décousue (bruit de fond, défaut technique, phrases hachées), NE signale PAS le problème et NE demande PAS de préciser : repère les MOTS-CLÉS et le thème principal (compétence, situation, valeur évoquée) et construis une réponse pertinente et cohérente autour d'eux, comme si la question était claire. (4) UNIQUEMENT si la question est TOTALEMENT incompréhensible (aucun mot-clé exploitable), réponds par CETTE SEULE phrase et rien d'autre, sur une ligne : « Je suis désolé, j'ai mal compris la question — pourriez-vous la reformuler, s'il vous plaît ? »";
+
 export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, voiceConfidence, debug, hasImage, answerStyle = "complet", tone = "confiant", starMode = true) {
   const mode = resolved.resolved_state;
   const parts = [
@@ -117,6 +120,7 @@ export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, vo
   let reminder = MODE_REMINDER[mode] || MODE_REMINDER.NEUTRE;
   if (mode === "CANDIDAT") reminder = answerStyle === "concis" ? MODE_REMINDER.CANDIDAT : MODE_REMINDER.CANDIDAT_COMPLET;
   parts.push("CONSIGNE : " + reminder);
+  if (mode === "CANDIDAT") parts.push(CANDIDAT_ROBUSTNESS);
   if (mode === "CANDIDAT" && starMode && answerStyle !== "concis") parts.push(STAR_REMINDER);
   if (mode === "CANDIDAT") parts.push(TONE_REMINDER[tone] || TONE_REMINDER.confiant);
   const vmod = resolved.voice_module;

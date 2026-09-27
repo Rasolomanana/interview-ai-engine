@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Bug corrigé — vidage auto de la question captée** : le buffer interne (`bufRef`) était accumulé sans reset → doublons. Corrigé : `clearTranscript()` réinitialise buffer + champ, appelé après CHAQUE génération (auto + bouton) ; `editTranscript()` synchronise les éditions manuelles ; l'effacement manuel reste vide. Vérifié testing_agent iteration_8 (4/4 · 100%).
+- ✅ **Robustesse candidat (anti-question + bruit)** : le copilote ne demande PLUS jamais quel format/style utiliser (règle CANDIDAT_ROBUSTNESS + garde-fou système) et répond toujours de façon complète/cohérente. Questions bruitées/mal transcrites → il extrait les mots-clés et répond quand même ; question totalement incompréhensible → phrase unique « Je suis désolé, j'ai mal compris la question — pourriez-vous la reformuler ? ». Vérifié par curl E2E (2 cas).
+- ✅ **Bug corrigé — vidage auto de la question captée** (testing_agent iteration_8, 4/4).
 - ✅ **Panneau Analyse vocale fixe (sticky)** : reste épinglé à l'écran pendant le scroll.
 - ✅ **Transcript éditable + toujours visible** (AutoListenBar) : champ modifiable affiché en permanence (taper/coller/corriger/effacer) + bouton « Effacer ».
 - ✅ **Analyse site + réponses STAR prêtes** (`/api/analyze-company`) : sections VALEURS & CULTURE, MISSION & PRIORITÉS, QUESTIONS PROBABLES, et **RÉPONSES STAR PRÊTES** — pour les 4 questions clés, une réponse STAR complète ancrée dans le CV (transmis) ET reliée explicitement aux valeurs (sécurité, innovation, collaboration) pour montrer les recherches. Vérifié par curl E2E (RTX + CV → STAR personnalisé chiffré).
