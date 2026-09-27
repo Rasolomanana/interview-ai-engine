@@ -322,7 +322,7 @@ export default function InterviewConsole() {
     <div className="command-bg min-h-screen w-full">
       <div className="relative z-10 mx-auto grid min-h-screen max-w-[1600px] grid-cols-1 gap-4 p-4 lg:grid-cols-[260px_1fr_300px]">
         {/* LEFT */}
-        <div className="glass hidden rounded-2xl p-4 lg:flex lg:flex-col">
+        <div className="glass hidden rounded-2xl p-4 lg:flex lg:flex-col lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
           <SessionSidebar sessions={sessions} activeId={active?.id} onSelect={selectSession} onNew={handleNew} onDelete={handleDelete} creating={creating} />
         </div>
 

@@ -33,7 +33,7 @@
 - ✅ **Version courte polie si question incomprise** : rule (4) renvoie 2 courtes phrases (≤15 mots) préfixées « [À DIRE] » à dire au recruteur pour demander de reformuler. Vérifié curl E2E.
 - ✅ **Robustesse candidat (anti-question + bruit)** : ne demande plus jamais le format, extrait les mots-clés des questions bruitées.
 - ✅ **Bug corrigé — vidage auto de la question captée** (testing_agent iteration_8, 4/4).
-- ✅ **Panneau Analyse vocale fixe (sticky)** : reste épinglé à l'écran pendant le scroll.
+- ✅ **Panneaux latéraux fixes (sticky)** : colonne GAUCHE (sessions/historique) ET colonne DROITE (analyse vocale) épinglées à l'écran pendant le scroll (`lg:sticky lg:top-4`). Vérifié (position:sticky + screenshot).
 - ✅ **Transcript éditable + toujours visible** (AutoListenBar) : champ modifiable affiché en permanence (taper/coller/corriger/effacer) + bouton « Effacer ».
 - ✅ **Analyse site + réponses STAR prêtes** (`/api/analyze-company`) : sections VALEURS & CULTURE, MISSION & PRIORITÉS, QUESTIONS PROBABLES, et **RÉPONSES STAR PRÊTES** — pour les 4 questions clés, une réponse STAR complète ancrée dans le CV (transmis) ET reliée explicitement aux valeurs (sécurité, innovation, collaboration) pour montrer les recherches. Vérifié par curl E2E (RTX + CV → STAR personnalisé chiffré).
 - ✅ **Méthode STAR** (toggle Réglages, activé par défaut) : structure les réponses aux questions comportementales en Situation/Tâche/Action/Résultat.
