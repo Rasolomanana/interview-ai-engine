@@ -113,7 +113,7 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
                     {importing ? "Lecture du PDF…" : "Importer un PDF (CV)"}
                   </button>
                   <span className="text-[11px] text-slate-500">ou collez le texte ci-dessous</span>
-                  <input ref={pdfRef} type="file" accept="application/pdf" className="hidden" onChange={importPdf} data-testid="pdf-input" />
+                  <input ref={pdfRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={importPdf} data-testid="pdf-input" />
                 </div>
                 <textarea data-testid="ctx-cv" value={form.cv} onChange={(e) => field("cv", e.target.value)} rows={4} className="input resize-none" placeholder="Expérience, compétences, outils maîtrisés…" />
               </Group>

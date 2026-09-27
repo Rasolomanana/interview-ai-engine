@@ -10,9 +10,34 @@ const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now())
 const now = () => new Date().toISOString();
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
+import * as pdfjsLib from "pdfjs-dist";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ""}/pdf.worker.min.js`;
+
+// Extract PDF text IN THE BROWSER (no upload) — robust on mobile/Android where
+// large multipart uploads can be dropped by the proxy. Falls back to the server.
 export async function extractPdf(file) {
+  try {
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let out = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const tc = await page.getTextContent();
+      out += tc.items.map((it) => it.str).join(" ") + "\n";
+    }
+    out = out.trim();
+    if (out) return out.slice(0, 20000);
+    // No text layer (scanned/photo PDF) — try the server as a second chance.
+  } catch (e) {
+    // Client parsing failed — fall back to the server extractor below.
+  }
+  return extractPdfServer(file);
+}
+
+async function extractPdfServer(file) {
   const fd = new FormData();
-  fd.append("file", file, file.name);
+  fd.append("file", file, file.name || "cv.pdf");
   const resp = await fetch(`${BACKEND_URL}/api/extract-pdf`, { method: "POST", body: fd });
   if (!resp.ok) {
     let d = "";
