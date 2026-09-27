@@ -138,6 +138,7 @@ export async function resetSession(id) {
     s.tours_sans_marqueur = 0; s.incomprehension = 0; s.updated_at = now();
     await saveSessions(l);
   }
+  await store.set("messages:" + id, []);
   return { ok: true, state: "NEUTRE" };
 }
 

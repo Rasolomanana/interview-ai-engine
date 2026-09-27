@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only test of the CANDIDAT no-greeting-on-2nd-turn bug fix in provider=Server, style=complet. Two consecutive candidate questions were sent. Result: 1st copilote response starts with 'Bonjour, je suis ravi d'être ici...' (greeting allowed on 1st turn), 2nd copilote response starts with 'Situation :' (STAR) — NO 'Bonjour', NO re-introduction. Bug fix confirmed working. 2nd response is complete, coherent, and relevant to Q2 ('défi que vous avez surmonté').",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Detection logic in buildTurnMessage uses history.some(h=>h.role==='Copilote') which correctly identifies any prior candidate copilote turn. Works as intended.",
+    "The CANDIDAT_COMPLET reminder itself already contains a conditional greeting rule; the added CANDIDAT_NO_GREETING acts as a strong reinforcement — good belt-and-suspenders approach.",
+    "Minor: If a session is reset (resetSession) but messages are not cleared, prior 'Copilote' history entries would still suppress greeting on a fresh 'first' answer. Not tested here but worth noting."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "n/a (Server provider, no key required)",
+  "seed_data_creation": "None. Used a fresh session on the deployed frontend.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Correct testids: provider selection = data-testid='provider-server'; answer style = data-testid='answer-complet' (NOT 'style-complet'); save = 'settings-save-btn'; empty-state candidat button = 'activate-candidat-btn'; composer input = 'message-input'; send = 'send-btn'; barge-in appears as 'barge-in-btn' during streaming — poll its absence to detect stream completion (SSE streaming can take 20-40s).",
+  "rca of the issue": "Before the fix, the CANDIDAT_COMPLET consigne allowed a greeting on puce 1 unconditionally, so the LLM regenerated 'Bonjour...' on every candidate turn. The fix in frontend/src/lib/promptClient.js appends the CANDIDAT_NO_GREETING clause whenever history already contains a role==='Copilote' turn (i.e. from the 2nd candidate answer onward), forbidding 'Bonjour' and self-re-introduction. Verified end-to-end: 1st response greeted, 2nd response did not."
+}

@@ -140,6 +140,7 @@ export default function InterviewConsole() {
     await api.resetSession(active.id);
     const data = await api.getSession(active.id);
     setActive(data.session);
+    setMessages([]);
     setMeta({ resolved_state: "NEUTRE", prev_state: "NEUTRE", tours: 0, modules: ["RESET"] });
     setStreaming({ active: false, text: "", meta: null, mode: "NEUTRE" });
     setPendingMode(null);

@@ -27,7 +27,8 @@
 - Serveur : claude-sonnet-4-6 via EMERGENT_LLM_KEY.
 
 ## Fonctionnalités (2026-06-27)
-- ✅ **Clarté des deux zones de saisie** : zone haut = « ÉCOUTE AUTO — capte le recruteur » → « Question captée du recruteur » → bouton « Générer la réponse » ; zone bas = « VOTRE SAISIE — tapez ou dictez (micro vert), puis Envoyer ». Champ du bas passé à 2 lignes + `resize-y` + `leading-relaxed` (dictée longue enfin lisible). Vérifié screenshot.
+- ✅ **Bug corrigé — « Bonjour » répété** : à partir de la 2e réponse candidat, le prompt interdit toute salutation/re-présentation (règle `CANDIDAT_NO_GREETING` déclenchée dès que l'historique contient un tour « Copilote »). La 1re réponse salue, les suivantes non. Vérifié testing_agent iteration_9 (100%). Bonus : `resetSession` vide aussi l'historique → un vrai nouveau départ salue de nouveau.
+- ✅ **Clarté des deux zones de saisie** (Écoute Auto recruteur en haut / Votre saisie en bas).
 - ✅ **Cadre « Question captée » redimensionnable** (`resize: vertical`).
 - ✅ **Version courte polie si question incomprise** : rule (4) renvoie 2 courtes phrases (≤15 mots) préfixées « [À DIRE] » à dire au recruteur pour demander de reformuler. Vérifié curl E2E.
 - ✅ **Robustesse candidat (anti-question + bruit)** : ne demande plus jamais le format, extrait les mots-clés des questions bruitées.
