@@ -1,9 +1,12 @@
 # PRD — Copilote Entretien IA
 
-## Fix (juin 2026) — Erreur 502 / "Analyse incomplète" sur /api/analyze-application
-- Cause: endpoint non-streamé + fetch du site entreprise exécuté AVANT le stream → réponse silencieuse ~25s + LLM ~40s → timeout/troncature ingress.
-- Correctif: endpoint converti en SSE. Flush immédiat d'un keepalive `progress`, fetch du site DANS le générateur, keepalives pendant la génération, puis event final `result` (JSON) + `done`. Chaîne de secours Claude→OpenAI→DeepSeek conservée.
-- Client `analyzeApplication` (api.js) consomme le SSE. Vérifié via curl ingress externe: sans URL 40s, avec URL 39s, `result`+`done` reçus.
+## Fix DÉFINITIF (juin 2026) — 502 / "Analyse incomplète" : JOB + POLLING
+- Le streaming SSE ne suffisait pas : une connexion unique de ~40s est tronquée par les proxys d'entreprise / passerelles (échec récurrent 3x).
+- Backend : POST /api/analyze-application crée un job (Mongo `analysis_jobs`), lance `asyncio.create_task(_run_application_analysis)`, renvoie `{job_id}` immédiatement. GET /api/analyze-application/{job_id} → `{status, result, error}`. Le worker fait fetch site + LLM (Claude→OpenAI→DeepSeek) + parse JSON puis persiste.
+- Client `analyzeApplication` : POST puis polling toutes les 2s (requêtes <1s), tolérant aux coupures, timeout global 3 min → immunisé contre tout timeout de connexion longue.
+- Vérifié via curl ingress (job done ~39s) ET navigateur preview (toast "Analyse terminée", score/mots-clés/signaux rendus). Extension repackagée (main.5b4752a4.js, 850K).
+- Reste connu (dev-only, non bloquant, pré-existant) : warning React "duplicate key" hors panneau ATS.
+
 
 
 ## Livrables

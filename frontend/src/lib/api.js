@@ -57,46 +57,42 @@ export async function transcribeBlob(blob) {
 }
 
 // Full recruiter-grade analysis: ATS CV + score + gaps + missing keywords + red flags + company.
-// Streamed (SSE) so a 40-70s LLM run never trips the gateway idle timeout (502).
+// Job + polling: start a background job, then poll (short requests) until done.
+// This never holds a long connection open, so corporate proxies / gateways
+// cannot truncate it (fixes the recurring "Analyse incomplète").
 export async function analyzeApplication({ cv, poste, url, onProgress, signal }) {
-  const resp = await fetch(`${BACKEND_URL}/api/analyze-application`, {
+  const start = await fetch(`${BACKEND_URL}/api/analyze-application`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cv: cv || "", poste: poste || "", url: url || "" }),
     signal,
   });
-  if (!resp.ok) {
+  if (!start.ok) {
     let d = "";
-    try { d = (await resp.json())?.detail || ""; } catch (e) { /* ignore */ }
-    throw new Error(d || `Erreur ${resp.status}`);
+    try { d = (await start.json())?.detail || ""; } catch (e) { /* ignore */ }
+    throw new Error(d || `Erreur ${start.status}`);
   }
-  const reader = resp.body.getReader();
-  const dec = new TextDecoder();
-  let buf = "";
-  let result = null;
-  let errMsg = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    const events = buf.split("\n\n");
-    buf = events.pop();
-    for (const chunk of events) {
-      let ev = "message"; let data = "";
-      for (const l of chunk.split("\n")) {
-        if (l.startsWith("event:")) ev = l.slice(6).trim();
-        else if (l.startsWith("data:")) data += l.slice(5).trim();
-      }
-      if (!data) continue;
-      const p = JSON.parse(data);
-      if (ev === "progress") onProgress?.();
-      else if (ev === "result") result = p;
-      else if (ev === "error") errMsg = p.detail || "Erreur serveur";
+  const { job_id } = await start.json();
+  if (!job_id) throw new Error("Impossible de démarrer l'analyse");
+
+  const deadline = Date.now() + 180000; // up to 3 min
+  while (Date.now() < deadline) {
+    if (signal?.aborted) throw new Error("Analyse annulée");
+    await new Promise((r) => setTimeout(r, 2000));
+    onProgress?.();
+    let poll;
+    try {
+      poll = await fetch(`${BACKEND_URL}/api/analyze-application/${job_id}`, { signal });
+    } catch (e) {
+      if (signal?.aborted) throw new Error("Analyse annulée");
+      continue; // transient network blip — keep polling
     }
+    if (!poll.ok) continue;
+    const p = await poll.json();
+    if (p.status === "done") return p.result;
+    if (p.status === "error") throw new Error(p.error || "Analyse échouée");
   }
-  if (errMsg) throw new Error(errMsg);
-  if (!result) throw new Error("Analyse incomplète");
-  return result;
+  throw new Error("Analyse expirée (délai dépassé)");
 }
 
 // Analyze a company / careers URL -> streamed briefing (values, culture, likely questions).

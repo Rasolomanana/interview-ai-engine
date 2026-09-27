@@ -36,6 +36,9 @@ SERVER_CHAIN = [("anthropic", "claude-sonnet-4-6"), ("openai", "gpt-5.4")]
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
@@ -343,127 +346,111 @@ async def _fetch_page_text(url: str) -> str:
         return _re.sub(r"\s+", " ", soup.get_text(" ")).strip()[:9000]
 
 
-@api_router.post("/analyze-application")
-async def analyze_application(req: ApplicationAnalyzeRequest):
-    """Full recruiter-grade analysis: ATS-optimized CV + fit score + gaps +
-    missing keywords + red flags + company briefing. Returns structured JSON."""
+def _application_prompt(cv: str, poste: str, site_text: str):
     system_message = (
         "Tu es un recruteur senior et un expert des systèmes ATS (Applicant Tracking System). "
         "Tu réécris des CV pour maximiser le score ATS et l'attractivité, et tu évalues objectivement "
         "l'adéquation candidat/poste. Tu réponds STRICTEMENT en JSON valide, en français."
     )
+    user_text = (
+        f"CV DU CANDIDAT :\n{cv[:6000]}\n\n"
+        f"OFFRE / POSTE :\n{poste[:4000]}\n\n"
+        f"CONTENU DU SITE ENTREPRISE (peut être vide) :\n{site_text}\n\n"
+        "Analyse et renvoie UNIQUEMENT un objet JSON (aucun texte hors JSON, pas de balises markdown) avec EXACTEMENT ces clés :\n"
+        "{\n"
+        '  "ats_cv": "CV RÉÉCRIT optimisé ATS, en texte markdown, tel qu\'un recruteur senior de cette entreprise voudrait le lire : sections claires (Résumé, Expériences, Compétences), verbes d\'action, et des RÉALISATIONS CHIFFRÉES (%, montants, volumes, délais) — invente des ordres de grandeur plausibles à partir du CV et marque-les [à confirmer] pour que le candidat puisse les rectifier. Intègre naturellement les mots-clés de l\'offre.",\n'
+        '  "score": 0-100 (entier : compatibilité globale CV vs offre),\n'
+        '  "gaps": ["lacune 1", "lacune 2", ...] (écarts concrets entre le CV et les exigences du poste),\n'
+        '  "missing_keywords": ["mot1","mot2","mot3","mot4","mot5"] (EXACTEMENT 5 mots-clés importants de l\'offre absents du CV),\n'
+        '  "red_flags": ["signal 1", "signal 2", ...] (ce qu\'un recruteur remarquerait immédiatement : trous, incohérences, formulations faibles),\n'
+        '  "company": "bref récap markdown : VALEURS & CULTURE + 5-6 QUESTIONS D\'ENTRETIEN PROBABLES liées à ces valeurs"\n'
+        "}\n"
+        "Le JSON doit être parsable directement."
+    )
+    return system_message, user_text
 
-    def _build_user_text(site_text: str) -> str:
-        return (
-            f"CV DU CANDIDAT :\n{req.cv[:6000]}\n\n"
-            f"OFFRE / POSTE :\n{req.poste[:4000]}\n\n"
-            f"CONTENU DU SITE ENTREPRISE (peut être vide) :\n{site_text}\n\n"
-            "Analyse et renvoie UNIQUEMENT un objet JSON (aucun texte hors JSON, pas de balises markdown) avec EXACTEMENT ces clés :\n"
-            "{\n"
-            '  "ats_cv": "CV RÉÉCRIT optimisé ATS, en texte markdown, tel qu\'un recruteur senior de cette entreprise voudrait le lire : sections claires (Résumé, Expériences, Compétences), verbes d\'action, et des RÉALISATIONS CHIFFRÉES (%, montants, volumes, délais) — invente des ordres de grandeur plausibles à partir du CV et marque-les [à confirmer] pour que le candidat puisse les rectifier. Intègre naturellement les mots-clés de l\'offre.",\n'
-            '  "score": 0-100 (entier : compatibilité globale CV vs offre),\n'
-            '  "gaps": ["lacune 1", "lacune 2", ...] (écarts concrets entre le CV et les exigences du poste),\n'
-            '  "missing_keywords": ["mot1","mot2","mot3","mot4","mot5"] (EXACTEMENT 5 mots-clés importants de l\'offre absents du CV),\n'
-            '  "red_flags": ["signal 1", "signal 2", ...] (ce qu\'un recruteur remarquerait immédiatement : trous, incohérences, formulations faibles),\n'
-            '  "company": "bref récap markdown : VALEURS & CULTURE + 5-6 QUESTIONS D\'ENTRETIEN PROBABLES liées à ces valeurs"\n'
-            "}\n"
-            "Le JSON doit être parsable directement."
-        )
+
+def _parse_json_object(raw: str):
     import json as _json
     import re as _re
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw[:4].lower() == "json":
+            raw = raw[4:]
+    try:
+        return _json.loads(raw)
+    except Exception:
+        m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+        if not m:
+            return None
+        return _json.loads(m.group(0))
 
-    def _parse(raw: str):
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.strip("`")
-            if raw[:4].lower() == "json":
-                raw = raw[4:]
-        try:
-            return _json.loads(raw)
-        except Exception:
-            m = _re.search(r"\{.*\}", raw, _re.DOTALL)
-            if not m:
-                return None
-            return _json.loads(m.group(0))
 
-    async def gen():
-        """Stream keepalives (so a long run + site fetch never trips the ingress
-        idle timeout -> 502/truncation), then emit the parsed JSON 'result' event.
-        The site fetch runs INSIDE the stream so headers flush immediately."""
-        # Flush headers right away so the connection is established before the
-        # (potentially slow) company-site fetch below.
-        yield _sse("progress", {})
+async def _run_application_analysis(job_id: str, cv: str, poste: str, url: str):
+    """Background worker: fetch site, call LLM chain, parse JSON, persist result
+    to the job document. Runs decoupled from any client connection so it is
+    immune to gateway / corporate-proxy request timeouts."""
+    try:
         site_text = ""
-        if req.url.strip():
+        if url.strip():
             try:
-                site_text = await _fetch_page_text(req.url.strip())
+                site_text = await _fetch_page_text(url.strip())
             except Exception as e:  # noqa: BLE001
                 logger.warning("site fetch failed: %s", e)
-            yield _sse("progress", {})
-        user_text = _build_user_text(site_text)
-
-        acc = []
-        emitted = False
-        errors = []
-        if EMERGENT_LLM_KEY:
-            for provider, model in SERVER_CHAIN:
-                try:
-                    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
-                    async for ev in chat.stream_message(UserMessage(text=user_text)):
-                        if isinstance(ev, TextDelta):
-                            emitted = True
-                            acc.append(ev.content)
-                            yield _sse("progress", {})
-                        elif isinstance(ev, StreamDone):
-                            break
-                    if emitted:
-                        break
-                except Exception as e:  # noqa: BLE001
-                    errors.append(f"{provider}: {str(e)[:160]}")
-                    logger.warning("analyze provider %s failed: %s", provider, e)
-                    if emitted:
-                        break
-        if not emitted and DEEPSEEK_API_KEY:
-            try:
-                from openai import AsyncOpenAI
-                ds = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
-                stream = await ds.chat.completions.create(
-                    model="deepseek-chat",
-                    messages=[{"role": "system", "content": system_message}, {"role": "user", "content": user_text}],
-                    stream=True,
-                )
-                async for chunk in stream:
-                    delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
-                    if delta:
-                        emitted = True
-                        acc.append(delta)
-                        yield _sse("progress", {})
-            except Exception as e:  # noqa: BLE001
-                errors.append(f"deepseek: {str(e)[:160]}")
-                logger.exception("deepseek analyze failed")
-
-        raw = "".join(acc).strip()
-        if not raw:
-            yield _sse("error", {"detail": "Analyse indisponible (fournisseurs LLM). " + " | ".join(errors[-2:])})
-            yield _sse("done", {})
-            return
-        data = _parse(raw)
+        system_message, user_text = _application_prompt(cv, poste, site_text)
+        raw = (await _generate_text(system_message, user_text)).strip()
+        data = _parse_json_object(raw)
         if data is None:
-            yield _sse("error", {"detail": "Réponse d'analyse illisible"})
-            yield _sse("done", {})
+            await db.analysis_jobs.update_one(
+                {"job_id": job_id},
+                {"$set": {"status": "error", "error": "Réponse d'analyse illisible", "updated_at": _now_iso()}},
+            )
             return
-        yield _sse("result", {
+        result = {
             "ats_cv": str(data.get("ats_cv", "")),
             "score": int(data.get("score", 0)) if str(data.get("score", "")).strip().isdigit() else data.get("score", 0),
             "gaps": data.get("gaps", []),
             "missing_keywords": data.get("missing_keywords", []),
             "red_flags": data.get("red_flags", []),
             "company": str(data.get("company", "")),
-        })
-        yield _sse("done", {})
+        }
+        await db.analysis_jobs.update_one(
+            {"job_id": job_id},
+            {"$set": {"status": "done", "result": result, "updated_at": _now_iso()}},
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.exception("analysis job %s failed", job_id)
+        await db.analysis_jobs.update_one(
+            {"job_id": job_id},
+            {"$set": {"status": "error", "error": str(e)[:300], "updated_at": _now_iso()}},
+        )
 
-    return StreamingResponse(gen(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+@api_router.post("/analyze-application")
+async def analyze_application(req: ApplicationAnalyzeRequest):
+    """Start a recruiter-grade analysis job in the background and return a job_id
+    immediately. The client polls GET /analyze-application/{job_id}. This avoids
+    holding a 40s connection open (which corporate proxies / gateways truncate)."""
+    if not EMERGENT_LLM_KEY and not DEEPSEEK_API_KEY:
+        raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
+    import asyncio
+    job_id = str(uuid.uuid4())
+    await db.analysis_jobs.insert_one({
+        "job_id": job_id, "status": "pending", "result": None, "error": None,
+        "created_at": _now_iso(), "updated_at": _now_iso(),
+    })
+    asyncio.create_task(_run_application_analysis(job_id, req.cv, req.poste, req.url))
+    return {"job_id": job_id, "status": "pending"}
+
+
+@api_router.get("/analyze-application/{job_id}")
+async def analyze_application_status(job_id: str):
+    """Poll the status/result of an analysis job."""
+    doc = await db.analysis_jobs.find_one({"job_id": job_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Job introuvable")
+    return {"status": doc.get("status"), "result": doc.get("result"), "error": doc.get("error")}
 
 
 @api_router.post("/analyze-company")
