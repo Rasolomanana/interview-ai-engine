@@ -347,33 +347,28 @@ async def _fetch_page_text(url: str) -> str:
 async def analyze_application(req: ApplicationAnalyzeRequest):
     """Full recruiter-grade analysis: ATS-optimized CV + fit score + gaps +
     missing keywords + red flags + company briefing. Returns structured JSON."""
-    site_text = ""
-    if req.url.strip():
-        try:
-            site_text = await _fetch_page_text(req.url.strip())
-        except Exception as e:  # noqa: BLE001
-            logger.warning("site fetch failed: %s", e)
-
     system_message = (
         "Tu es un recruteur senior et un expert des systèmes ATS (Applicant Tracking System). "
         "Tu réécris des CV pour maximiser le score ATS et l'attractivité, et tu évalues objectivement "
         "l'adéquation candidat/poste. Tu réponds STRICTEMENT en JSON valide, en français."
     )
-    user_text = (
-        f"CV DU CANDIDAT :\n{req.cv[:6000]}\n\n"
-        f"OFFRE / POSTE :\n{req.poste[:4000]}\n\n"
-        f"CONTENU DU SITE ENTREPRISE (peut être vide) :\n{site_text}\n\n"
-        "Analyse et renvoie UNIQUEMENT un objet JSON (aucun texte hors JSON, pas de balises markdown) avec EXACTEMENT ces clés :\n"
-        "{\n"
-        '  "ats_cv": "CV RÉÉCRIT optimisé ATS, en texte markdown, tel qu\'un recruteur senior de cette entreprise voudrait le lire : sections claires (Résumé, Expériences, Compétences), verbes d\'action, et des RÉALISATIONS CHIFFRÉES (%, montants, volumes, délais) — invente des ordres de grandeur plausibles à partir du CV et marque-les [à confirmer] pour que le candidat puisse les rectifier. Intègre naturellement les mots-clés de l\'offre.",\n'
-        '  "score": 0-100 (entier : compatibilité globale CV vs offre),\n'
-        '  "gaps": ["lacune 1", "lacune 2", ...] (écarts concrets entre le CV et les exigences du poste),\n'
-        '  "missing_keywords": ["mot1","mot2","mot3","mot4","mot5"] (EXACTEMENT 5 mots-clés importants de l\'offre absents du CV),\n'
-        '  "red_flags": ["signal 1", "signal 2", ...] (ce qu\'un recruteur remarquerait immédiatement : trous, incohérences, formulations faibles),\n'
-        '  "company": "bref récap markdown : VALEURS & CULTURE + 5-6 QUESTIONS D\'ENTRETIEN PROBABLES liées à ces valeurs"\n'
-        "}\n"
-        "Le JSON doit être parsable directement."
-    )
+
+    def _build_user_text(site_text: str) -> str:
+        return (
+            f"CV DU CANDIDAT :\n{req.cv[:6000]}\n\n"
+            f"OFFRE / POSTE :\n{req.poste[:4000]}\n\n"
+            f"CONTENU DU SITE ENTREPRISE (peut être vide) :\n{site_text}\n\n"
+            "Analyse et renvoie UNIQUEMENT un objet JSON (aucun texte hors JSON, pas de balises markdown) avec EXACTEMENT ces clés :\n"
+            "{\n"
+            '  "ats_cv": "CV RÉÉCRIT optimisé ATS, en texte markdown, tel qu\'un recruteur senior de cette entreprise voudrait le lire : sections claires (Résumé, Expériences, Compétences), verbes d\'action, et des RÉALISATIONS CHIFFRÉES (%, montants, volumes, délais) — invente des ordres de grandeur plausibles à partir du CV et marque-les [à confirmer] pour que le candidat puisse les rectifier. Intègre naturellement les mots-clés de l\'offre.",\n'
+            '  "score": 0-100 (entier : compatibilité globale CV vs offre),\n'
+            '  "gaps": ["lacune 1", "lacune 2", ...] (écarts concrets entre le CV et les exigences du poste),\n'
+            '  "missing_keywords": ["mot1","mot2","mot3","mot4","mot5"] (EXACTEMENT 5 mots-clés importants de l\'offre absents du CV),\n'
+            '  "red_flags": ["signal 1", "signal 2", ...] (ce qu\'un recruteur remarquerait immédiatement : trous, incohérences, formulations faibles),\n'
+            '  "company": "bref récap markdown : VALEURS & CULTURE + 5-6 QUESTIONS D\'ENTRETIEN PROBABLES liées à ces valeurs"\n'
+            "}\n"
+            "Le JSON doit être parsable directement."
+        )
     import json as _json
     import re as _re
 
@@ -392,9 +387,21 @@ async def analyze_application(req: ApplicationAnalyzeRequest):
             return _json.loads(m.group(0))
 
     async def gen():
-        """Stream raw deltas (keeps the gateway connection alive so a 40-70s
-        LLM run never trips the ingress idle timeout -> 502), then emit the
-        parsed structured JSON as a final 'result' event."""
+        """Stream keepalives (so a long run + site fetch never trips the ingress
+        idle timeout -> 502/truncation), then emit the parsed JSON 'result' event.
+        The site fetch runs INSIDE the stream so headers flush immediately."""
+        # Flush headers right away so the connection is established before the
+        # (potentially slow) company-site fetch below.
+        yield _sse("progress", {})
+        site_text = ""
+        if req.url.strip():
+            try:
+                site_text = await _fetch_page_text(req.url.strip())
+            except Exception as e:  # noqa: BLE001
+                logger.warning("site fetch failed: %s", e)
+            yield _sse("progress", {})
+        user_text = _build_user_text(site_text)
+
         acc = []
         emitted = False
         errors = []

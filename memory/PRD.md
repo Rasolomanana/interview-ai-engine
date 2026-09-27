@@ -1,5 +1,11 @@
 # PRD — Copilote Entretien IA
 
+## Fix (juin 2026) — Erreur 502 / "Analyse incomplète" sur /api/analyze-application
+- Cause: endpoint non-streamé + fetch du site entreprise exécuté AVANT le stream → réponse silencieuse ~25s + LLM ~40s → timeout/troncature ingress.
+- Correctif: endpoint converti en SSE. Flush immédiat d'un keepalive `progress`, fetch du site DANS le générateur, keepalives pendant la génération, puis event final `result` (JSON) + `done`. Chaîne de secours Claude→OpenAI→DeepSeek conservée.
+- Client `analyzeApplication` (api.js) consomme le SSE. Vérifié via curl ingress externe: sans URL 40s, avec URL 39s, `result`+`done` reçus.
+
+
 ## Livrables
 1. App web (React) + backend FastAPI (proxy IA, extraction PDF, Whisper).
 2. Extension Chrome (Manifest V3) empaquetée : /app/interview-copilot-extension/ (+ .zip).
