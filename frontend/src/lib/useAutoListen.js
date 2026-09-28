@@ -53,30 +53,6 @@ export function useAutoListen({ onQuestion }) {
     streamRef.current = null;
   }, []);
 
-  const startMic = useCallback(() => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) throw new Error("Reconnaissance vocale non supportée par ce navigateur.");
-    const rec = new SR();
-    rec.lang = micLangRef.current || "fr-FR"; rec.continuous = true; rec.interimResults = true;
-    bufRef.current = "";
-    rec.onresult = (e) => {
-      let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i];
-        if (r.isFinal) {
-          const seg = r[0].transcript.trim();
-          bufRef.current = (bufRef.current ? bufRef.current + " " : "") + seg;
-          setTranscript(bufRef.current + " ");
-          if (autoRef.current && /[?.!]$/.test(seg)) emit(seg);
-        } else interim += r[0].transcript;
-      }
-      setTranscript((bufRef.current ? bufRef.current + " " : "") + interim);
-    };
-    rec.onend = () => { if (activeRef.current) { try { rec.start(); } catch (e) {} } };
-    speechRef.current = rec;
-    try { rec.start(); } catch (e) {}
-  }, [emit]);
-
   const recordWindow = useCallback(() => {
     if (!activeRef.current || !streamRef.current) return;
     const audio = new MediaStream(streamRef.current.getAudioTracks());
@@ -104,6 +80,60 @@ export function useAutoListen({ onQuestion }) {
     setTimeout(() => { try { mr.state === "recording" && mr.stop(); } catch (e) {} }, 7000);
   }, [emit]);
 
+  // Server-side Whisper capture for the mic (used as a fallback when the browser's
+  // Web Speech API is blocked — e.g. an IT policy blocks Google's speech servers).
+  // Works even where Google is unreachable, and auto-detects FR/EN.
+  const startWhisperMic = useCallback(async () => {
+    try {
+      if (!streamRef.current) {
+        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+    } catch (e) {
+      activeRef.current = false; setActive(false);
+      return;
+    }
+    recordWindow();
+  }, [recordWindow]);
+
+  const startMic = useCallback(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    bufRef.current = "";
+    let switched = false;
+    let gotResult = false;
+    const toWhisper = () => {
+      if (switched || !activeRef.current) return;
+      switched = true;
+      setSource("mic");
+      try { speechRef.current && speechRef.current.stop(); } catch (e) {}
+      speechRef.current = null;
+      startWhisperMic();
+    };
+    if (!SR) { toWhisper(); return; } // no Web Speech (e.g. Firefox) -> Whisper
+    const rec = new SR();
+    rec.lang = micLangRef.current || "fr-FR"; rec.continuous = true; rec.interimResults = true;
+    rec.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) {
+          gotResult = true;
+          const seg = r[0].transcript.trim();
+          bufRef.current = (bufRef.current ? bufRef.current + " " : "") + seg;
+          setTranscript(bufRef.current + " ");
+          if (autoRef.current && /[?.!]$/.test(seg)) emit(seg);
+        } else { interim += r[0].transcript; if (r[0].transcript.trim()) gotResult = true; }
+      }
+      setTranscript((bufRef.current ? bufRef.current + " " : "") + interim);
+    };
+    // network / audio-capture / service-not-allowed -> Google speech unreachable: fall back.
+    rec.onerror = (e) => { if (e && e.error && !["no-speech", "aborted"].includes(e.error)) toWhisper(); };
+    rec.onend = () => { if (activeRef.current && !switched) { try { rec.start(); } catch (e) {} } };
+    speechRef.current = rec;
+    try { rec.start(); } catch (e) { toWhisper(); return; }
+    // Watchdog: nothing recognized in 10s -> assume Web Speech is silently blocked -> Whisper.
+    setTimeout(() => { if (!gotResult && !switched) toWhisper(); }, 10000);
+  }, [emit, startWhisperMic]);
+
   const start = useCallback(async (src) => {
     bufRef.current = ""; setTranscript(""); setSource(src); activeRef.current = true; setActive(true);
     try {
@@ -119,7 +149,8 @@ export function useAutoListen({ onQuestion }) {
         if (v) v.addEventListener("ended", () => stop());
         recordWindow();
       } else {
-        try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); streamRef.current = s; } catch (e) {}
+        // Mic: Web Speech first (live & free); it requests mic permission itself.
+        // Auto-falls back to server Whisper on error or 10s of silence.
         startMic();
       }
     } catch (e) {

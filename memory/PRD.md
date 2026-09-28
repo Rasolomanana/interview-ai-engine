@@ -1,6 +1,11 @@
 # PRD — Copilote Entretien IA
 
-## Fonctionnalité (juin 2026) — Recruteur anglophone : traduction FR + réponse dans SA langue
+## Fix (juin 2026) — Micro ne détectait aucune voix (Web Speech bloqué par le réseau)
+- Cause : le micro utilisait l'API Web Speech de Chrome, qui dépend des serveurs de Google (bloqués par la politique réseau) → aucune détection, sans erreur visible. De plus un `getUserMedia` ouvert en parallèle pouvait entrer en conflit avec Web Speech.
+- Fix (`useAutoListen.js`) : le micro tente Web Speech (live, gratuit) SANS flux getUserMedia concurrent ; il bascule automatiquement sur la transcription serveur Whisper (`recordWindow`) si Web Speech renvoie une erreur (network/audio-capture/service-not-allowed) OU reste 10s sans résultat. Whisper fonctionne même si Google est bloqué et détecte FR/EN.
+- Vérifié : endpoint /api/transcribe (auto-langue) atteint bien Whisper et gère les erreurs proprement. NB : le micro réel (permission + voix + réseau du poste) ne peut être testé que sur la machine de l'utilisateur.
+
+
 - Détection auto de la langue de la question (dans le MÊME appel LLM → zéro latence supplémentaire).
 - La réponse (et les libellés STAR / phrases « [À DIRE] ») est rédigée dans la langue du recruteur (anglais → réponse en anglais, à lire à voix haute).
 - Si la langue ≠ français : 1re ligne « 🌐 FR : <traduction concise> », affichée comme un bandeau bleu distinct (parse.js `translation` + CandidateBullets + FloatingAnswer). Aucune ligne vide / séparateur parasite.
