@@ -1,6 +1,11 @@
 # PRD — Copilote Entretien IA
 
-## Fix (juin 2026) — Micro ne détectait aucune voix (Web Speech bloqué par le réseau)
+## Amélioration (juin 2026) — Micro Android robuste (codecs mobiles)
+- `useAutoListen.recordWindow` : sélection du codec réellement supporté (Android Chrome n'a souvent que opus) via MediaRecorder.isTypeSupported ; blob créé avec le vrai mimeType.
+- `transcribeBlob` : extension de fichier dérivée du mimeType (webm/ogg/mp4/wav) pour que Whisper accepte l'audio.
+- Scénarios Android : a (tel. écoute un entretien sur PC) et c (copilote sur 2e appareil) → OK via micro + Whisper. b (entretien ET copilote sur le MÊME tel. pendant un appel Teams/Zoom) → limité par Android (l'app d'appel monopolise le micro, navigateur en arrière-plan coupe la capture) ; recommander a ou c. Capture d'onglet (getDisplayMedia audio) NON supportée sur mobile.
+
+
 - Cause : le micro utilisait l'API Web Speech de Chrome, qui dépend des serveurs de Google (bloqués par la politique réseau) → aucune détection, sans erreur visible. De plus un `getUserMedia` ouvert en parallèle pouvait entrer en conflit avec Web Speech.
 - Fix (`useAutoListen.js`) : le micro tente Web Speech (live, gratuit) SANS flux getUserMedia concurrent ; il bascule automatiquement sur la transcription serveur Whisper (`recordWindow`) si Web Speech renvoie une erreur (network/audio-capture/service-not-allowed) OU reste 10s sans résultat. Whisper fonctionne même si Google est bloqué et détecte FR/EN.
 - Vérifié : endpoint /api/transcribe (auto-langue) atteint bien Whisper et gère les erreurs proprement. NB : le micro réel (permission + voix + réseau du poste) ne peut être testé que sur la machine de l'utilisateur.

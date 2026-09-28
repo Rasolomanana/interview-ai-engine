@@ -56,13 +56,17 @@ export function useAutoListen({ onQuestion }) {
   const recordWindow = useCallback(() => {
     if (!activeRef.current || !streamRef.current) return;
     const audio = new MediaStream(streamRef.current.getAudioTracks());
+    // Pick a codec the device actually supports (Android Chrome often only has opus).
+    const supported = (t) => { try { return typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t); } catch (e) { return false; } };
+    const pick = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg"].find(supported);
     let mr;
-    try { mr = new MediaRecorder(audio, { mimeType: "audio/webm" }); } catch (e) { mr = new MediaRecorder(audio); }
+    try { mr = pick ? new MediaRecorder(audio, { mimeType: pick }) : new MediaRecorder(audio); } catch (e) { mr = new MediaRecorder(audio); }
+    const mime = mr.mimeType || pick || "audio/webm";
     recRef.current = mr;
     const chunks = [];
     mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     mr.onstop = async () => {
-      const blob = new Blob(chunks, { type: "audio/webm" });
+      const blob = new Blob(chunks, { type: mime });
       if (blob.size > 3000) {
         setBusy(true);
         try {
