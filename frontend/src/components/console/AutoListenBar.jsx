@@ -1,4 +1,4 @@
-import { Headphones, MonitorSpeaker, Mic, Square, Loader2, Zap, Eraser, Languages } from "lucide-react";
+import { Headphones, MonitorSpeaker, Mic, Square, Loader2, Zap, Eraser, Languages, Pause } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AutoListenBar({ listen, onGenerate }) {
@@ -41,17 +41,28 @@ export default function AutoListenBar({ listen, onGenerate }) {
               <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
               {source === "tab" ? "Onglet" : "Micro"} en écoute
             </span>
-            <button data-testid="listen-stop-btn" onClick={stop} className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-slate-300 hover:text-white">
-              <Square className="h-3.5 w-3.5" /> Stop
+            <button data-testid="listen-stop-btn" onClick={stop} className="flex items-center gap-1.5 rounded-lg border border-red-500/50 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/25" title="Arrêter complètement l'écoute">
+              <Square className="h-3.5 w-3.5" /> Arrêter l'écoute
             </button>
-            {busy && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
-            <label className="flex items-center gap-1.5 text-xs text-slate-400">
-              <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} data-testid="listen-auto-toggle" className="accent-indigo-500" />
-              Auto-répondre
-            </label>
+            {/* Garde-fou : couper/réactiver la réponse automatique sans arrêter l'écoute */}
+            <button
+              data-testid="listen-auto-toggle"
+              onClick={() => setAuto(!auto)}
+              title={auto ? "Réponse automatique ACTIVE — cliquez pour mettre en pause" : "Réponse automatique EN PAUSE — cliquez pour réactiver"}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${auto ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25" : "border-amber-500/50 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25"}`}
+            >
+              {auto ? <><Zap className="h-3.5 w-3.5" /> Réponse auto : ON</> : <><Pause className="h-3.5 w-3.5" /> Réponse auto : EN PAUSE</>}
+            </button>
+            {busy && <span className="flex items-center gap-1 text-xs text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> transcription…</span>}
           </>
         )}
       </div>
+
+      {active && !auto && (
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-1.5 text-[11px] text-amber-300" data-testid="auto-paused-hint">
+          <Pause className="h-3.5 w-3.5 shrink-0" /> Réponse automatique en pause — l'écoute continue, mais rien ne se génère seul. Cliquez « Générer la réponse » quand vous voulez, ou réactivez « Réponse auto ».
+        </div>
+      )}
 
       <div className="mt-2">
           <div className="mb-1 flex items-center justify-between">

@@ -1,6 +1,18 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { transcribeBlob } from "./api";
 
+const wc = (t) => (t || "").trim().split(/\s+/).filter(Boolean).length;
+
+// Heuristic: does the accumulated transcript look like a finished recruiter question?
+// Triggers on a "?" OR on interrogative / prompt cues in FR & EN (so questions
+// without punctuation from Whisper are still caught).
+function isLikelyQuestion(t) {
+  const s = (t || "").toLowerCase();
+  if (s.includes("?")) return true;
+  if (wc(s) < 4) return false;
+  return /\b(comment|pourquoi|quel|quelle|quels|quelles|qu'est|qu est|est-ce|est ce|combien|où|quand|qui|dites?[- ]moi|décri|decri|parlez|parle[- ]moi|expliqu|présentez|presentez|pouvez[- ]vous|pourriez[- ]vous|avez[- ]vous|racontez|donnez[- ]moi|selon vous|what|why|how|when|where|which|who|can you|could you|tell me|describe|explain|do you|have you|would you|walk me|give me|talk about)\b/.test(s);
+}
+
 // Auto-listen: capture the recruiter audio and transcribe it automatically.
 // Two sources:
 //   - "mic": your microphone (place a phone nearby) via the browser's Web Speech API (live, free).
@@ -20,6 +32,7 @@ export function useAutoListen({ onQuestion }) {
   const recRef = useRef(null);
   const speechRef = useRef(null);
   const bufRef = useRef("");
+  const silenceRef = useRef(0);
 
   useEffect(() => { autoRef.current = auto; }, [auto]);
   useEffect(() => { micLangRef.current = micLang; }, [micLang]);
@@ -67,16 +80,28 @@ export function useAutoListen({ onQuestion }) {
     mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     mr.onstop = async () => {
       const blob = new Blob(chunks, { type: mime });
+      let text = "";
       if (blob.size > 3000) {
         setBusy(true);
-        try {
-          const text = (await transcribeBlob(blob)).trim();
-          if (text) {
-            bufRef.current = (bufRef.current ? bufRef.current + " " : "") + text;
-            setTranscript(bufRef.current);
-            if (autoRef.current && text.includes("?")) emit(text);
-          }
-        } catch (e) {} finally { setBusy(false); }
+        try { text = (await transcribeBlob(blob)).trim(); } catch (e) {} finally { setBusy(false); }
+      }
+      if (text) {
+        bufRef.current = (bufRef.current ? bufRef.current + " " : "") + text;
+        setTranscript(bufRef.current);
+        silenceRef.current = 0;
+        // Question detected in the buffer -> answer now.
+        if (autoRef.current && isLikelyQuestion(bufRef.current)) {
+          const q = bufRef.current.trim();
+          bufRef.current = "";
+          emit(q);
+        }
+      } else if (autoRef.current && bufRef.current.trim() && wc(bufRef.current) >= 5) {
+        // A silent window after the recruiter spoke -> they paused -> answer the buffer.
+        silenceRef.current += 1;
+        const q = bufRef.current.trim();
+        bufRef.current = "";
+        silenceRef.current = 0;
+        emit(q);
       }
       if (activeRef.current) recordWindow();
     };
@@ -124,7 +149,12 @@ export function useAutoListen({ onQuestion }) {
           const seg = r[0].transcript.trim();
           bufRef.current = (bufRef.current ? bufRef.current + " " : "") + seg;
           setTranscript(bufRef.current + " ");
-          if (autoRef.current && /[?.!]$/.test(seg)) emit(seg);
+          // End-of-sentence punctuation OR an interrogative buffer -> answer now.
+          if (autoRef.current && (/[?.!]$/.test(seg) || isLikelyQuestion(bufRef.current))) {
+            const q = bufRef.current.trim();
+            bufRef.current = "";
+            emit(q);
+          }
         } else { interim += r[0].transcript; if (r[0].transcript.trim()) gotResult = true; }
       }
       setTranscript((bufRef.current ? bufRef.current + " " : "") + interim);

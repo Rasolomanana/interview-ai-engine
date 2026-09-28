@@ -1,6 +1,11 @@
 # PRD — Copilote Entretien IA
 
-## Fonctionnalités (juin 2026) — Capture d'écran + vérif warning React
+## Amélioration (juin 2026) — Détection auto mains-libres + garde-fous
+- `useAutoListen` : déclenchement de la génération sur (a) « ? », (b) mots interrogatifs FR&EN (`isLikelyQuestion`), (c) SILENCE après parole (fenêtre vide + buffer ≥ 5 mots) → mains-libres même sans ponctuation. Appliqué aux voies Whisper (onglet) et Web Speech (micro). Buffer vidé après chaque emit.
+- `AutoListenBar` garde-fous : bouton visible « Réponse auto : ON / EN PAUSE » (coupe l'auto sans stopper l'écoute) + bandeau ambre en pause ; « Arrêter l'écoute » (rouge) ; « Interrompre » (barge-in composer) inchangé. `data-testid=listen-auto-toggle` conservé.
+- NB : captation Teams réelle (audio+permission) non testable en env automatisé.
+
+
 - Bouton « Capturer l'écran » (`InterviewConsole.captureScreen`, data-testid `capture-screen-btn`) : getDisplayMedia (vidéo) → frame sur canvas (JPEG 0.85, max 1600px) → envoyée via send() avec marqueur [REPONSE_ORALE] → état CANDIDAT + V1_VISION → analyse IA (tests psychotechniques/QCM/écran partagé). Stream écran gardé actif pour captures répétées ; nettoyage au démontage ; message clair si getDisplayMedia indisponible (mobile) ou refusé. Desktop uniquement.
 - Warning React "duplicate key" : VÉRIFIÉ ÉLIMINÉ (chargement propre + flux complet envoi/réponse serveur = 0 warning/erreur). Provenait d'un build antérieur ; toutes les clés de liste sont en index ou id unique.
 - NB : getDisplayMedia et micro réels non testables en env automatisé (écran/permission requis) — à valider sur la machine utilisateur.
