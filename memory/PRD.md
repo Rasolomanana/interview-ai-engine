@@ -1,6 +1,14 @@
 # PRD — Copilote Entretien IA
 
-## Fix DÉFINITIF (juin 2026) — Blocage Gemini en début d'entretien (réseau bloque Google)
+## Fonctionnalité (juin 2026) — Recruteur anglophone : traduction FR + réponse dans SA langue
+- Détection auto de la langue de la question (dans le MÊME appel LLM → zéro latence supplémentaire).
+- La réponse (et les libellés STAR / phrases « [À DIRE] ») est rédigée dans la langue du recruteur (anglais → réponse en anglais, à lire à voix haute).
+- Si la langue ≠ français : 1re ligne « 🌐 FR : <traduction concise> », affichée comme un bandeau bleu distinct (parse.js `translation` + CandidateBullets + FloatingAnswer). Aucune ligne vide / séparateur parasite.
+- STAR : libellés adaptés à la langue (Situation:/Task:/Action:/Result: en anglais).
+- Écoute auto : Whisper (onglet Teams/Zoom) passe en détection auto de langue (`language=auto` → None). Micro Web Speech : sélecteur FR/EN dans la barre d'écoute (`micLang`).
+- Vérifié navigateur : question EN → bandeau FR + réponse STAR en anglais, état CANDIDAT.
+
+
 - Symptôme : en mode Gemini, la 1re génération « bloquait » ; passer en Serveur (sans clé) débloquait.
 - Cause racine : `gemini.js` n'avait AUCUN timeout. Un réseau d'entreprise qui bloque Google en laissant la connexion pendante (sans erreur) fige `fetch` indéfiniment → le repli auto (déclenché par une erreur) ne partait jamais.
 - Fix 1 — chien de garde `gemini.js` : timeout « temps jusqu'au 1er token » de 9s. Sans réponse, on abandonne via une erreur normale (non-AbortError) → `streamMessage`/`streamRaw` basculent automatiquement sur le Serveur. Le barge-in utilisateur reste distingué (AbortError).

@@ -1,12 +1,23 @@
 import { motion } from "framer-motion";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Languages } from "lucide-react";
 import { segmentsFor } from "@/lib/parse";
 
 // Progressive reveal of the 3 telegraphic bullets (T2: puce 1 -> 2 -> 3).
 export default function CandidateBullets({ parsed, streaming }) {
-  const { alert, response, bullets } = parsed;
+  const { alert, response, translation, bullets } = parsed;
   return (
     <div className="space-y-2.5" data-testid="candidate-bullets">
+      {translation && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-2 rounded-lg border border-sky-500/30 bg-sky-950/30 px-3 py-2 text-[13px] text-sky-200"
+          data-testid="candidate-translation"
+        >
+          <Languages className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />
+          <span><span className="font-mono text-[11px] font-bold uppercase text-sky-400">FR&nbsp;·&nbsp;</span>{translation}</span>
+        </motion.div>
+      )}
       {alert && (
         <motion.div
           initial={{ opacity: 0, y: -6 }}

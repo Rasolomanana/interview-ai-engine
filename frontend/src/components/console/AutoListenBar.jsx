@@ -1,8 +1,8 @@
-import { Headphones, MonitorSpeaker, Mic, Square, Loader2, Zap, Eraser } from "lucide-react";
+import { Headphones, MonitorSpeaker, Mic, Square, Loader2, Zap, Eraser, Languages } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AutoListenBar({ listen, onGenerate }) {
-  const { active, source, transcript, busy, auto, setAuto, start, stop, supported, setTranscript, clearTranscript } = listen;
+  const { active, source, transcript, busy, auto, setAuto, micLang, setMicLang, start, stop, supported, setTranscript, clearTranscript } = listen;
 
   const startSrc = async (src) => {
     try { await start(src); } catch (e) { toast.error(e.message); }
@@ -25,6 +25,15 @@ export default function AutoListenBar({ listen, onGenerate }) {
               className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-40">
               <Mic className="h-3.5 w-3.5" /> Micro (téléphone à proximité)
             </button>
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-0.5" data-testid="mic-lang-toggle" title="Langue du recruteur au micro">
+              <Languages className="ml-1 h-3.5 w-3.5 text-slate-500" />
+              {[["fr-FR", "FR"], ["en-US", "EN"]].map(([code, label]) => (
+                <button key={code} data-testid={`mic-lang-${label.toLowerCase()}`} onClick={() => setMicLang(code)}
+                  className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${micLang === code ? "bg-emerald-500/20 text-emerald-200" : "text-slate-400 hover:text-white"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </>
         ) : (
           <>

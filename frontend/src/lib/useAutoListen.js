@@ -11,15 +11,18 @@ export function useAutoListen({ onQuestion }) {
   const [transcript, setTranscript] = useState("");
   const [busy, setBusy] = useState(false);
   const [auto, setAuto] = useState(true);
+  const [micLang, setMicLang] = useState("fr-FR");
 
   const activeRef = useRef(false);
   const autoRef = useRef(true);
+  const micLangRef = useRef("fr-FR");
   const streamRef = useRef(null);
   const recRef = useRef(null);
   const speechRef = useRef(null);
   const bufRef = useRef("");
 
   useEffect(() => { autoRef.current = auto; }, [auto]);
+  useEffect(() => { micLangRef.current = micLang; }, [micLang]);
 
   // Reset the captured question (buffer + field). Used after each generation.
   const clearTranscript = useCallback(() => {
@@ -54,7 +57,7 @@ export function useAutoListen({ onQuestion }) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) throw new Error("Reconnaissance vocale non supportée par ce navigateur.");
     const rec = new SR();
-    rec.lang = "fr-FR"; rec.continuous = true; rec.interimResults = true;
+    rec.lang = micLangRef.current || "fr-FR"; rec.continuous = true; rec.interimResults = true;
     bufRef.current = "";
     rec.onresult = (e) => {
       let interim = "";
@@ -127,5 +130,5 @@ export function useAutoListen({ onQuestion }) {
 
   useEffect(() => () => stop(), [stop]);
   const supported = typeof navigator !== "undefined" && !!navigator.mediaDevices;
-  return { active, source, transcript, busy, auto, setAuto, start, stop, supported, setTranscript: editTranscript, clearTranscript };
+  return { active, source, transcript, busy, auto, setAuto, micLang, setMicLang, start, stop, supported, setTranscript: editTranscript, clearTranscript };
 }

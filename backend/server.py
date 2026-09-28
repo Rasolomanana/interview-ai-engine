@@ -528,15 +528,17 @@ async def analyze_company(req: CompanyAnalyzeRequest):
 
 
 @api_router.post("/transcribe")
-async def transcribe(file: UploadFile = File(...), language: str = Form("fr")):
+async def transcribe(file: UploadFile = File(...), language: str = Form("auto")):
     if not EMERGENT_LLM_KEY:
         raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY manquant")
     data = await file.read()
     buf = io.BytesIO(data)
     buf.name = file.filename or "audio.webm"
     stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
+    # "auto"/empty -> let Whisper auto-detect the spoken language (FR, EN, ...).
+    lang = None if (not language or language.lower() == "auto") else language
     try:
-        resp = await stt.transcribe(file=buf, model="whisper-1", response_format="json", language=language)
+        resp = await stt.transcribe(file=buf, model="whisper-1", response_format="json", language=lang)
         return {"text": resp.text}
     except Exception as e:  # noqa: BLE001
         logger.exception("Whisper failed")

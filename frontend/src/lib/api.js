@@ -55,7 +55,7 @@ async function extractPdfServer(file) {
 export async function transcribeBlob(blob) {
   const fd = new FormData();
   fd.append("file", blob, "audio.webm");
-  fd.append("language", "fr");
+  fd.append("language", "auto");
   const resp = await fetch(`${BACKEND_URL}/api/transcribe`, { method: "POST", body: fd });
   if (!resp.ok) throw new Error(`Transcription ${resp.status}`);
   return (await resp.json()).text || "";
