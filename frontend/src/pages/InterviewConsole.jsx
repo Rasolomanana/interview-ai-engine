@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Send, Mic, MicOff, ImagePlus, X, Zap, RotateCcw, SlidersHorizontal,
-  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound, FileText, Headphones, PictureInPicture2,
+  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound, FileText, Headphones, PictureInPicture2, MonitorUp,
 } from "lucide-react";
 import * as api from "@/lib/api";
 import { useVoice } from "@/lib/useVoice";
@@ -52,6 +52,7 @@ export default function InterviewConsole() {
   const controllerRef = useRef(null);
   const threadRef = useRef(null);
   const fileRef = useRef(null);
+  const screenStreamRef = useRef(null);
   const streamInfoRef = useRef({ mode: "NEUTRE", modules: [] });
   const initRef = useRef(false);
 
@@ -86,7 +87,10 @@ export default function InterviewConsole() {
     if (voice.listening && voice.transcript) setInput(voice.transcript);
   }, [voice.transcript, voice.listening]);
 
-  useEffect(() => () => { try { pipWinRef.current?.close(); } catch (e) {} }, []);
+  useEffect(() => () => {
+    try { pipWinRef.current?.close(); } catch (e) {}
+    try { screenStreamRef.current?.getTracks().forEach((t) => t.stop()); } catch (e) {}
+  }, []);
 
   const selectSession = async (id) => {
     const data = await api.getSession(id);
@@ -221,6 +225,46 @@ export default function InterviewConsole() {
       setPendingMode(null);
     }
     send(raw, display, image);
+  };
+
+  // Capture the recruiter's shared screen (desktop only) and send the frame to the
+  // AI for analysis — psychotechnical tests, MCQs, diagrams shown on screen.
+  // The screen stream is kept alive so repeated captures are instant (pick once).
+  const captureScreen = async () => {
+    if (!active || streaming.active) return;
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      toast.error("Capture d'écran indisponible sur cet appareil (ordinateur requis).");
+      return;
+    }
+    try {
+      let stream = screenStreamRef.current;
+      if (!stream || !stream.active) {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: false });
+        screenStreamRef.current = stream;
+        stream.getVideoTracks()[0].addEventListener("ended", () => { screenStreamRef.current = null; });
+      }
+      const track = stream.getVideoTracks()[0];
+      const video = document.createElement("video");
+      video.srcObject = new MediaStream([track]);
+      video.muted = true;
+      await new Promise((res) => { video.onloadedmetadata = res; });
+      await video.play();
+      await new Promise((r) => setTimeout(r, 200));
+      let w = video.videoWidth || 1280;
+      let h = video.videoHeight || 720;
+      const maxW = 1600;
+      if (w > maxW) { h = Math.round((h * maxW) / w); w = maxW; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(video, 0, 0, w, h);
+      video.pause(); video.srcObject = null;
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      toast.success("Écran capturé — analyse en cours…");
+      send("[REPONSE_ORALE] Analyse le test / la question affiché(e) sur l'écran capturé et donne la réponse à dire.", "🖼️ Capture d'écran (test)", dataUrl);
+    } catch (e) {
+      if (e.name === "NotAllowedError") toast("Capture annulée.");
+      else toast.error("Capture impossible : " + (e.message || e.name));
+    }
   };
 
   const lastRecruiterQuestion = [...messages].reverse().find((m) => m.role === "assistant" && m.mode === "RECRUTEUR")?.content;
@@ -418,6 +462,9 @@ export default function InterviewConsole() {
             <div className="flex items-end gap-2">
               <button onClick={() => fileRef.current?.click()} data-testid="image-upload-btn" className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-slate-400 transition-colors hover:text-white" title="Joindre une image">
                 <ImagePlus className="h-5 w-5" />
+              </button>
+              <button onClick={captureScreen} disabled={streaming.active} data-testid="capture-screen-btn" className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-sky-300 transition-colors hover:bg-sky-500/20 disabled:opacity-40" title="Capturer l'écran partagé du recruteur (test psychotechnique) — ordinateur uniquement">
+                <MonitorUp className="h-5 w-5" />
               </button>
               <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => {
                 const f = e.target.files?.[0];

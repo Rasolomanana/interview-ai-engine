@@ -1,6 +1,22 @@
 # PRD — Copilote Entretien IA
 
-## Amélioration (juin 2026) — Micro Android robuste (codecs mobiles)
+## Fonctionnalités (juin 2026) — Capture d'écran + vérif warning React
+- Bouton « Capturer l'écran » (`InterviewConsole.captureScreen`, data-testid `capture-screen-btn`) : getDisplayMedia (vidéo) → frame sur canvas (JPEG 0.85, max 1600px) → envoyée via send() avec marqueur [REPONSE_ORALE] → état CANDIDAT + V1_VISION → analyse IA (tests psychotechniques/QCM/écran partagé). Stream écran gardé actif pour captures répétées ; nettoyage au démontage ; message clair si getDisplayMedia indisponible (mobile) ou refusé. Desktop uniquement.
+- Warning React "duplicate key" : VÉRIFIÉ ÉLIMINÉ (chargement propre + flux complet envoi/réponse serveur = 0 warning/erreur). Provenait d'un build antérieur ; toutes les clés de liste sont en index ou id unique.
+- NB : getDisplayMedia et micro réels non testables en env automatisé (écran/permission requis) — à valider sur la machine utilisateur.
+
+
+- Architecture confirmée : app 100% client (état + prompts + persistance dans le navigateur) ; backend = 5 endpoints utilitaires (/generate, /transcribe, /analyze-company, /analyze-application, /extract-pdf).
+- 🔧 Corrigé : `tests/test_analyze_application.py` réécrit pour le contrat job+polling → 30/30 tests backend passent.
+- Dette technique identifiée (SANS impact utilisateur, non corrigée volontairement) :
+  * `backend/state_machine.py` + `backend/prompt.py` + endpoints `/sessions/*`, `/sessions/{id}/message`, `/state/resolve` = code legacy non utilisé à l'exécution ; portent l'ancien prompt (3 puces + question NEUTRE, sans STAR/langue/anti-salutation). Divergent du frontend qui fait autorité.
+  * Collection Mongo `analysis_jobs` sans purge.
+  * Repli DeepSeek ignore l'image.
+  * CORS allow_credentials=True + origins "*" (inoffensif, pas de credentials).
+  * Warning React "duplicate key" (dev-only, cosmétique).
+- Tous les correctifs récents confirmés présents dans le chemin actif (frontend) : §4.5, STAR bilingue, LANGUAGE_REMINDER, anti-salutation, robustesse, chien de garde Gemini, repli micro Whisper, job+polling.
+
+
 - `useAutoListen.recordWindow` : sélection du codec réellement supporté (Android Chrome n'a souvent que opus) via MediaRecorder.isTypeSupported ; blob créé avec le vrai mimeType.
 - `transcribeBlob` : extension de fichier dérivée du mimeType (webm/ogg/mp4/wav) pour que Whisper accepte l'audio.
 - Scénarios Android : a (tel. écoute un entretien sur PC) et c (copilote sur 2e appareil) → OK via micro + Whisper. b (entretien ET copilote sur le MÊME tel. pendant un appel Teams/Zoom) → limité par Android (l'app d'appel monopolise le micro, navigateur en arrière-plan coupe la capture) ; recommander a ou c. Capture d'onglet (getDisplayMedia audio) NON supportée sur mobile.
