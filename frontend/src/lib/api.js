@@ -102,6 +102,42 @@ export async function analyzeApplication({ cv, poste, url, onProgress, signal })
   throw new Error("Analyse expirée (délai dépassé)");
 }
 
+// Generate a one-page cover letter tailored to the job offer + (ATS) CV.
+// Same job + polling model as analyzeApplication (immune to proxy timeouts).
+export async function generateCoverLetter({ cv, poste, entreprise, onProgress, signal }) {
+  const start = await fetch(`${BACKEND_URL}/api/cover-letter`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cv: cv || "", poste: poste || "", entreprise: entreprise || "" }),
+    signal,
+  });
+  if (!start.ok) {
+    let d = "";
+    try { d = (await start.json())?.detail || ""; } catch (e) { /* ignore */ }
+    throw new Error(d || `Erreur ${start.status}`);
+  }
+  const { job_id } = await start.json();
+  if (!job_id) throw new Error("Impossible de démarrer la génération");
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) throw new Error("Génération annulée");
+    await new Promise((r) => setTimeout(r, 2000));
+    onProgress?.();
+    let poll;
+    try {
+      poll = await fetch(`${BACKEND_URL}/api/analyze-application/${job_id}`, { signal });
+    } catch (e) {
+      if (signal?.aborted) throw new Error("Génération annulée");
+      continue;
+    }
+    if (!poll.ok) continue;
+    const p = await poll.json();
+    if (p.status === "done") return p.result?.letter || "";
+    if (p.status === "error") throw new Error(p.error || "Génération échouée");
+  }
+  throw new Error("Génération expirée (délai dépassé)");
+}
+
 // Analyze a company / careers URL -> streamed briefing (values, culture, likely questions).
 export async function analyzeCompany({ url, poste, cv, onDelta, signal }) {
   const resp = await fetch(`${BACKEND_URL}/api/analyze-company`, {

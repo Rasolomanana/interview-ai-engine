@@ -1,6 +1,11 @@
 # PRD — Copilote Entretien IA
 
-## Fonctionnalité (juin 2026) — Export Word du CV ATS
+## Fonctionnalité (juin 2026) — Lettre de motivation IA + export Word
+- Backend : `/api/cover-letter` (job+polling, réutilise `analysis_jobs` + poll `/analyze-application/{job_id}`). Worker `_run_cover_letter` via `_generate_text` (Claude Sonnet). Lettre 1 page (~300 mots), adaptée à l'offre + CV ATS + valeurs entreprise, dans la langue de l'offre. Testé ingress : job done ~14s, lettre FR valide.
+- Frontend : `api.generateCoverLetter({cv,poste,entreprise})` (POST+poll) ; `docxExport.downloadCoverLetterDocx` (Word 1 page, marges 1", justifié, gras). ContextPanel : bloc « Lettre de motivation » (bouton Générer/Régénérer violet + textarea éditable + bouton Télécharger Word). Persisté dans context.coverLetter (saveContext).
+- .docx lettre validé (test Node : PK, gras préservé). Téléchargement navigateur réel à confirmer côté utilisateur.
+
+
 - Dépendance `docx@8.5.0` (yarn add ; version compatible node 20).
 - `frontend/src/lib/docxExport.js` : `downloadAtsCvDocx(markdown, filename)` convertit le markdown ATS en .docx mis en forme (## → sections+filet, ### → sous-titres, **gras**, puces, --- ignoré ; Calibri 10-11pt, marges 0.5" pour ~2 pages).
 - Bouton `download-ats-word-btn` dans ContextPanel (colonne droite, sous le CV ATS) : exporte UNIQUEMENT le CV optimisé ATS, nom de fichier basé sur poste/session.

@@ -446,11 +446,68 @@ async def analyze_application(req: ApplicationAnalyzeRequest):
 
 @api_router.get("/analyze-application/{job_id}")
 async def analyze_application_status(job_id: str):
-    """Poll the status/result of an analysis job."""
+    """Poll the status/result of an analysis or cover-letter job."""
     doc = await db.analysis_jobs.find_one({"job_id": job_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Job introuvable")
     return {"status": doc.get("status"), "result": doc.get("result"), "error": doc.get("error")}
+
+
+class CoverLetterRequest(BaseModel):
+    cv: str = ""
+    poste: str = ""
+    entreprise: str = ""
+
+
+async def _run_cover_letter(job_id: str, cv: str, poste: str, entreprise: str):
+    """Background worker: write a one-page cover letter tailored to the job offer
+    and the (ATS-optimized) CV. Stored in analysis_jobs, polled like the analysis."""
+    try:
+        system_message = (
+            "Tu es un expert senior en recrutement et en rédaction de candidatures. "
+            "Tu écris des lettres de motivation percutantes, sincères et sur-mesure, qui donnent envie de rencontrer le candidat. "
+            "Tu rédiges dans la langue de l'OFFRE D'EMPLOI (français par défaut)."
+        )
+        user_text = (
+            f"CV DU CANDIDAT (optimisé) :\n{cv[:6000]}\n\n"
+            f"OFFRE / POSTE VISÉ :\n{poste[:4000]}\n\n"
+            f"INFOS ENTREPRISE (valeurs, culture — peut être vide) :\n{entreprise[:3000]}\n\n"
+            "Rédige une LETTRE DE MOTIVATION prête à envoyer, tenant sur UNE SEULE PAGE (environ 280 à 350 mots, 3 à 4 paragraphes). "
+            "Structure : (1) une accroche qui montre l'intérêt pour CE poste et CETTE entreprise ; "
+            "(2) l'adéquation du profil avec les exigences de l'offre, en t'appuyant sur des réalisations CONCRÈTES et CHIFFRÉES tirées du CV ; "
+            "(3) la motivation précise, ancrée dans les valeurs/mission de l'entreprise ; "
+            "(4) une conclusion avec disponibilité et invitation à un entretien. "
+            "Commence par « Objet : Candidature au poste de ... » puis « Madame, Monsieur, ». "
+            "Termine par une formule de politesse et « [Votre nom] » comme signature. "
+            "Style professionnel, chaleureux et confiant, sans exagération ni cliché creux. "
+            "Ne mets PAS d'en-tête d'adresse ni de date. Réponds UNIQUEMENT avec le texte de la lettre (pas de commentaire, pas de balises markdown)."
+        )
+        letter = (await _generate_text(system_message, user_text)).strip()
+        if not letter:
+            await db.analysis_jobs.update_one({"job_id": job_id}, {"$set": {"status": "error", "error": "Lettre vide", "updated_at": _now_iso()}})
+            return
+        await db.analysis_jobs.update_one(
+            {"job_id": job_id},
+            {"$set": {"status": "done", "result": {"letter": letter}, "updated_at": _now_iso()}},
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.exception("cover-letter job %s failed", job_id)
+        await db.analysis_jobs.update_one({"job_id": job_id}, {"$set": {"status": "error", "error": str(e)[:300], "updated_at": _now_iso()}})
+
+
+@api_router.post("/cover-letter")
+async def cover_letter(req: CoverLetterRequest):
+    """Start a cover-letter job in the background; poll GET /analyze-application/{job_id}."""
+    if not EMERGENT_LLM_KEY and not DEEPSEEK_API_KEY:
+        raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
+    import asyncio
+    job_id = str(uuid.uuid4())
+    await db.analysis_jobs.insert_one({
+        "job_id": job_id, "status": "pending", "result": None, "error": None,
+        "created_at": _now_iso(), "updated_at": _now_iso(),
+    })
+    asyncio.create_task(_run_cover_letter(job_id, req.cv, req.poste, req.entreprise))
+    return {"job_id": job_id, "status": "pending"}
 
 
 @api_router.post("/analyze-company")

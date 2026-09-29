@@ -18,6 +18,37 @@ function inlineRuns(text, base = {}) {
   return runs;
 }
 
+// Export a cover letter (plain prose) to a clean one-page Word .docx.
+export async function downloadCoverLetterDocx(text, filename = "Lettre-de-motivation.docx") {
+  const lines = (text || "").replace(/\r/g, "").split("\n");
+  const children = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) { children.push(new Paragraph({ spacing: { after: 120 } })); continue; }
+    children.push(new Paragraph({
+      spacing: { after: 120, line: 276 },
+      alignment: AlignmentType.JUSTIFIED,
+      children: inlineRuns(line, { size: 22 }),
+    }));
+  }
+  const doc = new Document({
+    styles: { default: { document: { run: { font: "Calibri", size: 22 } } } },
+    sections: [{
+      properties: { page: { margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } },
+      children,
+    }],
+  });
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 // docx `size` is in half-points (20 = 10pt).
 export async function downloadAtsCvDocx(markdown, filename = "CV-optimise-ATS.docx") {
   const lines = (markdown || "").replace(/\r/g, "").split("\n");

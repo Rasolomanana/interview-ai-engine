@@ -1,18 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { X, FileText, Briefcase, Building2, Layers, Save, Upload, Loader2, Globe, Sparkles, Gauge, AlertTriangle, KeyRound, Target, FileDown } from "lucide-react";
-import { extractPdf, analyzeApplication } from "@/lib/api";
-import { downloadAtsCvDocx } from "@/lib/docxExport";
+import { X, FileText, Briefcase, Building2, Layers, Save, Upload, Loader2, Globe, Sparkles, Gauge, AlertTriangle, KeyRound, Target, FileDown, Mail } from "lucide-react";
+import { extractPdf, analyzeApplication, generateCoverLetter } from "@/lib/api";
+import { downloadAtsCvDocx, downloadCoverLetterDocx } from "@/lib/docxExport";
 
 const SECTEURS = ["Logistique", "Tech", "Finance", "Autre"];
-const EMPTY = { title: "", cv: "", poste: "", entreprise: "", secteur: "Autre", atsCv: "", score: null, gaps: [], missingKeywords: [], redFlags: [] };
+const EMPTY = { title: "", cv: "", poste: "", entreprise: "", secteur: "Autre", atsCv: "", score: null, gaps: [], missingKeywords: [], redFlags: [], coverLetter: "" };
 
 export default function ContextPanel({ open, session, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY);
   const [importing, setImporting] = useState(false);
   const [companyUrl, setCompanyUrl] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
+  const [genLetter, setGenLetter] = useState(false);
   const pdfRef = useRef(null);
 
   useEffect(() => {
@@ -22,6 +23,7 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
         title: session.title || "",
         cv: c.cv || "", poste: c.poste || "", entreprise: c.entreprise || "", secteur: c.secteur || "Autre",
         atsCv: c.atsCv || "", score: c.score ?? null, gaps: c.gaps || [], missingKeywords: c.missingKeywords || [], redFlags: c.redFlags || [],
+        coverLetter: c.coverLetter || "",
       });
     }
   }, [session, open]);
@@ -45,6 +47,21 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
       toast.error("Analyse échouée : " + err.message);
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const runCoverLetter = async () => {
+    if (!form.poste.trim()) { toast.error("Ajoutez l'offre / le poste visé d'abord"); return; }
+    if (!form.atsCv.trim() && !form.cv.trim()) { toast.error("Ajoutez votre CV (ou lancez l'analyse ATS) d'abord"); return; }
+    setGenLetter(true);
+    try {
+      const letter = await generateCoverLetter({ cv: form.atsCv || form.cv, poste: form.poste, entreprise: form.entreprise });
+      setForm((f) => ({ ...f, coverLetter: letter }));
+      toast.success("Lettre de motivation générée");
+    } catch (err) {
+      toast.error("Génération échouée : " + err.message);
+    } finally {
+      setGenLetter(false);
     }
   };
 
@@ -193,6 +210,42 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
                         <li key={i} className="flex gap-2 text-[13px] text-slate-300"><span className="text-slate-500">•</span>{g}</li>
                       ))}
                   </ul>
+                </Group>
+
+                <Group icon={<Mail className="h-4 w-4" />} label="Lettre de motivation (1 page, adaptée à l'offre + CV ATS)">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      data-testid="generate-cover-letter-btn"
+                      onClick={runCoverLetter}
+                      disabled={genLetter}
+                      className="flex items-center gap-2 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-200 transition-colors hover:bg-violet-500/20 disabled:opacity-40"
+                    >
+                      {genLetter ? <><Loader2 className="h-4 w-4 animate-spin" /> Génération…</> : <><Sparkles className="h-4 w-4" /> {form.coverLetter ? "Régénérer la lettre" : "Générer la lettre"}</>}
+                    </button>
+                    {form.coverLetter && (
+                      <button
+                        data-testid="download-cover-letter-word-btn"
+                        onClick={async () => {
+                          try {
+                            const name = (form.title || form.poste || "candidature").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 40) || "candidature";
+                            await downloadCoverLetterDocx(form.coverLetter, `Lettre-motivation-${name}.docx`);
+                            toast.success("Lettre Word téléchargée.");
+                          } catch (e) { toast.error("Export Word impossible : " + (e.message || e)); }
+                        }}
+                        className="flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200 transition-colors hover:bg-sky-500/20"
+                      >
+                        <FileDown className="h-4 w-4" /> Télécharger en Word (1 page)
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    data-testid="cover-letter"
+                    value={form.coverLetter}
+                    onChange={(e) => field("coverLetter", e.target.value)}
+                    rows={12}
+                    className="input mt-2 resize-y text-[13px] leading-relaxed"
+                    placeholder="Clique « Générer la lettre » : l'IA RH rédige une lettre d'une page adaptée à l'offre et à ton CV ATS. Tu peux la retoucher avant de la télécharger."
+                  />
                 </Group>
               </div>
             </div>
