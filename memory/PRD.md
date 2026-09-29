@@ -1,6 +1,12 @@
 # PRD — Copilote Entretien IA
 
-## Amélioration (juin 2026) — Détection auto mains-libres + garde-fous
+## Fonctionnalité (juin 2026) — Export Word du CV ATS
+- Dépendance `docx@8.5.0` (yarn add ; version compatible node 20).
+- `frontend/src/lib/docxExport.js` : `downloadAtsCvDocx(markdown, filename)` convertit le markdown ATS en .docx mis en forme (## → sections+filet, ### → sous-titres, **gras**, puces, --- ignoré ; Calibri 10-11pt, marges 0.5" pour ~2 pages).
+- Bouton `download-ats-word-btn` dans ContextPanel (colonne droite, sous le CV ATS) : exporte UNIQUEMENT le CV optimisé ATS, nom de fichier basé sur poste/session.
+- Vérifié : .docx valide (ZIP PK, word/document.xml, titres/gras/puces OK) via test Node. Téléchargement navigateur réel à valider côté utilisateur.
+
+
 - `useAutoListen` : déclenchement de la génération sur (a) « ? », (b) mots interrogatifs FR&EN (`isLikelyQuestion`), (c) SILENCE après parole (fenêtre vide + buffer ≥ 5 mots) → mains-libres même sans ponctuation. Appliqué aux voies Whisper (onglet) et Web Speech (micro). Buffer vidé après chaque emit.
 - `AutoListenBar` garde-fous : bouton visible « Réponse auto : ON / EN PAUSE » (coupe l'auto sans stopper l'écoute) + bandeau ambre en pause ; « Arrêter l'écoute » (rouge) ; « Interrompre » (barge-in composer) inchangé. `data-testid=listen-auto-toggle` conservé.
 - NB : captation Teams réelle (audio+permission) non testable en env automatisé.

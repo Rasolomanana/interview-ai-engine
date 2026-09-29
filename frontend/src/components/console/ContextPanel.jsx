@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { X, FileText, Briefcase, Building2, Layers, Save, Upload, Loader2, Globe, Sparkles, Gauge, AlertTriangle, KeyRound, Target } from "lucide-react";
+import { X, FileText, Briefcase, Building2, Layers, Save, Upload, Loader2, Globe, Sparkles, Gauge, AlertTriangle, KeyRound, Target, FileDown } from "lucide-react";
 import { extractPdf, analyzeApplication } from "@/lib/api";
+import { downloadAtsCvDocx } from "@/lib/docxExport";
 
 const SECTEURS = ["Logistique", "Tech", "Finance", "Autre"];
 const EMPTY = { title: "", cv: "", poste: "", entreprise: "", secteur: "Autre", atsCv: "", score: null, gaps: [], missingKeywords: [], redFlags: [] };
@@ -150,6 +151,21 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
 
                 <Group icon={<Target className="h-4 w-4" />} label="CV optimisé ATS (modifiable — rectifie les chiffres)">
                   <textarea data-testid="ats-cv" value={form.atsCv} onChange={(e) => field("atsCv", e.target.value)} rows={14} className="input resize-y font-mono text-[12.5px] leading-relaxed" placeholder="Clique « Analyser » pour générer un CV optimisé ATS avec des réalisations chiffrées. Les valeurs [à confirmer] sont à rectifier." />
+                  <button
+                    data-testid="download-ats-word-btn"
+                    onClick={async () => {
+                      if (!form.atsCv.trim()) { toast.error("Aucun CV ATS à télécharger — lance d'abord l'analyse."); return; }
+                      try {
+                        const name = (form.title || form.poste || "CV").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 40) || "CV";
+                        await downloadAtsCvDocx(form.atsCv, `CV-ATS-${name}.docx`);
+                        toast.success("CV Word téléchargé.");
+                      } catch (e) { toast.error("Export Word impossible : " + (e.message || e)); }
+                    }}
+                    disabled={!form.atsCv.trim()}
+                    className="mt-2 flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200 transition-colors hover:bg-sky-500/20 disabled:opacity-40"
+                  >
+                    <FileDown className="h-4 w-4" /> Télécharger en Word (mis en forme, ~2 pages)
+                  </button>
                 </Group>
 
                 <Group icon={<KeyRound className="h-4 w-4" />} label="5 mots-clés manquants">
