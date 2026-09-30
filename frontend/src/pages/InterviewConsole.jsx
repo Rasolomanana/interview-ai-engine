@@ -227,6 +227,25 @@ export default function InterviewConsole() {
     send(raw, display, image);
   };
 
+  // Paste an image straight from the clipboard (Ctrl/Cmd+V) into the composer.
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const it of items) {
+      if (it.type && it.type.startsWith("image/")) {
+        const f = it.getAsFile();
+        if (f) {
+          const r = new FileReader();
+          r.onload = () => setImage(r.result);
+          r.readAsDataURL(f);
+          toast.success("Image collée depuis le presse-papier.");
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+  };
+
   // Capture the recruiter's shared screen (desktop only) and send the frame to the
   // AI for analysis — psychotechnical tests, MCQs, diagrams shown on screen.
   // The screen stream is kept alive so repeated captures are instant (pick once).
@@ -460,7 +479,7 @@ export default function InterviewConsole() {
               </div>
             )}
             <div className="flex items-end gap-2">
-              <button onClick={() => fileRef.current?.click()} data-testid="image-upload-btn" className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-slate-400 transition-colors hover:text-white" title="Joindre une image">
+              <button onClick={() => fileRef.current?.click()} data-testid="image-upload-btn" className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-slate-400 transition-colors hover:text-white" title="Joindre une image (ou coller avec Ctrl/Cmd+V)">
                 <ImagePlus className="h-5 w-5" />
               </button>
               <button onClick={captureScreen} disabled={streaming.active} data-testid="capture-screen-btn" className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-sky-300 transition-colors hover:bg-sky-500/20 disabled:opacity-40" title="Capturer l'écran partagé du recruteur (test psychotechnique) — ordinateur uniquement">
@@ -489,6 +508,7 @@ export default function InterviewConsole() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitInput(); } }}
+                onPaste={handlePaste}
                 rows={2}
                 data-testid="message-input"
                 placeholder={state === "RECRUTEUR" ? "Votre réponse au recruteur…" : "Question du recruteur à traiter…"}

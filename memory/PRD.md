@@ -1,6 +1,10 @@
 # PRD — Copilote Entretien IA
 
-## Fonctionnalité (juin 2026) — Lettre de motivation IA + export Word
+## Fonctionnalité (juin 2026) — Collage d'image (Ctrl/Cmd+V) dans le composer
+- `InterviewConsole.handlePaste` branché sur `onPaste` du textarea `message-input` : détecte une image dans le presse-papier → FileReader → `setImage` (data URL) → aperçu + toast. Même chemin vision que l'upload/capture d'écran. Titre du bouton image mis à jour.
+- Vérifié navigateur : événement paste synthétique avec fichier image → aperçu `image-preview` visible + toast « Image collée ».
+
+
 - Backend : `/api/cover-letter` (job+polling, réutilise `analysis_jobs` + poll `/analyze-application/{job_id}`). Worker `_run_cover_letter` via `_generate_text` (Claude Sonnet). Lettre 1 page (~300 mots), adaptée à l'offre + CV ATS + valeurs entreprise, dans la langue de l'offre. Testé ingress : job done ~14s, lettre FR valide.
 - Frontend : `api.generateCoverLetter({cv,poste,entreprise})` (POST+poll) ; `docxExport.downloadCoverLetterDocx` (Word 1 page, marges 1", justifié, gras). ContextPanel : bloc « Lettre de motivation » (bouton Générer/Régénérer violet + textarea éditable + bouton Télécharger Word). Persisté dans context.coverLetter (saveContext).
 - .docx lettre validé (test Node : PK, gras préservé). Téléchargement navigateur réel à confirmer côté utilisateur.
