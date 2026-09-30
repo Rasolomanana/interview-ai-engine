@@ -1,6 +1,11 @@
 # PRD — Copilote Entretien IA
 
-## Fonctionnalité (juin 2026) — Collage d'image (Ctrl/Cmd+V) dans le composer
+## Fonctionnalité (juin 2026) — Multi-images (analyse de plusieurs problèmes à la fois)
+- Backend `/api/generate` : `images_base64: List[str]` (rétro-compat `image_base64`). `_stream_with_fallback` construit N `ImageContent`. Vérifié ingress : 2 images réelles → 2 problèmes résolus séparément (« 42 », « Paris »).
+- Frontend : `image` state = tableau. Collage (Ctrl/Cmd+V) multiple, upload `multiple`, capture d'écran = append (n'envoie plus seul). Aperçus multiples avec suppression individuelle + « tout retirer ». `send` → `body.images` (array) ; `streamServer`/`streamGemini` bouclent sur les images ; `streamMessage` normalise en tableau.
+- Prompt VISION multi : traite CHAQUE image et CHAQUE problème séparément (matrice/suite, association/glisser-déposer, QCM, schéma), titre en gras + réponse (appariement complet si association) + justification. Réponses persistées dans l'historique de session.
+
+
 - `InterviewConsole.handlePaste` branché sur `onPaste` du textarea `message-input` : détecte une image dans le presse-papier → FileReader → `setImage` (data URL) → aperçu + toast. Même chemin vision que l'upload/capture d'écran. Titre du bouton image mis à jour.
 - Vérifié navigateur : événement paste synthétique avec fichier image → aperçu `image-preview` visible + toast « Image collée ».
 

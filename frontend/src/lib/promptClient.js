@@ -131,7 +131,7 @@ export function buildTurnMessage(resolved, text, ctx, history, stateCandidat, vo
   if (mode === "CANDIDAT") parts.push(TONE_REMINDER[tone] || TONE_REMINDER.confiant);
   const vmod = resolved.voice_module;
   if (vmod && VOICE_REMINDER[vmod]) parts.push("VOIX : " + VOICE_REMINDER[vmod]);
-  if (hasImage && mode === "CANDIDAT") parts.push("VISION : applique le FORMAT STRICT [RÉPONSE : X] + Logique + À prononcer.");
+  if (hasImage && mode === "CANDIDAT") parts.push("VISION (multi-images) : une ou PLUSIEURS images peuvent être jointes, et chaque image peut contenir un ou plusieurs problèmes (matrice/suite logique, association ou glisser-déposer, QCM, dominos, schéma…). Traite CHAQUE problème SÉPARÉMENT, dans l'ordre. Pour chacun : (1) un titre court en gras (ex. « **Image 1 — Matrice logique** », « **Association tableaux de bord** »), (2) la RÉPONSE claire — pour une association, donne l'APPARIEMENT COMPLET question → réponse ligne par ligne ; pour un QCM/matrice, la bonne option et l'élément manquant — (3) une justification brève (< 20 mots). Utilise des puces. N'invente JAMAIS : si une image est floue/illisible, signale-le explicitement pour ce problème.");
   if (history && history.length) parts.push("\n[HISTORIQUE RÉCENT]\n" + history.slice(-6).map((h) => `${h.role}: ${h.content}`).join("\n"));
   parts.push("\n[MESSAGE UTILISATEUR]\n" + (text || "(aucun texte — voir image)"));
   return parts.join("\n");

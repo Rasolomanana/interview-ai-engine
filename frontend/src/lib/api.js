@@ -300,7 +300,8 @@ export function streamMessage(sessionId, body, handlers) {
       const { session, messages } = await getSession(sessionId);
       if (!session) { handlers.onError?.("Session introuvable"); return; }
       const settings = await getSettings();
-      const hasImage = !!body.image_base64;
+      const images = (body.images && body.images.length) ? body.images : (body.image_base64 ? [body.image_base64] : []);
+      const hasImage = images.length > 0;
 
       const resolved = resolveState({
         current_state: session.state,
@@ -338,21 +339,21 @@ export function streamMessage(sessionId, body, handlers) {
       let emitted = false;
       const onDelta = (c) => { full += c; emitted = true; handlers.onDelta?.(c); };
       if (useServer) {
-        await streamServer({ systemMessage, userText: turnMessage, imageDataUrl: body.image_base64, signal: controller.signal, onDelta });
+        await streamServer({ systemMessage, userText: turnMessage, images, signal: controller.signal, onDelta });
       } else {
         try {
           await streamGemini({
             apiKey: settings.geminiKey,
             model: settings.model || "gemini-3.8-flash",
             systemMessage, userText: turnMessage,
-            imageDataUrl: body.image_base64, signal: controller.signal, onDelta,
+            images, signal: controller.signal, onDelta,
           });
         } catch (err) {
           if (!emitted && err.name !== "AbortError") {
             geminiUnavailable = true;
             handlers.onFallback?.(String(err?.message || ""));
             full = "";
-            await streamServer({ systemMessage, userText: turnMessage, imageDataUrl: body.image_base64, signal: controller.signal, onDelta });
+            await streamServer({ systemMessage, userText: turnMessage, images, signal: controller.signal, onDelta });
           } else {
             throw err;
           }

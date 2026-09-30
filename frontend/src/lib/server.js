@@ -3,11 +3,12 @@
 // machines where those APIs are blocked by an IT policy.
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-export async function streamServer({ systemMessage, userText, imageDataUrl, signal, onDelta }) {
+export async function streamServer({ systemMessage, userText, imageDataUrl, images, signal, onDelta }) {
+  const imgs = (images && images.length) ? images : (imageDataUrl ? [imageDataUrl] : []);
   const resp = await fetch(`${BACKEND_URL}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ system_message: systemMessage, turn_message: userText, image_base64: imageDataUrl || null }),
+    body: JSON.stringify({ system_message: systemMessage, turn_message: userText, images_base64: imgs }),
     signal,
   });
   if (!resp.ok) {

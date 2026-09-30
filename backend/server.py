@@ -108,6 +108,7 @@ class GenerateRequest(BaseModel):
     system_message: str
     turn_message: str
     image_base64: Optional[str] = None
+    images_base64: Optional[List[str]] = None
 
 
 class CompanyAnalyzeRequest(BaseModel):
@@ -238,23 +239,25 @@ async def generate(req: GenerateRequest):
         raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
 
     return StreamingResponse(
-        _stream_with_fallback(req.system_message, req.turn_message, req.image_base64),
+        _stream_with_fallback(req.system_message, req.turn_message, req.images_base64 or ([req.image_base64] if req.image_base64 else [])),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
-async def _stream_with_fallback(system_message: str, turn_message: str, image_base64: Optional[str]):
+async def _stream_with_fallback(system_message: str, turn_message: str, images_base64: Optional[list]):
     """Try Emergent providers (Claude, then OpenAI) first — free/managed — and only
     fall back to the user's paid DeepSeek key as a last resort. Only advance to the
-    next provider if NOTHING has been streamed yet (avoids duplicated output)."""
+    next provider if NOTHING has been streamed yet (avoids duplicated output).
+    Supports MULTIPLE images (several screenshots / problems at once)."""
+    imgs = [i for i in (images_base64 or []) if i]
     emitted = False
     errors = []
     if EMERGENT_LLM_KEY:
         for provider, model in SERVER_CHAIN:
             try:
                 chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
-                fc = [ImageContent(image_base64=_strip_data_url(image_base64))] if image_base64 else None
+                fc = [ImageContent(image_base64=_strip_data_url(i)) for i in imgs] if imgs else None
                 um = UserMessage(text=turn_message, file_contents=fc) if fc else UserMessage(text=turn_message)
                 async for ev in chat.stream_message(um):
                     if isinstance(ev, TextDelta):

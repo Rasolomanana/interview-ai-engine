@@ -35,7 +35,7 @@ export default function InterviewConsole() {
   const [meta, setMeta] = useState(null);
   const [latency, setLatency] = useState(null);
   const [input, setInput] = useState("");
-  const [image, setImage] = useState(null);
+  const [image, setImage] = useState([]);
   const [pendingMode, setPendingMode] = useState(null);
   const [ctxOpen, setCtxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -164,20 +164,22 @@ export default function InterviewConsole() {
     toast("⛔ Barge-in — génération annulée, état inchangé");
   };
 
-  const send = (rawText, displayText, img) => {
+  const send = (rawText, displayText, imgs) => {
+    const imgList = Array.isArray(imgs) ? imgs.filter(Boolean) : (imgs ? [imgs] : []);
     if (!active || streaming.active) return;
-    if (!rawText?.trim() && !img) return;
+    if (!rawText?.trim() && !imgList.length) return;
     if (settings.provider !== "server" && !settings.geminiKey) {
       toast.error("Ajoutez une clé Gemini, ou choisissez le mode Serveur dans Réglages");
       setSettingsOpen(true);
       return;
     }
-    const userMsg = { id: uid(), role: "user", content: displayText ?? cleanDisplay(rawText) ?? "(image)", mode: active.state };
+    const imgLabel = imgList.length > 1 ? `(${imgList.length} images)` : "(image)";
+    const userMsg = { id: uid(), role: "user", content: displayText ?? cleanDisplay(rawText) ?? imgLabel, mode: active.state };
     setMessages((m) => [...m, userMsg]);
     setStreaming({ active: true, text: "", meta: null, mode: active.state });
     streamInfoRef.current = { mode: active.state, modules: [] };
     setInput("");
-    setImage(null);
+    setImage([]);
     if (voice.listening) voice.stop();
     const t0 = Date.now();
 
@@ -187,7 +189,7 @@ export default function InterviewConsole() {
         text: rawText || "",
         state_candidat: voice.metrics.stateCandidat,
         voice_confidence: voice.metrics.voiceConfidence,
-        image_base64: img || null,
+        images: imgList,
         barge_in: false,
       },
       {
@@ -219,31 +221,37 @@ export default function InterviewConsole() {
 
   const submitInput = () => {
     let raw = input;
-    let display = cleanDisplay(input) || "(image)";
-    if ((pendingMode === "CANDIDAT" || active?.state === "CANDIDAT") && !/\[/.test(input)) {
+    let display = cleanDisplay(input);
+    // Images without text -> ask the AI to solve every problem in the images.
+    if (image.length && !input.trim()) {
+      raw = "[REPONSE_ORALE] Analyse chaque image ci-jointe : identifie et résous CHAQUE problème/test présenté (associations, matrices logiques, QCM, schémas…), en donnant clairement la réponse et une brève justification pour chacun.";
+      display = image.length > 1 ? `🖼️ ${image.length} images à analyser` : "🖼️ Image à analyser";
+    } else if ((pendingMode === "CANDIDAT" || active?.state === "CANDIDAT") && !/\[/.test(input)) {
       raw = "[REPONSE_ORALE] " + input;
       setPendingMode(null);
     }
     send(raw, display, image);
   };
 
-  // Paste an image straight from the clipboard (Ctrl/Cmd+V) into the composer.
+  // Paste image(s) straight from the clipboard (Ctrl/Cmd+V) into the composer.
   const handlePaste = (e) => {
     const items = e.clipboardData?.items;
     if (!items) return;
+    const files = [];
     for (const it of items) {
       if (it.type && it.type.startsWith("image/")) {
         const f = it.getAsFile();
-        if (f) {
-          const r = new FileReader();
-          r.onload = () => setImage(r.result);
-          r.readAsDataURL(f);
-          toast.success("Image collée depuis le presse-papier.");
-          e.preventDefault();
-          return;
-        }
+        if (f) files.push(f);
       }
     }
+    if (!files.length) return;
+    e.preventDefault();
+    files.forEach((f) => {
+      const r = new FileReader();
+      r.onload = () => setImage((arr) => [...arr, r.result]);
+      r.readAsDataURL(f);
+    });
+    toast.success(files.length > 1 ? `${files.length} images collées.` : "Image collée depuis le presse-papier.");
   };
 
   // Capture the recruiter's shared screen (desktop only) and send the frame to the
@@ -278,8 +286,8 @@ export default function InterviewConsole() {
       canvas.getContext("2d").drawImage(video, 0, 0, w, h);
       video.pause(); video.srcObject = null;
       const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-      toast.success("Écran capturé — analyse en cours…");
-      send("[REPONSE_ORALE] Analyse le test / la question affiché(e) sur l'écran capturé et donne la réponse à dire.", "🖼️ Capture d'écran (test)", dataUrl);
+      setImage((arr) => [...arr, dataUrl]);
+      toast.success("Écran capturé — ajouté. Capturez-en d'autres ou cliquez « Envoyer » pour analyser.");
     } catch (e) {
       if (e.name === "NotAllowedError") toast("Capture annulée.");
       else toast.error("Capture impossible : " + (e.message || e.name));
@@ -467,30 +475,36 @@ export default function InterviewConsole() {
                 <ClipboardList className="h-3.5 w-3.5" /> Mode Candidat — saisissez la question posée par le recruteur.
               </div>
             )}
-            {image && (
-              <div className="mb-2 flex items-center gap-2">
-                <div className="relative">
-                  <img src={image} alt="upload" className="h-16 w-16 rounded-lg border border-white/10 object-cover" data-testid="image-preview" />
-                  <button onClick={() => setImage(null)} className="absolute -right-1.5 -top-1.5 rounded-full bg-red-500 p-0.5 text-white">
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-                <span className="text-xs text-slate-400">Image jointe (test logique visuel)</span>
+            {image.length > 0 && (
+              <div className="mb-2 flex flex-wrap items-center gap-2" data-testid="image-previews">
+                {image.map((src, i) => (
+                  <div key={i} className="relative">
+                    <img src={src} alt={`image ${i + 1}`} className="h-16 w-16 rounded-lg border border-white/10 object-cover" data-testid="image-preview" />
+                    <button onClick={() => setImage((arr) => arr.filter((_, j) => j !== i))} className="absolute -right-1.5 -top-1.5 rounded-full bg-red-500 p-0.5 text-white" title="Retirer">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                <span className="text-xs text-slate-400">{image.length} image{image.length > 1 ? "s" : ""} à analyser — cliquez « Envoyer »</span>
+                {image.length > 1 && (
+                  <button onClick={() => setImage([])} className="text-xs text-slate-500 underline hover:text-slate-300" title="Tout retirer">tout retirer</button>
+                )}
               </div>
             )}
             <div className="flex items-end gap-2">
-              <button onClick={() => fileRef.current?.click()} data-testid="image-upload-btn" className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-slate-400 transition-colors hover:text-white" title="Joindre une image (ou coller avec Ctrl/Cmd+V)">
+              <button onClick={() => fileRef.current?.click()} data-testid="image-upload-btn" className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-slate-400 transition-colors hover:text-white" title="Joindre une ou plusieurs images (ou coller avec Ctrl/Cmd+V)">
                 <ImagePlus className="h-5 w-5" />
               </button>
               <button onClick={captureScreen} disabled={streaming.active} data-testid="capture-screen-btn" className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-sky-300 transition-colors hover:bg-sky-500/20 disabled:opacity-40" title="Capturer l'écran partagé du recruteur (test psychotechnique) — ordinateur uniquement">
                 <MonitorUp className="h-5 w-5" />
               </button>
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                const r = new FileReader();
-                r.onload = () => setImage(r.result);
-                r.readAsDataURL(f);
+              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                files.forEach((f) => {
+                  const r = new FileReader();
+                  r.onload = () => setImage((arr) => [...arr, r.result]);
+                  r.readAsDataURL(f);
+                });
                 e.target.value = "";
               }} />
 

@@ -6,17 +6,18 @@
 // mode Serveur.
 const FIRST_TOKEN_TIMEOUT_MS = 9000;
 
-export async function streamGemini({ apiKey, model, systemMessage, userText, imageDataUrl, signal, onDelta }) {
+export async function streamGemini({ apiKey, model, systemMessage, userText, imageDataUrl, images, signal, onDelta }) {
   const parts = [{ text: userText }];
-  if (imageDataUrl) {
-    const [meta, b64] = imageDataUrl.split(",");
+  const imgs = (images && images.length) ? images : (imageDataUrl ? [imageDataUrl] : []);
+  for (const img of imgs) {
+    const [meta, b64] = img.split(",");
     const mime = (meta.match(/data:(.*?);/) || [])[1] || "image/png";
     parts.push({ inline_data: { mime_type: mime, data: b64 } });
   }
   const body = {
     system_instruction: { parts: [{ text: systemMessage }] },
     contents: [{ role: "user", parts }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
+    generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
   };
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
 
