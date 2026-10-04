@@ -36,6 +36,7 @@ export default function InterviewConsole() {
   const [latency, setLatency] = useState(null);
   const [input, setInput] = useState("");
   const [image, setImage] = useState([]);
+  const [screenCapturing, setScreenCapturing] = useState(false);
   const [pendingMode, setPendingMode] = useState(null);
   const [ctxOpen, setCtxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -268,7 +269,8 @@ export default function InterviewConsole() {
       if (!stream || !stream.active) {
         stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: false });
         screenStreamRef.current = stream;
-        stream.getVideoTracks()[0].addEventListener("ended", () => { screenStreamRef.current = null; });
+        setScreenCapturing(true);
+        stream.getVideoTracks()[0].addEventListener("ended", () => { screenStreamRef.current = null; setScreenCapturing(false); });
       }
       const track = stream.getVideoTracks()[0];
       const video = document.createElement("video");
@@ -287,7 +289,7 @@ export default function InterviewConsole() {
       video.pause(); video.srcObject = null;
       const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
       setImage((arr) => [...arr, dataUrl]);
-      toast.success("Écran capturé — ajouté. Capturez-en d'autres ou cliquez « Envoyer » pour analyser.");
+      toast.success("🔒 Capture LOCALE ajoutée — invisible pour le recruteur. Cliquez « Envoyer » pour analyser.", { duration: 5000 });
     } catch (e) {
       if (e.name === "NotAllowedError") toast("Capture annulée.");
       else toast.error("Capture impossible : " + (e.message || e.name));
@@ -475,6 +477,21 @@ export default function InterviewConsole() {
                 <ClipboardList className="h-3.5 w-3.5" /> Mode Candidat — saisissez la question posée par le recruteur.
               </div>
             )}
+            {screenCapturing && (
+              <div className="mb-2 flex items-center justify-between gap-3 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-xs font-semibold text-emerald-200" data-testid="local-capture-banner">
+                <span className="flex items-center gap-2">
+                  <span className="text-base">🔒</span>
+                  Capture d'écran <span className="underline">LOCALE</span> active — <span className="text-emerald-300">invisible pour le recruteur</span>. Ce n'est PAS le partage Teams/Zoom.
+                </span>
+                <button
+                  data-testid="stop-screen-capture-btn"
+                  onClick={() => { try { screenStreamRef.current?.getTracks().forEach((t) => t.stop()); } catch (e) {} screenStreamRef.current = null; setScreenCapturing(false); }}
+                  className="shrink-0 rounded-md border border-emerald-400/40 bg-emerald-500/15 px-2 py-1 text-[11px] text-emerald-100 hover:bg-emerald-500/25"
+                >
+                  Arrêter la capture
+                </button>
+              </div>
+            )}
             {image.length > 0 && (
               <div className="mb-2 flex flex-wrap items-center gap-2" data-testid="image-previews">
                 {image.map((src, i) => (
@@ -495,7 +512,7 @@ export default function InterviewConsole() {
               <button onClick={() => fileRef.current?.click()} data-testid="image-upload-btn" className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-slate-400 transition-colors hover:text-white" title="Joindre une ou plusieurs images (ou coller avec Ctrl/Cmd+V)">
                 <ImagePlus className="h-5 w-5" />
               </button>
-              <button onClick={captureScreen} disabled={streaming.active} data-testid="capture-screen-btn" className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-sky-300 transition-colors hover:bg-sky-500/20 disabled:opacity-40" title="Capturer l'écran partagé du recruteur (test psychotechnique) — ordinateur uniquement">
+              <button onClick={captureScreen} disabled={streaming.active} data-testid="capture-screen-btn" className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-sky-300 transition-colors hover:bg-sky-500/20 disabled:opacity-40" title="Capturer l'écran (LOCAL — invisible pour le recruteur, ce n'est pas le partage Teams/Zoom) — ordinateur uniquement">
                 <MonitorUp className="h-5 w-5" />
               </button>
               <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" onChange={(e) => {
