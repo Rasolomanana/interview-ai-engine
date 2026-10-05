@@ -1,0 +1,3 @@
+# SPA fallback for Cloudflare Pages — copy this file to frontend/public/_redirects
+# so client-side routes resolve to index.html.
+/*    /index.html   200
