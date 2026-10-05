@@ -1,0 +1,50 @@
+========================================================
+  COPILOTE ENTRETIEN IA — Extension Chrome
+  DEUX MODES : "Gemini" (gratuit) ou "Serveur" (secours)
+========================================================
+
+L'app fonctionne dans le navigateur. Dans "Réglages", choisissez :
+
+ • MODE GEMINI (gratuit) : appelle Google Gemini avec VOTRE clé
+   gratuite. À utiliser si Google n'est PAS bloqué sur le PC.
+
+ • MODE SERVEUR (secours) : AUCUNE clé nécessaire. Le navigateur
+   parle uniquement à l'application (pas à Google). À utiliser si
+   un pare-feu d'entreprise bloque "Google Gemini API".
+
+------------------------------------------------------------
+INSTALLER L'EXTENSION (Chrome ou Edge)
+------------------------------------------------------------
+1. Décompressez le .zip → un dossier contenant "manifest.json".
+2. Ouvrez  chrome://extensions   (ou  edge://extensions ).
+3. Activez le "Mode développeur" (en haut à droite).
+4. "Charger l'extension non empaquetée" → choisissez le dossier.
+5. Cliquez l'icône "Copilote Entretien IA".
+
+------------------------------------------------------------
+CHOISIR LE MODE (fenêtre "Réglages IA")
+------------------------------------------------------------
+A) Si Google Gemini est bloqué sur ce PC :
+   → cliquez la carte "Serveur" → "Enregistrer". C'est tout, ça marche.
+
+B) Sinon (Google accessible) :
+   → cliquez "Gemini", collez votre clé (obtenue sur
+     https://aistudio.google.com/app/apikey ), modèle
+     "Gemini 3.8 Flash" → "Enregistrer".
+
+------------------------------------------------------------
+COMMENT SAVOIR SI UN PC BLOQUE GEMINI ?
+------------------------------------------------------------
+Mettez le mode "Gemini" + votre clé, puis cliquez "Mode Recruteur".
+ • L'IA répond  → Gemini n'est PAS bloqué (gardez ce mode gratuit).
+ • Message "bloqué par votre administrateur" ou "Failed to fetch"
+   → Gemini est bloqué : basculez en mode "Serveur".
+
+------------------------------------------------------------
+UTILISATION
+------------------------------------------------------------
+- Mode Candidat : collez/dictez la question du recruteur → 3 puces.
+- Mode Recruteur : simulation, une question à la fois.
+- Micro : autorisez le microphone quand Chrome le demande.
+- Image : bouton image pour les tests de logique visuelle.
+========================================================
