@@ -1,0 +1,30 @@
+# Render.com Blueprint — deploys the FastAPI backend.
+# In Render: New -> Blueprint -> point to your repo. Then set the secret env vars
+# (MONGO_URL, ANTHROPIC_API_KEY, OPENAI_API_KEY, EMERGENT_LLM_KEY=local) in the dashboard.
+services:
+  - type: web
+    name: interview-ai-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DB_NAME
+        value: interview_ai
+      - key: EMERGENT_LLM_KEY
+        value: local
+      - key: ANTHROPIC_MODEL
+        value: claude-3-5-sonnet-20241022
+      - key: OPENAI_MODEL
+        value: gpt-4o
+      - key: CORS_ORIGINS
+        value: "*"
+      # Set these as SECRETS in the Render dashboard (do not commit real values):
+      - key: MONGO_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
