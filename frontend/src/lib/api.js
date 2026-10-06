@@ -41,6 +41,22 @@ const fallbackReason = (err) =>
     ? "Accès à Google bloqué (réseau/SSL) — bascule automatique sur le mode Serveur"
     : String(err?.message || "Gemini indisponible — bascule serveur");
 
+// Flips the session to Server mode, logs a visible console trace, and exposes an
+// inspectable flag on window so you can verify the fallback fired from DevTools.
+function activateServerFallback(err) {
+  geminiUnavailable = true;
+  const reason = fallbackReason(err);
+  const kind = isNetworkError(err) ? "NETWORK/SSL" : "API";
+  console.warn(
+    `[Gemini→Serveur] Fallback activé (${kind}). geminiUnavailable=true. Raison:`,
+    reason,
+    "| Erreur d'origine:",
+    err?.name, err?.message
+  );
+  if (typeof window !== "undefined") window.__geminiUnavailable = true;
+  return reason;
+}
+
 import * as pdfjsLib from "pdfjs-dist";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ""}/pdf.worker.min.js`;
@@ -216,8 +232,7 @@ export async function streamRaw({ systemMessage, userText, onDelta, onFallback, 
     await streamGemini({ apiKey: settings.geminiKey, model: settings.model || "gemini-3.8-flash", systemMessage, userText, signal, onDelta: wrapped });
   } catch (err) {
     if (shouldFallback(err, emitted)) {
-      geminiUnavailable = true;
-      onFallback?.(fallbackReason(err));
+      onFallback?.(activateServerFallback(err));
       await streamServer({ systemMessage, userText, signal, onDelta });
     } else {
       throw err;
@@ -376,8 +391,8 @@ export function streamMessage(sessionId, body, handlers) {
           });
         } catch (err) {
           if (shouldFallback(err, emitted)) {
-            geminiUnavailable = true;
-            handlers.onFallback?.(fallbackReason(err));
+            const reason = activateServerFallback(err);
+            handlers.onFallback?.(reason);
             full = "";
             await streamServer({ systemMessage, userText: turnMessage, images, signal: controller.signal, onDelta });
           } else {
