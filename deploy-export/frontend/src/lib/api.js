@@ -15,6 +15,32 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 // repeated 9s timeout on every turn.
 let geminiUnavailable = false;
 
+// A direct browser->Google call can fail at the NETWORK/TLS layer (corporate SSL
+// inspection, antivirus/VPN interception, blocked domain, wrong system clock).
+// fetch() then rejects with `TypeError: Failed to fetch`, and Chrome logs
+// net::ERR_SSL_VERSION_OR_CIPHER_MISMATCH / ERR_CONNECTION_* to the console.
+// None of these are user barge-ins, so we must fall back to the Server provider.
+function isNetworkError(err) {
+  if (!err || err.name === "AbortError") return false;
+  const msg = String(err.message || err).toLowerCase();
+  return (
+    err.name === "TypeError" ||
+    msg.includes("failed to fetch") ||
+    msg.includes("networkerror") ||
+    msg.includes("ssl") ||
+    msg.includes("err_") ||
+    msg.includes("cipher") ||
+    msg.includes("cert")
+  );
+}
+// Any non-abort Gemini failure (network/SSL, 429/503, 9s watchdog) should route
+// the rest of the session to the Server provider.
+const shouldFallback = (err, emitted) => !emitted && err && err.name !== "AbortError";
+const fallbackReason = (err) =>
+  isNetworkError(err)
+    ? "Accès à Google bloqué (réseau/SSL) — bascule automatique sur le mode Serveur"
+    : String(err?.message || "Gemini indisponible — bascule serveur");
+
 import * as pdfjsLib from "pdfjs-dist";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ""}/pdf.worker.min.js`;
@@ -189,9 +215,9 @@ export async function streamRaw({ systemMessage, userText, onDelta, onFallback, 
   try {
     await streamGemini({ apiKey: settings.geminiKey, model: settings.model || "gemini-3.8-flash", systemMessage, userText, signal, onDelta: wrapped });
   } catch (err) {
-    if (!emitted && err.name !== "AbortError") {
+    if (shouldFallback(err, emitted)) {
       geminiUnavailable = true;
-      onFallback?.(String(err?.message || ""));
+      onFallback?.(fallbackReason(err));
       await streamServer({ systemMessage, userText, signal, onDelta });
     } else {
       throw err;
@@ -349,9 +375,9 @@ export function streamMessage(sessionId, body, handlers) {
             images, signal: controller.signal, onDelta,
           });
         } catch (err) {
-          if (!emitted && err.name !== "AbortError") {
+          if (shouldFallback(err, emitted)) {
             geminiUnavailable = true;
-            handlers.onFallback?.(String(err?.message || ""));
+            handlers.onFallback?.(fallbackReason(err));
             full = "";
             await streamServer({ systemMessage, userText: turnMessage, images, signal: controller.signal, onDelta });
           } else {
