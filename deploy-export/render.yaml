@@ -1,6 +1,6 @@
 # Render.com Blueprint — deploys the FastAPI backend.
-# In Render: New -> Blueprint -> point to your repo. Then set the secret env vars
-# (MONGO_URL, ANTHROPIC_API_KEY, OPENAI_API_KEY, EMERGENT_LLM_KEY=local) in the dashboard.
+# In Render: New -> Blueprint -> point to your repo. Then set the SECRET env vars
+# (MONGO_URL + at least OPENROUTER_API_KEY) in the dashboard.
 services:
   - type: web
     name: interview-ai-backend
@@ -11,16 +11,22 @@ services:
     envVars:
       - key: DB_NAME
         value: interview_ai
-      - key: EMERGENT_LLM_KEY
-        value: local
+      # Cheapest-first provider. "provider/model" from https://openrouter.ai/models
+      - key: OPENROUTER_MODEL
+        value: deepseek/deepseek-chat
       - key: ANTHROPIC_MODEL
-        value: claude-3-5-sonnet-20241022
+        value: claude-sonnet-4-6
       - key: OPENAI_MODEL
         value: gpt-4o
+      - key: APP_TITLE
+        value: Interview AI Engine
       - key: CORS_ORIGINS
         value: "*"
-      # Set these as SECRETS in the Render dashboard (do not commit real values):
+      # Set these as SECRETS in the Render dashboard (do not commit real values).
+      # OPENROUTER_API_KEY is the recommended primary. The others are optional.
       - key: MONGO_URL
+        sync: false
+      - key: OPENROUTER_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false

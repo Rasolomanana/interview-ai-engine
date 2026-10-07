@@ -28,10 +28,30 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-LLM_MODEL = ("anthropic", "claude-sonnet-4-6")
-# Server-side fallback chain: free/Emergent first, user's paid DeepSeek key strictly last.
-SERVER_CHAIN = [("anthropic", "claude-sonnet-4-6"), ("openai", "gpt-5.4")]
+
+
+def _build_server_chain():
+    """Server fallback chain, cheapest-first. OpenRouter is PRIMARY (one key,
+    OpenAI-compatible, routes to low-cost models like DeepSeek/Qwen, and is
+    reachable where Google/Gemini is blocked by IT policy). Anthropic and OpenAI
+    are OPTIONAL fallbacks. A provider is included only if its key is configured."""
+    chain = []
+    if OPENROUTER_API_KEY:
+        chain.append(("openrouter", os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")))
+    if ANTHROPIC_API_KEY:
+        chain.append(("anthropic", os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")))
+    if OPENAI_API_KEY:
+        chain.append(("openai", os.environ.get("OPENAI_MODEL", "gpt-5.4")))
+    return chain
+
+
+SERVER_CHAIN = _build_server_chain()
+LLM_MODEL = SERVER_CHAIN[0] if SERVER_CHAIN else ("anthropic", "claude-sonnet-4-6")
+LLM_ENABLED = bool(SERVER_CHAIN)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -235,7 +255,7 @@ async def generate(req: GenerateRequest):
     """Stateless generation proxy — used by the client 'Serveur' provider so the
     browser never contacts an external LLM directly (works even where Google/OpenAI
     are blocked by an IT policy). Multi-provider fallback chain, DeepSeek last resort."""
-    if not EMERGENT_LLM_KEY and not DEEPSEEK_API_KEY:
+    if not LLM_ENABLED and not DEEPSEEK_API_KEY:
         raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
 
     return StreamingResponse(
@@ -253,7 +273,7 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
     imgs = [i for i in (images_base64 or []) if i]
     emitted = False
     errors = []
-    if EMERGENT_LLM_KEY:
+    if SERVER_CHAIN:
         for provider, model in SERVER_CHAIN:
             try:
                 chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
@@ -304,7 +324,7 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
 
 async def _generate_text(system_message: str, user_text: str) -> str:
     """Non-streaming aggregate generation with the same fallback chain."""
-    if EMERGENT_LLM_KEY:
+    if SERVER_CHAIN:
         for provider, model in SERVER_CHAIN:
             try:
                 chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
@@ -435,7 +455,7 @@ async def analyze_application(req: ApplicationAnalyzeRequest):
     """Start a recruiter-grade analysis job in the background and return a job_id
     immediately. The client polls GET /analyze-application/{job_id}. This avoids
     holding a 40s connection open (which corporate proxies / gateways truncate)."""
-    if not EMERGENT_LLM_KEY and not DEEPSEEK_API_KEY:
+    if not LLM_ENABLED and not DEEPSEEK_API_KEY:
         raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
     import asyncio
     job_id = str(uuid.uuid4())
@@ -501,7 +521,7 @@ async def _run_cover_letter(job_id: str, cv: str, poste: str, entreprise: str):
 @api_router.post("/cover-letter")
 async def cover_letter(req: CoverLetterRequest):
     """Start a cover-letter job in the background; poll GET /analyze-application/{job_id}."""
-    if not EMERGENT_LLM_KEY and not DEEPSEEK_API_KEY:
+    if not LLM_ENABLED and not DEEPSEEK_API_KEY:
         raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
     import asyncio
     job_id = str(uuid.uuid4())
@@ -517,8 +537,8 @@ async def cover_letter(req: CoverLetterRequest):
 async def analyze_company(req: CompanyAnalyzeRequest):
     """Fetch a company / careers page, extract its text and use the LLM to produce
     a briefing: values, culture, and the interview questions those values imply."""
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY manquant")
+    if not LLM_ENABLED:
+        raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
     import httpx
     from bs4 import BeautifulSoup
     import re as _re
@@ -589,12 +609,12 @@ async def analyze_company(req: CompanyAnalyzeRequest):
 
 @api_router.post("/transcribe")
 async def transcribe(file: UploadFile = File(...), language: str = Form("auto")):
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY manquant")
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY manquant (requis pour la transcription Whisper)")
     data = await file.read()
     buf = io.BytesIO(data)
     buf.name = file.filename or "audio.webm"
-    stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
+    stt = OpenAISpeechToText(api_key=OPENAI_API_KEY)
     # "auto"/empty -> let Whisper auto-detect the spoken language (FR, EN, ...).
     lang = None if (not language or language.lower() == "auto") else language
     try:

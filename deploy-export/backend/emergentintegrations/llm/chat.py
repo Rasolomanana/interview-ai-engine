@@ -9,6 +9,7 @@ import os
 
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")
 MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
 
 
@@ -79,15 +80,28 @@ class LlmChat:
                         yield TextDelta(text)
             yield StreamDone()
         else:
+            # OpenAI-compatible providers: "openrouter" (primary, cheapest) or "openai".
             from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+            if self.provider == "openrouter":
+                client = AsyncOpenAI(
+                    api_key=os.environ["OPENROUTER_API_KEY"],
+                    base_url="https://openrouter.ai/api/v1",
+                    default_headers={
+                        "HTTP-Referer": os.environ.get("APP_URL", "https://interview-ai-engine"),
+                        "X-Title": os.environ.get("APP_TITLE", "Interview AI Engine"),
+                    },
+                )
+                model = self.model or OPENROUTER_MODEL
+            else:
+                client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+                model = OPENAI_MODEL
             content = [{"type": "text", "text": um.text}]
             for ic in imgs:
                 mime = _detect_mime(ic.image_base64)
                 content.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{ic.image_base64}"}})
             messages = [{"role": "system", "content": self.system_message}, {"role": "user", "content": content}]
             stream = await client.chat.completions.create(
-                model=OPENAI_MODEL, messages=messages, stream=True, max_tokens=MAX_TOKENS,
+                model=model, messages=messages, stream=True, max_tokens=MAX_TOKENS,
             )
             async for chunk in stream:
                 delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""

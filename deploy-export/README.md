@@ -49,17 +49,23 @@ interview-ai-engine/
 ## 2. Variables d'environnement
 
 ### Backend (`backend/.env`)
+Le serveur essaie les fournisseurs **du moins cher au plus cher**, en sautant ceux dont la clé est vide : **OpenRouter → Anthropic → OpenAI → DeepSeek**.
+
 | Variable | Rôle |
 |---|---|
 | `MONGO_URL` | URI MongoDB Atlas |
 | `DB_NAME` | nom de la base (ex. `interview_ai`) |
-| `ANTHROPIC_API_KEY` | clé Anthropic (fournisseur principal) |
-| `OPENAI_API_KEY` | clé OpenAI (fallback **+ transcription Whisper**) |
-| `ANTHROPIC_MODEL` | (optionnel) défaut `claude-3-5-sonnet-20241022` |
+| `OPENROUTER_API_KEY` | **clé principale recommandée** (la moins chère, passe en réseau d'entreprise). https://openrouter.ai/settings/keys |
+| `OPENROUTER_MODEL` | modèle `provider/model` depuis https://openrouter.ai/models (défaut `deepseek/deepseek-chat` ; pour les images, choisir un modèle vision ex. `openai/gpt-4o-mini`) |
+| `ANTHROPIC_API_KEY` | (optionnel) fallback Anthropic |
+| `OPENAI_API_KEY` | (optionnel) fallback OpenAI **+ transcription Whisper** (requis pour l'audio) |
+| `ANTHROPIC_MODEL` | (optionnel) défaut `claude-sonnet-4-6` |
 | `OPENAI_MODEL` | (optionnel) défaut `gpt-4o` |
-| `EMERGENT_LLM_KEY` | **mets `local`** (valeur ignorée, sert juste d'interrupteur) |
 | `DEEPSEEK_API_KEY` | (optionnel) dernier recours payant |
+| `APP_URL` / `APP_TITLE` | (optionnel) identité envoyée à OpenRouter |
 | `CORS_ORIGINS` | origines autorisées, ex. `https://ton-app.pages.dev` (ou `*`) |
+
+> `EMERGENT_LLM_KEY` n'est **plus nécessaire** : les fournisseurs sont choisis uniquement selon les clés `*_API_KEY` présentes. Configuration minimale viable : `MONGO_URL` + `DB_NAME` + `OPENROUTER_API_KEY` (+ `OPENAI_API_KEY` si tu veux la transcription audio).
 
 ### Frontend (`frontend/.env` + réglages Cloudflare Pages)
 | Variable | Rôle |
@@ -122,8 +128,9 @@ uvicorn server:app --host 0.0.0.0 --port $PORT
    - Root Directory : `backend`
    - Build : `pip install -r requirements.txt`
    - Start : `uvicorn server:app --host 0.0.0.0 --port $PORT`
-3. Ajoute les variables d'env (secrets) : `MONGO_URL`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-   `EMERGENT_LLM_KEY=local`, `DB_NAME`, (`DEEPSEEK_API_KEY` optionnel), `CORS_ORIGINS`.
+3. Ajoute les variables d'env (secrets) : `MONGO_URL`, `OPENROUTER_API_KEY` (principale),
+   `DB_NAME`, `OPENROUTER_MODEL`, (`OPENAI_API_KEY` si tu veux la transcription audio,
+   `ANTHROPIC_API_KEY` / `DEEPSEEK_API_KEY` optionnels), `CORS_ORIGINS`.
 4. Note l'URL publique (ex. `https://interview-ai-backend.onrender.com`).
 
 ### Frontend sur Cloudflare Pages
@@ -143,8 +150,8 @@ uvicorn server:app --host 0.0.0.0 --port $PORT
 | Élément Emergent | Remplacement dans ce paquet |
 |---|---|
 | `pip install emergentintegrations` | **supprimé** de requirements.txt ; shim local `backend/emergentintegrations/` |
-| `EMERGENT_LLM_KEY` (clé universelle) | tes clés `ANTHROPIC_API_KEY` + `OPENAI_API_KEY` ; mets `EMERGENT_LLM_KEY=local` |
-| Modèles alias (`claude-sonnet-4-6`, `gpt-5.4`) | ids réels via `ANTHROPIC_MODEL` / `OPENAI_MODEL` |
+| `EMERGENT_LLM_KEY` (clé universelle) | **plus nécessaire** ; mets simplement `OPENROUTER_API_KEY` (principale, la moins chère). Anthropic/OpenAI/DeepSeek optionnels |
+| Modèles alias (`claude-sonnet-4-6`, `gpt-5.4`) | ids réels via `OPENROUTER_MODEL` / `ANTHROPIC_MODEL` / `OPENAI_MODEL` |
 | Déploiement/routing `/api` d'Emergent | reverse proxy inutile : le frontend appelle `REACT_APP_BACKEND_URL/api/...` en direct |
 
 ## 8. Points de vigilance
