@@ -10,6 +10,9 @@ import os
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")
+# Hybrid cost control: cheap text model by default, vision model ONLY when images
+# are actually attached to the request.
+OPENROUTER_VISION_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "openai/gpt-4o-mini")
 MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
 
 
@@ -92,6 +95,10 @@ class LlmChat:
                     },
                 )
                 model = self.model or OPENROUTER_MODEL
+                # Hybrid: switch to a vision-capable model only when images are attached,
+                # so routine text turns stay on the cheapest text model.
+                if imgs:
+                    model = OPENROUTER_VISION_MODEL
             else:
                 client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
                 model = OPENAI_MODEL

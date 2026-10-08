@@ -14,6 +14,9 @@ services:
       # Cheapest-first provider. "provider/model" from https://openrouter.ai/models
       - key: OPENROUTER_MODEL
         value: deepseek/deepseek-chat
+      # Used automatically ONLY when images are attached (hybrid cost control).
+      - key: OPENROUTER_VISION_MODEL
+        value: openai/gpt-4o-mini
       - key: ANTHROPIC_MODEL
         value: claude-sonnet-4-6
       - key: OPENAI_MODEL
