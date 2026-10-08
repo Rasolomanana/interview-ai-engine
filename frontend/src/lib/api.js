@@ -5,6 +5,7 @@ import { resolve as resolveState } from "./stateMachine";
 import { buildSystemMessage, buildTurnMessage } from "./promptClient";
 import { streamGemini } from "./gemini";
 import { streamServer } from "./server";
+import { estimateTurnCost } from "./costEstimate";
 
 const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
 const now = () => new Date().toISOString();
@@ -378,6 +379,7 @@ export function streamMessage(sessionId, body, handlers) {
 
       let full = "";
       let emitted = false;
+      let providerUsed = useServer ? "server" : "gemini";
       const onDelta = (c) => { full += c; emitted = true; handlers.onDelta?.(c); };
       if (useServer) {
         await streamServer({ systemMessage, userText: turnMessage, images, signal: controller.signal, onDelta });
@@ -394,12 +396,24 @@ export function streamMessage(sessionId, body, handlers) {
             const reason = activateServerFallback(err);
             handlers.onFallback?.(reason);
             full = "";
+            providerUsed = "server";
             await streamServer({ systemMessage, userText: turnMessage, images, signal: controller.signal, onDelta });
           } else {
             throw err;
           }
         }
       }
+
+      // Rough cost/token estimate for this turn (see costEstimate.js).
+      try {
+        const usage = estimateTurnCost({
+          provider: providerUsed,
+          inputText: systemMessage + "\n" + turnMessage,
+          outputText: full,
+          imageCount: images.length,
+        });
+        handlers.onUsage?.({ ...usage, provider: providerUsed });
+      } catch { /* non-blocking */ }
 
       msgs.push({ id: uid(), role: "assistant", content: full, mode: resolved.resolved_state, modules: resolved.modules, created_at: now() });
       await store.set("messages:" + sessionId, msgs);

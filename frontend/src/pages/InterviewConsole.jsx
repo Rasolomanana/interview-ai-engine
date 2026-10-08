@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Send, Mic, MicOff, ImagePlus, X, Zap, RotateCcw, SlidersHorizontal,
-  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound, FileText, Headphones, PictureInPicture2, MonitorUp,
+  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound, FileText, Headphones, PictureInPicture2, MonitorUp, Coins,
 } from "lucide-react";
 import * as api from "@/lib/api";
 import { useVoice } from "@/lib/useVoice";
@@ -26,6 +26,7 @@ const BADGE = {
 
 const MARKER_RE = /\[(RESET|RECRUTEUR|MODE_SIMULATION|REPONSE_ORALE|R[ÉE]PONSE_ORALE|DEBUG)\]/gi;
 const cleanDisplay = (t) => (t || "").replace(MARKER_RE, "").trim();
+const ZERO_COST = { cost: 0, inputTokens: 0, outputTokens: 0, turns: 0, lastProvider: null };
 
 export default function InterviewConsole() {
   const [sessions, setSessions] = useState([]);
@@ -42,6 +43,7 @@ export default function InterviewConsole() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-3.8-flash", provider: "gemini", answerStyle: "complet", tone: "confiant", starMode: true });
   const [creating, setCreating] = useState(false);
+  const [cost, setCost] = useState({ cost: 0, inputTokens: 0, outputTokens: 0, turns: 0, lastProvider: null });
   const [showListen, setShowListen] = useState(false);
   const [recap, setRecap] = useState({ open: false, text: "", loading: false });
   const [pipRoot, setPipRoot] = useState(null);
@@ -58,6 +60,20 @@ export default function InterviewConsole() {
   const initRef = useRef(false);
 
   const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Math.random()));
+
+  useEffect(() => {
+    if (!active?.id) return;
+    try {
+      const raw = localStorage.getItem("cost:" + active.id);
+      setCost(raw ? JSON.parse(raw) : ZERO_COST);
+    } catch { setCost(ZERO_COST); }
+  }, [active?.id]);
+
+  const resetCost = () => {
+    setCost(ZERO_COST);
+    try { if (active?.id) localStorage.setItem("cost:" + active.id, JSON.stringify(ZERO_COST)); } catch { /* ignore */ }
+    toast("Compteur de coût remis à zéro");
+  };
 
   const refreshSessions = useCallback(async () => {
     const list = await api.listSessions();
@@ -214,6 +230,19 @@ export default function InterviewConsole() {
         },
         onFallback: (reason) => {
           toast(reason || "Gemini indisponible — bascule automatique sur le mode Serveur", { icon: "🔁", duration: 6000 });
+        },
+        onUsage: (u) => {
+          setCost((c) => {
+            const next = {
+              cost: c.cost + (u.cost || 0),
+              inputTokens: c.inputTokens + (u.inputTokens || 0),
+              outputTokens: c.outputTokens + (u.outputTokens || 0),
+              turns: c.turns + 1,
+              lastProvider: u.provider,
+            };
+            try { if (active?.id) localStorage.setItem("cost:" + active.id, JSON.stringify(next)); } catch { /* ignore */ }
+            return next;
+          });
         },
         onAbort: () => setStreaming((s) => ({ ...s, active: false })),
       }
@@ -419,6 +448,19 @@ export default function InterviewConsole() {
               <span className="rounded-lg border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-slate-400" data-testid="turn-counter">
                 Tours ss marq. : {active?.tours_sans_marqueur ?? 0}
               </span>
+              <button
+                onClick={resetCost}
+                data-testid="cost-counter"
+                title={`Estimation des crédits de cette session\nEntrée ~${cost.inputTokens.toLocaleString()} tok · Sortie ~${cost.outputTokens.toLocaleString()} tok · ${cost.turns} tours${cost.lastProvider === "gemini" ? " · Gemini (gratuit)" : cost.lastProvider === "server" ? " · Serveur (payant)" : ""}\nCliquez pour remettre à zéro`}
+                className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-950/20 px-2.5 py-1 font-mono text-[11px] text-amber-200/90 transition-colors hover:border-amber-400/50"
+              >
+                <Coins className="h-3.5 w-3.5 text-amber-400" />
+                {cost.cost >= 0.01
+                  ? `≈ $${cost.cost.toFixed(2)}`
+                  : cost.cost > 0
+                    ? `≈ $${cost.cost.toFixed(4)}`
+                    : cost.lastProvider === "gemini" ? "Gratuit" : "≈ $0"}
+              </button>
             </div>
             <div className="flex items-center gap-1.5">
               <button onClick={startLive} data-testid="live-btn"
