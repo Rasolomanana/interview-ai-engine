@@ -144,3 +144,29 @@
 ## Backlog (P1/P2)
 - P1 : détection auto « Gemini bloqué » -> bascule Serveur ; abort du récap à la fermeture.
 - P2 : audio de l'entretien enregistré/exporté ; scores ; refactor InterviewConsole (hooks usePip/useLive) ; accessibilité radiogroup/aria-pressed sur groupes de boutons (ton/style).
+
+## Déploiement autonome (hors Emergent) + fiabilité réseau — Oct 2026
+Export complet dans `/app/deploy-export/` + archive `/app/interview-ai-engine-standalone.zip`
+(Cloudflare Pages + Render + MongoDB Atlas). Dépendance `emergentintegrations` remplacée
+par un shim local `backend/emergentintegrations/`.
+
+- ✅ **Fallback SSL/réseau Gemini→Serveur** (`lib/api.js`) : `isNetworkError()` détecte
+  `Failed to fetch`/`ERR_SSL_*`/cipher/cert ; `activateServerFallback()` logue
+  `[Gemini→Serveur] Fallback activé …`, expose `window.__geminiUnavailable=true`.
+- ✅ **OpenRouter fournisseur serveur principal** (shim) : chaîne cheapest-first
+  OpenRouter→Anthropic→OpenAI→DeepSeek, activée selon les clés présentes. Passe en
+  réseau d'entreprise (endpoint openrouter.ai). Modèle via `OPENROUTER_MODEL`.
+- ✅ **Logique hybride vision** : `OPENROUTER_VISION_MODEL` utilisé auto UNIQUEMENT quand
+  des images sont jointes ; sinon modèle texte économique. Testé (texte→deepseek, image→gpt-4o-mini).
+- ✅ **Modèle Anthropic** défaut mis à jour `claude-sonnet-4-6` (fix 404 claude-3-5-sonnet-20241022).
+- ✅ **Fix build Cloudflare** : cause = `yarn.lock` non suivi par git → npm non-déterministe
+  (date-fns ERESOLVE puis ajv/ajv-keywords codegen). `yarn.lock` (frontend + export) forcé en
+  suivi git. `yarn build` validé. Builder avec yarn (lockfile déterministe), pas npm.
+- ✅ **Gate mot de passe mode Serveur manuel** (`SettingsPanel.jsx` + `/api/verify-server-access`) :
+  Gemini reste défaut ; clic manuel "Serveur" → mot de passe requis (backend `SERVER_ACCESS_PASSWORD`,
+  hmac.compare_digest) ; correct → serveur activé + mémorisé (localStorage `serverAccessGranted`) ;
+  incorrect → reste Gemini + erreur ; fallback auto NON gaté. Vérifié testing_agent iteration_14 (5/5, 100%).
+
+## Backlog ajouté
+- P1 : rate-limiting sur `/api/verify-server-access` (anti-brute-force) ; TTL/purge `analysis_jobs`.
+- P2 : grant serveur via token signé court (au lieu d'un booléen localStorage) si enforcement backend requis.

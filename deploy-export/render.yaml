@@ -37,3 +37,6 @@ services:
         sync: false
       - key: DEEPSEEK_API_KEY
         sync: false
+      # Shared password that gates MANUAL Server-mode selection in the UI.
+      - key: SERVER_ACCESS_PASSWORD
+        sync: false
