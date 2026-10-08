@@ -170,3 +170,12 @@ par un shim local `backend/emergentintegrations/`.
 ## Backlog ajouté
 - P1 : rate-limiting sur `/api/verify-server-access` (anti-brute-force) ; TTL/purge `analysis_jobs`.
 - P2 : grant serveur via token signé court (au lieu d'un booléen localStorage) si enforcement backend requis.
+
+## Compteur de coûts par entretien — Oct 2026
+- ✅ **Badge estimation crédits** (`InterviewConsole.jsx` header, `lib/costEstimate.js`) :
+  pastille `data-testid=cost-counter` à côté du turn-counter. Estime tokens (~4 car/token,
+  +800/image) et coût USD par tour via `estimateTurnCost()`, émis par `streamMessage` → `onUsage`.
+  Gemini = gratuit ($0) ; Serveur = estimation (défaut ~DeepSeek $0.30/$1.10 par M, surchargeable
+  via localStorage.serverPricing). Cumul par session persisté dans localStorage `cost:<sessionId>`,
+  tooltip détaillé (tokens entrée/sortie, tours, fournisseur), clic = remise à zéro.
+  Vérifié testing_agent iteration_15 (4/4, 100% : badge, incrément serveur ≈$0.0010, persistance, reset).
