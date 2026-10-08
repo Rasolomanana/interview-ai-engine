@@ -7,7 +7,7 @@ model id comes from ANTHROPIC_MODEL / OPENAI_MODEL env vars (so you control them
 """
 import os
 
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")
 # Hybrid cost control: cheap text model by default, vision model ONLY when images
