@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck, Server, Sparkles, AlignLeft, Drama, ListChecks } from "lucide-react";
+import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck, Server, Sparkles, AlignLeft, Drama, ListChecks, Lock } from "lucide-react";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 const MODELS = [
   { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (rapide · gratuit)" },
@@ -22,6 +24,10 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
   const [answerStyle, setAnswerStyle] = useState("complet");
   const [tone, setTone] = useState("confiant");
   const [starMode, setStarMode] = useState(true);
+  const [askServerPwd, setAskServerPwd] = useState(false);
+  const [serverPwd, setServerPwd] = useState("");
+  const [serverPwdError, setServerPwdError] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -31,8 +37,47 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
       setAnswerStyle(settings?.answerStyle || "complet");
       setTone(settings?.tone || "confiant");
       setStarMode(settings?.starMode !== false);
+      setAskServerPwd(false);
+      setServerPwd("");
+      setServerPwdError("");
     }
   }, [open, settings]);
+
+  // Manual Server selection is password-gated (protects paid credits). The
+  // automatic Gemini->Server fallback lives in lib/api.js and is NOT affected.
+  const handleSelectServer = () => {
+    if (localStorage.getItem("serverAccessGranted") === "true") {
+      setProvider("server");
+      setAskServerPwd(false);
+    } else {
+      setAskServerPwd(true);
+      setServerPwdError("");
+    }
+  };
+
+  const submitServerPwd = async () => {
+    setVerifying(true);
+    setServerPwdError("");
+    try {
+      const resp = await fetch(`${BACKEND_URL}/api/verify-server-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: serverPwd }),
+      });
+      if (!resp.ok) throw new Error("bad");
+      const data = await resp.json();
+      if (!data.success) throw new Error("bad");
+      localStorage.setItem("serverAccessGranted", "true");
+      setProvider("server");
+      setAskServerPwd(false);
+      setServerPwd("");
+    } catch {
+      setServerPwdError("Mot de passe incorrect — vous restez en mode Gemini.");
+      setProvider("gemini");
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -69,7 +114,7 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
                   </button>
                   <button
                     data-testid="provider-server"
-                    onClick={() => setProvider("server")}
+                    onClick={handleSelectServer}
                     className={`flex items-start gap-2.5 rounded-xl border p-3 text-left transition-all ${provider === "server" ? "border-indigo-500/60 bg-indigo-500/10" : "border-white/10 bg-white/[0.03] hover:border-white/20"}`}
                   >
                     <Server className={`mt-0.5 h-4 w-4 shrink-0 ${provider === "server" ? "text-indigo-400" : "text-slate-400"}`} />
@@ -80,6 +125,35 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
                   </button>
                 </div>
               </div>
+
+              {askServerPwd && provider !== "server" && (
+                <div data-testid="server-password-form" className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3">
+                  <label className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-amber-300/90">
+                    <Lock className="h-4 w-4" /> Mot de passe requis pour le mode Serveur
+                  </label>
+                  <p className="mb-2 text-[11px] text-amber-200/70">Le mode Serveur consomme des crédits payants. Entrez le mot de passe pour l'activer manuellement.</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      data-testid="server-password-input"
+                      value={serverPwd}
+                      onChange={(e) => setServerPwd(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && serverPwd && !verifying) submitServerPwd(); }}
+                      placeholder="Mot de passe"
+                      className="flex-1 rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 font-mono text-sm text-slate-100 outline-none focus:border-amber-500/60"
+                    />
+                    <button
+                      data-testid="server-password-submit"
+                      onClick={submitServerPwd}
+                      disabled={verifying || !serverPwd}
+                      className="shrink-0 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-black hover:bg-amber-400 disabled:opacity-50"
+                    >
+                      {verifying ? "Vérification…" : "Déverrouiller"}
+                    </button>
+                  </div>
+                  {serverPwdError && <p data-testid="server-password-error" className="mt-2 text-xs text-red-400">{serverPwdError}</p>}
+                </div>
+              )}
 
               {provider === "gemini" ? (
                 <>

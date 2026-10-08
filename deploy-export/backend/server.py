@@ -1,5 +1,6 @@
 import os
 import io
+import hmac
 import base64
 import logging
 import uuid
@@ -32,6 +33,9 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+# Optional shared secret that gates MANUAL selection of Server mode in the UI
+# (automatic Gemini->Server fallback is never gated). Leave empty to disable.
+SERVER_ACCESS_PASSWORD = os.environ.get("SERVER_ACCESS_PASSWORD")
 
 
 def _build_server_chain():
@@ -131,6 +135,10 @@ class GenerateRequest(BaseModel):
     images_base64: Optional[List[str]] = None
 
 
+class VerifyServerAccessRequest(BaseModel):
+    password: str = Field(default="", max_length=256)
+
+
 class CompanyAnalyzeRequest(BaseModel):
     url: str
     poste: str = ""
@@ -161,6 +169,20 @@ def _strip_data_url(b64: str) -> str:
 @api_router.get("/")
 async def root():
     return {"message": "Interview AI Engine v4"}
+
+
+@api_router.post("/verify-server-access")
+async def verify_server_access(body: VerifyServerAccessRequest):
+    """Gate for MANUAL Server-mode selection. Timing-safe compare against
+    SERVER_ACCESS_PASSWORD. If the env var is unset, the gate is disabled."""
+    if not SERVER_ACCESS_PASSWORD:
+        return {"success": True, "configured": False}
+    ok = hmac.compare_digest(
+        body.password.encode("utf-8"), SERVER_ACCESS_PASSWORD.encode("utf-8")
+    )
+    if not ok:
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+    return {"success": True, "configured": True}
 
 
 @api_router.post("/sessions", response_model=Session)
