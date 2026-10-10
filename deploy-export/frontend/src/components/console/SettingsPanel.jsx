@@ -6,8 +6,8 @@ import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck, Server, Sparkles, Al
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 const MODELS = [
+  { id: "gemini-flash-latest", label: "Gemini Flash (toujours à jour · recommandé)" },
   { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (rapide · gratuit)" },
-  { id: "gemini-flash-latest", label: "Gemini Flash (toujours à jour)" },
   { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
 ];
 
@@ -21,7 +21,7 @@ const TONES = [
 export default function SettingsPanel({ open, settings, onClose, onSave }) {
   const [provider, setProvider] = useState("gemini");
   const [key, setKey] = useState("");
-  const [model, setModel] = useState("gemini-3.8-flash");
+  const [model, setModel] = useState("gemini-flash-latest");
   const [answerStyle, setAnswerStyle] = useState("complet");
   const [tone, setTone] = useState("confiant");
   const [starMode, setStarMode] = useState(true);
@@ -34,7 +34,7 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
     if (open) {
       setProvider(settings?.provider || "gemini");
       setKey(settings?.geminiKey || "");
-      setModel(settings?.model || "gemini-3.8-flash");
+      setModel(settings?.model || "gemini-flash-latest");
       setAnswerStyle(settings?.answerStyle || "complet");
       setTone(settings?.tone || "confiant");
       setStarMode(settings?.starMode !== false);

@@ -49,19 +49,18 @@ interview-ai-engine/
 ## 2. Variables d'environnement
 
 ### Backend (`backend/.env`)
-Le serveur essaie les fournisseurs **du moins cher au plus cher**, en sautant ceux dont la clé est vide : **OpenRouter → Anthropic → OpenAI → DeepSeek**.
+Le serveur essaie les fournisseurs **du moins cher au plus cher**, en sautant ceux dont la clé est vide : **OpenRouter gratuit → OpenRouter payant → Anthropic (dernier recours uniquement)**. Côté navigateur, Gemini Flash reste toujours le premier choix.
 
 | Variable | Rôle |
 |---|---|
 | `MONGO_URL` | URI MongoDB Atlas |
 | `DB_NAME` | nom de la base (ex. `interview_ai`) |
 | `OPENROUTER_API_KEY` | **clé principale recommandée** (la moins chère, passe en réseau d'entreprise). https://openrouter.ai/settings/keys |
+| `OPENROUTER_FREE_MODEL` | 1ʳᵉ étape serveur, gratuite (défaut `openrouter/free` ; `""` pour la désactiver ; 50 req/jour, 1000 avec 10 $ de crédits achetés) |
 | `OPENROUTER_MODEL` | modèle `provider/model` depuis https://openrouter.ai/models (défaut `deepseek/deepseek-chat` ; pour les images, choisir un modèle vision ex. `openai/gpt-4o-mini`) |
-| `ANTHROPIC_API_KEY` | (optionnel) fallback Anthropic |
-| `OPENAI_API_KEY` | (optionnel) fallback OpenAI **+ transcription Whisper** (requis pour l'audio) |
+| `ANTHROPIC_API_KEY` | (optionnel) **dernier recours** uniquement |
+| `OPENAI_API_KEY` | (optionnel) **transcription Whisper uniquement** (plus utilisé pour le texte) |
 | `ANTHROPIC_MODEL` | (optionnel) défaut `claude-sonnet-4-6` |
-| `OPENAI_MODEL` | (optionnel) défaut `gpt-4o` |
-| `DEEPSEEK_API_KEY` | (optionnel) dernier recours payant |
 | `APP_URL` / `APP_TITLE` | (optionnel) identité envoyée à OpenRouter |
 | `CORS_ORIGINS` | origines autorisées, ex. `https://ton-app.pages.dev` (ou `*`) |
 
@@ -130,7 +129,7 @@ uvicorn server:app --host 0.0.0.0 --port $PORT
    - Start : `uvicorn server:app --host 0.0.0.0 --port $PORT`
 3. Ajoute les variables d'env (secrets) : `MONGO_URL`, `OPENROUTER_API_KEY` (principale),
    `DB_NAME`, `OPENROUTER_MODEL`, (`OPENAI_API_KEY` si tu veux la transcription audio,
-   `ANTHROPIC_API_KEY` / `DEEPSEEK_API_KEY` optionnels), `CORS_ORIGINS`.
+   `ANTHROPIC_API_KEY` optionnel, dernier recours), `OPENROUTER_FREE_MODEL`, `CORS_ORIGINS`.
 4. Note l'URL publique (ex. `https://interview-ai-backend.onrender.com`).
 
 ### Frontend sur Cloudflare Pages

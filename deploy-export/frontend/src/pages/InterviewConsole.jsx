@@ -41,7 +41,7 @@ export default function InterviewConsole() {
   const [pendingMode, setPendingMode] = useState(null);
   const [ctxOpen, setCtxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-3.8-flash", provider: "gemini", answerStyle: "complet", tone: "confiant", starMode: true });
+  const [settings, setSettings] = useState({ geminiKey: "", model: "gemini-flash-latest", provider: "gemini", answerStyle: "complet", tone: "confiant", starMode: true });
   const [creating, setCreating] = useState(false);
   const [cost, setCost] = useState({ cost: 0, inputTokens: 0, outputTokens: 0, turns: 0, lastProvider: null });
   const [showListen, setShowListen] = useState(false);

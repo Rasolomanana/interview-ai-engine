@@ -253,7 +253,7 @@ export async function streamRaw({ systemMessage, userText, onDelta, onFallback, 
   let emitted = false;
   const wrapped = (c) => { emitted = true; onDelta?.(c); };
   try {
-    await streamGemini({ apiKey: settings.geminiKey, model: settings.model || "gemini-3.8-flash", systemMessage, userText, signal, onDelta: wrapped });
+    await streamGemini({ apiKey: settings.geminiKey, model: settings.model || "gemini-flash-latest", systemMessage, userText, signal, onDelta: wrapped });
   } catch (err) {
     if (shouldFallback(err, emitted)) {
       onFallback?.(activateServerFallback(err, settings?.model));
@@ -329,18 +329,18 @@ export async function resetSession(id) {
 }
 
 const ALLOWED_MODELS = [
-  "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash",
+  "gemini-flash-latest", "gemini-3.8-flash", "gemini-3.5-flash",
   "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.1-pro-preview",
 ];
 
 export async function getSettings() {
-  const s = await store.get("settings", { geminiKey: "", model: "gemini-3.8-flash", provider: "gemini", answerStyle: "complet", tone: "confiant", starMode: true });
+  const s = await store.get("settings", { geminiKey: "", model: "gemini-flash-latest", provider: "gemini", answerStyle: "complet", tone: "confiant", starMode: true });
   if (!s.provider) s.provider = "gemini";
   if (!s.answerStyle) s.answerStyle = "complet";
   if (!s.tone) s.tone = "confiant";
   if (s.starMode === undefined) s.starMode = true;
   if (!s.model || !ALLOWED_MODELS.includes(s.model)) {
-    s.model = "gemini-3.8-flash";
+    s.model = "gemini-flash-latest";
     await store.set("settings", s);
   }
   return s;
@@ -411,7 +411,7 @@ export function streamMessage(sessionId, body, handlers) {
         try {
           await streamGemini({
             apiKey: settings.geminiKey,
-            model: settings.model || "gemini-3.8-flash",
+            model: settings.model || "gemini-flash-latest",
             systemMessage, userText: turnMessage,
             images, signal: controller.signal, onDelta,
           });
@@ -431,7 +431,7 @@ export function streamMessage(sessionId, body, handlers) {
       // Rough cost/token estimate for this turn (see costEstimate.js).
       try {
         const usage = estimateTurnCost({
-          provider: providerUsed,
+          provider: serverInfo?.provider || providerUsed,
           inputText: systemMessage + "\n" + turnMessage,
           outputText: full,
           imageCount: images.length,

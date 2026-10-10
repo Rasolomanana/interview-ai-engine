@@ -194,7 +194,7 @@ export default function AdminDashboard() {
               <div className="text-[11px] text-slate-400">{money(llm.gemini_cost)}</div>
             </div>
             <div data-testid="admin-server-calls" className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-950/20 p-3">
-              <div className="text-[10px] uppercase text-fuchsia-300">Appels Serveur (Anthropic, OpenRouter…)</div>
+              <div className="text-[10px] uppercase text-fuchsia-300">Appels Serveur (OpenRouter gratuit/payant, Anthropic)</div>
               <div className="text-2xl font-bold text-white">{num(llm.server_calls)}</div>
               <div className="text-[11px] text-slate-400">{money(llm.server_cost)}</div>
             </div>

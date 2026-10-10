@@ -97,7 +97,8 @@ class LlmChat:
                 model = self.model or OPENROUTER_MODEL
                 # Hybrid: switch to a vision-capable model only when images are attached,
                 # so routine text turns stay on the cheapest text model.
-                if imgs:
+                # Free entries keep their model: openrouter/free auto-picks a vision-capable free model.
+                if imgs and not (model.endswith(":free") or model == "openrouter/free"):
                     model = OPENROUTER_VISION_MODEL
             else:
                 client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])

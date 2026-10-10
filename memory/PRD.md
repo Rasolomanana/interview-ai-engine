@@ -216,3 +216,9 @@ ayant lancé une simulation ; rétention TTL 90j.
 - Fallback toast (15 s) + console + window.__geminiLastError + localStorage geminiLastError + trackEvent("gemini_error").
 - Settings: GeminiDiagnostic component ("Tester Gemini" button + last error box). Mirrored in deploy-export.
 - Self-tested: fake key → "Clé API invalide (HTTP 400) INVALID_ARGUMENT". Other branches not E2E-tested.
+
+## 2026-10-10 — LLM chain: Gemini Flash → OpenRouter free → OpenRouter paid → Anthropic (last)
+- deploy-export backend: SERVER_CHAIN = (label, provider, model): openrouter_free (OPENROUTER_FREE_MODEL, default openrouter/free) → openrouter (OPENROUTER_MODEL) → anthropic. OpenAI & DeepSeek removed from text chain (OPENAI_API_KEY only for Whisper).
+- Free entries keep their model even with images (no forced paid vision swap).
+- Frontend: default Gemini model gemini-flash-latest; cost estimate per real provider (free=0, anthropic 3/15 $/M); dashboard labels "OpenRouter gratuit"/"OpenRouter (payant)".
+- Verified via mocked-provider unit run (free 429 → paid). Real provider calls not tested (user keys).

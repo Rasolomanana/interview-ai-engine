@@ -11,7 +11,9 @@ services:
     envVars:
       - key: DB_NAME
         value: interview_ai
-      # Cheapest-first provider. "provider/model" from https://openrouter.ai/models
+      # Chain: OpenRouter FREE -> OpenRouter paid -> Anthropic (last resort).
+      - key: OPENROUTER_FREE_MODEL
+        value: openrouter/free
       - key: OPENROUTER_MODEL
         value: deepseek/deepseek-chat
       # Used automatically ONLY when images are attached (hybrid cost control).
@@ -19,8 +21,6 @@ services:
         value: openai/gpt-4o-mini
       - key: ANTHROPIC_MODEL
         value: claude-sonnet-4-6
-      - key: OPENAI_MODEL
-        value: gpt-4o
       - key: APP_TITLE
         value: Interview AI Engine
       - key: CORS_ORIGINS
@@ -34,8 +34,6 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: OPENAI_API_KEY
-        sync: false
-      - key: DEEPSEEK_API_KEY
         sync: false
       # Shared password that gates MANUAL Server-mode selection in the UI.
       - key: SERVER_ACCESS_PASSWORD

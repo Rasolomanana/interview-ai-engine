@@ -43,22 +43,21 @@ SERVER_ACCESS_PASSWORD = os.environ.get("SERVER_ACCESS_PASSWORD")
 
 
 def _build_server_chain():
-    """Server fallback chain, cheapest-first. OpenRouter is PRIMARY (one key,
-    OpenAI-compatible, routes to low-cost models like DeepSeek/Qwen, and is
-    reachable where Google/Gemini is blocked by IT policy). Anthropic and OpenAI
-    are OPTIONAL fallbacks. A provider is included only if its key is configured."""
+    """Server chain (label, provider, model), cheapest-first; Anthropic strictly LAST:
+    OpenRouter free -> OpenRouter paid (cheap) -> Anthropic. Entries need their key."""
     chain = []
     if OPENROUTER_API_KEY:
-        chain.append(("openrouter", os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")))
+        free = os.environ.get("OPENROUTER_FREE_MODEL", "openrouter/free").strip()
+        if free:
+            chain.append(("openrouter_free", "openrouter", free))
+        chain.append(("openrouter", "openrouter", os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")))
     if ANTHROPIC_API_KEY:
-        chain.append(("anthropic", os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")))
-    if OPENAI_API_KEY:
-        chain.append(("openai", os.environ.get("OPENAI_MODEL", "gpt-5.4")))
+        chain.append(("anthropic", "anthropic", os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")))
     return chain
 
 
 SERVER_CHAIN = _build_server_chain()
-LLM_MODEL = SERVER_CHAIN[0] if SERVER_CHAIN else ("anthropic", "claude-sonnet-4-6")
+LLM_MODEL = SERVER_CHAIN[0][1:] if SERVER_CHAIN else ("anthropic", "claude-sonnet-4-6")
 LLM_ENABLED = bool(SERVER_CHAIN)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -298,7 +297,7 @@ async def generate(req: GenerateRequest):
     """Stateless generation proxy — used by the client 'Serveur' provider so the
     browser never contacts an external LLM directly (works even where Google/OpenAI
     are blocked by an IT policy). Multi-provider fallback chain, DeepSeek last resort."""
-    if not LLM_ENABLED and not DEEPSEEK_API_KEY:
+    if not LLM_ENABLED:
         raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
 
     return StreamingResponse(
@@ -309,15 +308,14 @@ async def generate(req: GenerateRequest):
 
 
 async def _stream_with_fallback(system_message: str, turn_message: str, images_base64: Optional[list]):
-    """Try Emergent providers (Claude, then OpenAI) first — free/managed — and only
-    fall back to the user's paid DeepSeek key as a last resort. Only advance to the
-    next provider if NOTHING has been streamed yet (avoids duplicated output).
+    """Walk SERVER_CHAIN (OpenRouter free -> OpenRouter paid -> Anthropic last). Only
+    advance to the next provider if NOTHING has been streamed yet (no duplicated output).
     Supports MULTIPLE images (several screenshots / problems at once)."""
     imgs = [i for i in (images_base64 or []) if i]
     emitted = False
     errors = []
     if SERVER_CHAIN:
-        for provider, model in SERVER_CHAIN:
+        for label, provider, model in SERVER_CHAIN:
             try:
                 chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
                 fc = [ImageContent(image_base64=_strip_data_url(i)) for i in imgs] if imgs else None
@@ -329,36 +327,14 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
                     elif isinstance(ev, StreamDone):
                         break
                 if emitted:
-                    yield _sse("done", {"provider": provider, "model": model})
+                    yield _sse("done", {"provider": label, "model": model})
                     return
             except Exception as e:  # noqa: BLE001
-                errors.append(f"{provider}: {str(e)[:160]}")
-                logger.warning("Provider %s failed, trying next: %s", provider, e)
+                errors.append(f"{label}: {str(e)[:160]}")
+                logger.warning("Provider %s (%s) failed, trying next: %s", label, model, e)
                 if emitted:
-                    yield _sse("done", {"provider": provider, "model": model})
+                    yield _sse("done", {"provider": label, "model": model})
                     return
-
-    # Last resort: DeepSeek (OpenAI-compatible), user's own key.
-    if DEEPSEEK_API_KEY and not emitted:
-        try:
-            from openai import AsyncOpenAI
-            ds = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
-            stream = await ds.chat.completions.create(
-                model="deepseek-chat",
-                messages=[{"role": "system", "content": system_message}, {"role": "user", "content": turn_message}],
-                stream=True,
-            )
-            async for chunk in stream:
-                delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
-                if delta:
-                    emitted = True
-                    yield _sse("delta", {"content": delta})
-            if emitted:
-                yield _sse("done", {"provider": "deepseek", "model": "deepseek-chat"})
-                return
-        except Exception as e:  # noqa: BLE001
-            errors.append(f"deepseek: {str(e)[:160]}")
-            logger.exception("DeepSeek fallback failed")
 
     if not emitted:
         yield _sse("error", {"detail": "Tous les fournisseurs ont échoué. " + " | ".join(errors[-3:])})
@@ -368,7 +344,7 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
 async def _generate_text(system_message: str, user_text: str) -> str:
     """Non-streaming aggregate generation with the same fallback chain."""
     if SERVER_CHAIN:
-        for provider, model in SERVER_CHAIN:
+        for label, provider, model in SERVER_CHAIN:
             try:
                 chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
                 out = []
@@ -380,19 +356,7 @@ async def _generate_text(system_message: str, user_text: str) -> str:
                 if out:
                     return "".join(out)
             except Exception as e:  # noqa: BLE001
-                logger.warning("analyze provider %s failed: %s", provider, e)
-    if DEEPSEEK_API_KEY:
-        try:
-            from openai import AsyncOpenAI
-            ds = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
-            r = await ds.chat.completions.create(
-                model="deepseek-chat",
-                messages=[{"role": "system", "content": system_message}, {"role": "user", "content": user_text}],
-                stream=False,
-            )
-            return r.choices[0].message.content or ""
-        except Exception as e:  # noqa: BLE001
-            logger.exception("deepseek analyze failed")
+                logger.warning("analyze provider %s (%s) failed: %s", label, model, e)
     raise HTTPException(status_code=502, detail="Analyse indisponible (fournisseurs LLM)")
 
 
@@ -513,7 +477,7 @@ async def analyze_application(req: ApplicationAnalyzeRequest, request: Request):
     """Start a recruiter-grade analysis job in the background and return a job_id
     immediately. The client polls GET /analyze-application/{job_id}. This avoids
     holding a 40s connection open (which corporate proxies / gateways truncate)."""
-    if not LLM_ENABLED and not DEEPSEEK_API_KEY:
+    if not LLM_ENABLED:
         raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
     import asyncio
     job_id = str(uuid.uuid4())
@@ -584,7 +548,7 @@ async def _run_cover_letter(job_id: str, cv: str, poste: str, entreprise: str):
 @api_router.post("/cover-letter")
 async def cover_letter(req: CoverLetterRequest, request: Request):
     """Start a cover-letter job in the background; poll GET /analyze-application/{job_id}."""
-    if not LLM_ENABLED and not DEEPSEEK_API_KEY:
+    if not LLM_ENABLED:
         raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
     import asyncio
     job_id = str(uuid.uuid4())

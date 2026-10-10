@@ -7,7 +7,9 @@ const IMAGE_TOKENS = 800; // rough per-image vision cost
 // USD per 1M tokens: [input, output].
 export const PRICING = {
   gemini: { in: 0, out: 0 },       // user's own free Google key
-  server: { in: 0.3, out: 1.1 },   // default ~DeepSeek via OpenRouter
+  openrouter_free: { in: 0, out: 0 }, // OpenRouter free router
+  server: { in: 0.3, out: 1.1 },   // default ~DeepSeek via OpenRouter (paid)
+  anthropic: { in: 3, out: 15 },   // Claude Sonnet (last resort)
 };
 
 export function estimateTokens(text = "") {
@@ -24,7 +26,7 @@ function serverPrice() {
 }
 
 export function estimateTurnCost({ provider, inputText, outputText, imageCount = 0 }) {
-  const price = provider === "gemini" ? PRICING.gemini : serverPrice();
+  const price = PRICING[provider] && provider !== "server" ? PRICING[provider] : serverPrice();
   const inputTokens = estimateTokens(inputText) + imageCount * IMAGE_TOKENS;
   const outputTokens = estimateTokens(outputText);
   const cost = (inputTokens / 1e6) * price.in + (outputTokens / 1e6) * price.out;

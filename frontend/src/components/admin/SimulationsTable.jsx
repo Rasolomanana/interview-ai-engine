@@ -1,4 +1,4 @@
-const LABELS = { gemini: "Gemini", anthropic: "Anthropic", openrouter: "OpenRouter", openai: "OpenAI", deepseek: "DeepSeek", server: "Serveur (non détaillé)" };
+const LABELS = { gemini: "Gemini", anthropic: "Anthropic", openrouter_free: "OpenRouter gratuit", openrouter: "OpenRouter (payant)", openai: "OpenAI", deepseek: "DeepSeek", server: "Serveur (non détaillé)" };
 const label = (p) => LABELS[p] || p;
 
 export const SimulationsTable = ({ rows }) => (
