@@ -179,3 +179,26 @@ par un shim local `backend/emergentintegrations/`.
   via localStorage.serverPricing). Cumul par session persisté dans localStorage `cost:<sessionId>`,
   tooltip détaillé (tokens entrée/sortie, tours, fournisseur), clic = remise à zéro.
   Vérifié testing_agent iteration_15 (4/4, 100% : badge, incrément serveur ≈$0.0010, persistance, reset).
+
+## Espace administrateur (Lot A) — Oct 2026
+Décisions user : email Resend différé (Lot B) ; CV complet stocké UNIQUEMENT si consentement opt-in ;
+/admin protégé par ADMIN_PASSWORD (inaccessible si non défini) ; pas de pays ; visiteurs = sessions
+ayant lancé une simulation ; rétention TTL 90j.
+
+- ✅ **Backend `admin.py`** (`create_admin_router`): POST /api/admin/login, GET /api/admin/stats
+  (header X-Admin-Password), GET /api/admin/export?fmt=csv|xlsx. Helpers record_event,
+  record_ats_submission (CV stocké seulement si consent), anonymize_ip (IPv4→/16, IPv6→3 hextets),
+  ensure_indexes (TTL 90j sur admin_events + ats_submissions). Lecture ADMIN_PASSWORD en lazy (load_dotenv order).
+- ✅ **server.py** : POST /api/track (simulation + llm_call reportés par le CLIENT → couvre Gemini & Serveur),
+  analyze-application accepte consent+session_id et enregistre l'analyse, cover-letter logue un event,
+  startup ensure_indexes, include admin router.
+- ✅ **Frontend** : page `/admin` (AdminDashboard.jsx, login + 5 cartes stats + conso LLM + séries jour/semaine/mois
+  + tableau soumissions + export CSV/Excel), PrivacyBanner (bannière confidentialité dismiss persistant),
+  case consentement opt-in NON pré-cochée dans ContextPanel, trackEvent dans onUsage, react-router (/ et /admin).
+- ✅ Vérifié testing_agent iteration_16 (backend 11/11, frontend 100%). Tests: /app/backend/tests/test_admin.py.
+- Preview creds : ADMIN_PASSWORD=admin2026, SERVER_ACCESS_PASSWORD=interview2026.
+
+## Lot B (à faire, après feu vert + clé) — RGPD
+- Email Resend vers raskint09@gmail.com (CV + rapport ATS + score + date) UNIQUEMENT si consentement.
+  Nécessite RESEND_API_KEY + domaine expéditeur vérifié. Prévoir bouton d'effacement (droit à l'oubli) dans /admin.
+- Note RGPD : transfert US (Gmail) sensible ; base légale/consentement sous responsabilité de l'exploitant.

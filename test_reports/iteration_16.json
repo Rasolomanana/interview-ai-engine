@@ -1,0 +1,30 @@
+{
+  "summary": "Full backend + frontend verification of the Admin space (Lot A). 11/11 pytest tests PASSED. UI verified end-to-end on preview URL: admin gate (wrong→error, correct→dashboard), 5 stat cards (Visiteurs=3, Simulations=3, Analyses ATS=5, CV analysés=2, Lettres=0), LLM consumption panel (calls/tokens_in/tokens_out/cost + per-provider 'server' breakdown), 3 time-series panels (par jour/semaine/mois), submissions table showing correct Consent./CV stocké oui|non per row, IP anonymisée truncated as x.x. CSV + XLSX downloads triggered successfully (analyses_ats.csv / analyses_ats.xlsx). Tracking end-to-end: POST /api/track for type=simulation and type=llm_call increments stats totals.simulations and llm.calls. Consent-gated storage proven at backend: analyze-application with consent=false → latest submission has_cv=False, consent=False; with consent=true → has_cv=True, consent=True. Privacy banner shown on first load, dismissed by data-testid=privacy-accept-btn, persists after reload via localStorage.privacyAccepted=1. Consent checkbox in Context panel: NOT pre-checked, located above analyze-company-btn (DOM order: analyze_after_consent), toggles both directions.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Main app /", "issues": ["AI Settings (Réglages IA) dialog auto-opens on first load and overlays the UI; Escape key alone does not dismiss it — had to click 'Fermer'. Not a blocker but may surprise users who expect to see the console first. Consider deferring the dialog to a user action or auto-closing it once a key is detected."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin.py",
+    "/app/test_reports/pytest/admin_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin.py: ADMIN_PASSWORD read live inside _admin_password() — resilient to .env load order. Good.",
+    "admin.py: anonymize_ip truncates IPv4 to /16 (x.x) and IPv6 to first 3 hextets — reasonable pseudonymization.",
+    "server.py: analyze-application correctly runs analysis in background task; records 'ats' event + ats_submission with consent flag; cv_text is stored only when consent=True. Verified live.",
+    "TTL indexes created via ensure_indexes on startup (90-day retention). Could not force-verify TTL deletion in a 10-min test window but index creation path exists.",
+    "The admin_router.get('/export') always returns 200 with headers; browser-trigger downloads work (filenames: analyses_ats.csv, analyses_ats.xlsx)."
+  ],
+  "updated_files": ["/app/backend/tests/test_admin.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100%"},
+  "test_credentials": "ADMIN_PASSWORD=admin2026, SERVER_ACCESS_PASSWORD=interview2026 (read from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created 2 ATS submissions via /api/analyze-application (TEST_NoConsent, TEST_WithConsent) + 2 track events (simulation, llm_call) during testing. All persisted in admin_events + ats_submissions collections (will auto-expire after 90 days).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Admin space fully functional on preview URL. Tests in /app/backend/tests/test_admin.py (pytest, 11 tests, ~66s). AI Settings dialog auto-opens on first visit of / — scripts must close it (click 'Fermer') before interacting with header buttons like open-context-btn, otherwise clicks are swallowed by overlay. consent-checkbox is inside #context-panel (opened by open-context-btn)."
+}
