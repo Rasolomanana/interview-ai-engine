@@ -428,9 +428,10 @@ export function streamMessage(sessionId, body, handlers) {
       let full = "";
       let emitted = false;
       let providerUsed = useServer ? "server" : "gemini";
+      let serverInfo = {};
       const onDelta = (c) => { full += c; emitted = true; handlers.onDelta?.(c); };
       if (useServer) {
-        await streamServer({ systemMessage, userText: turnMessage, images, signal: controller.signal, onDelta });
+        serverInfo = await streamServer({ systemMessage, userText: turnMessage, images, signal: controller.signal, onDelta });
       } else {
         try {
           await streamGemini({
@@ -445,7 +446,7 @@ export function streamMessage(sessionId, body, handlers) {
             handlers.onFallback?.(reason);
             full = "";
             providerUsed = "server";
-            await streamServer({ systemMessage, userText: turnMessage, images, signal: controller.signal, onDelta });
+            serverInfo = await streamServer({ systemMessage, userText: turnMessage, images, signal: controller.signal, onDelta });
           } else {
             throw err;
           }
@@ -460,7 +461,7 @@ export function streamMessage(sessionId, body, handlers) {
           outputText: full,
           imageCount: images.length,
         });
-        handlers.onUsage?.({ ...usage, provider: providerUsed });
+        handlers.onUsage?.({ ...usage, provider: providerUsed, serverProvider: serverInfo?.provider, serverModel: serverInfo?.model });
       } catch { /* non-blocking */ }
 
       msgs.push({ id: uid(), role: "assistant", content: full, mode: resolved.resolved_state, modules: resolved.modules, created_at: now() });

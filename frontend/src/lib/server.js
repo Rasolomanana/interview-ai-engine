@@ -19,6 +19,7 @@ export async function streamServer({ systemMessage, userText, imageDataUrl, imag
   const reader = resp.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
+  let info = {};
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -36,6 +37,8 @@ export async function streamServer({ systemMessage, userText, imageDataUrl, imag
       const p = JSON.parse(data);
       if (ev === "delta") onDelta(p.content);
       else if (ev === "error") throw new Error(p.detail || "Erreur serveur");
+      else if (ev === "done" && p.provider) info = p;
     }
   }
+  return info;
 }

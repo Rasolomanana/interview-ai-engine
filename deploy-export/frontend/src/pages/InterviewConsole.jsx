@@ -232,7 +232,11 @@ export default function InterviewConsole() {
           toast(reason || "Gemini indisponible — bascule automatique sur le mode Serveur", { icon: "🔁", duration: 6000 });
         },
         onUsage: (u) => {
-          api.trackEvent("llm_call", active?.id, { provider: u.provider, tokens_in: u.inputTokens, tokens_out: u.outputTokens, cost: u.cost });
+          api.trackEvent("llm_call", active?.id, {
+            provider: u.provider === "server" ? (u.serverProvider || "server") : u.provider,
+            mode: u.provider, model: u.serverModel || "",
+            tokens_in: u.inputTokens, tokens_out: u.outputTokens, cost: u.cost,
+          });
           if (active?.id) {
             const k = "simTracked:" + active.id;
             if (!localStorage.getItem(k)) { localStorage.setItem(k, "1"); api.trackEvent("simulation", active.id); }

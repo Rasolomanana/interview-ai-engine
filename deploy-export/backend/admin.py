@@ -8,6 +8,7 @@ import os
 import io
 import csv
 import hmac
+from collections import Counter
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Header, Request, Response
@@ -117,6 +118,38 @@ async def _timeseries(db, fmt, since):
     return sorted(buckets.values(), key=lambda x: x["bucket"])
 
 
+async def _simulations_detail(db, limit=100):
+    pipeline = [
+        {"$match": {"type": "llm_call", "session_id": {"$ne": ""}}},
+        {"$group": {
+            "_id": "$session_id",
+            "first": {"$min": "$ts"},
+            "providers": {"$push": {"$ifNull": ["$meta.provider", "inconnu"]}},
+            "cost": {"$sum": {"$ifNull": ["$meta.cost", 0]}},
+        }},
+        {"$sort": {"first": -1}},
+        {"$limit": limit},
+    ]
+    out = []
+    async for r in db.admin_events.aggregate(pipeline):
+        counts = Counter(r["providers"])
+        gemini = counts.get("gemini", 0)
+        server = sum(n for p, n in counts.items() if p != "gemini")
+        main = counts.most_common(1)[0][0] if counts else "—"
+        ts = r.get("first")
+        out.append({
+            "session_id": r["_id"][:8],
+            "ts": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
+            "gemini_calls": gemini,
+            "server_calls": server,
+            "main_provider": main,
+            "mixed": gemini > 0 and server > 0,
+            "providers": dict(counts),
+            "cost": round(r["cost"], 4),
+        })
+    return out
+
+
 def create_admin_router(db):
     router = APIRouter(prefix="/api/admin")
 
@@ -164,6 +197,11 @@ def create_admin_router(db):
                 "tokens_out": r["tout"], "cost": round(r["cost"], 4),
             }
         llm["cost"] = round(llm["cost"], 4)
+        gem = llm["by_provider"].get("gemini", {})
+        llm["gemini_calls"] = gem.get("calls", 0)
+        llm["server_calls"] = llm["calls"] - llm["gemini_calls"]
+        llm["gemini_cost"] = gem.get("cost", 0)
+        llm["server_cost"] = round(llm["cost"] - llm["gemini_cost"], 4)
 
         submissions = []
         async for d in db.ats_submissions.find({}, {"_id": 0}).sort("ts", -1).limit(100):
@@ -190,6 +228,7 @@ def create_admin_router(db):
             "by_week": await _timeseries(db, "%G-S%V", now - timedelta(days=84)),
             "by_month": await _timeseries(db, "%Y-%m", now - timedelta(days=365)),
             "submissions": submissions,
+            "simulations_detail": await _simulations_detail(db),
             "retention_days": _retention_days(),
         }
 

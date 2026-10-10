@@ -5,6 +5,7 @@ import {
   RefreshCw, LogOut, ShieldCheck,
 } from "lucide-react";
 import { adminLogin, adminStats, adminExport } from "@/lib/api";
+import { SimulationsTable } from "@/components/admin/SimulationsTable";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(4)}`;
 const num = (n) => (Number(n) || 0).toLocaleString();
@@ -186,10 +187,22 @@ export default function AdminDashboard() {
             <div><div className="text-[10px] uppercase text-slate-500">Tokens sortie</div><div className="text-xl font-bold text-white">{num(llm.tokens_out)}</div></div>
             <div><div className="text-[10px] uppercase text-slate-500">Coût estimé</div><div className="text-xl font-bold text-amber-300">{money(llm.cost)}</div></div>
           </div>
+          <div className="mt-4 grid grid-cols-2 gap-3" data-testid="admin-llm-split">
+            <div data-testid="admin-gemini-calls" className="rounded-xl border border-sky-500/20 bg-sky-950/20 p-3">
+              <div className="text-[10px] uppercase text-sky-300">Appels Gemini (navigateur)</div>
+              <div className="text-2xl font-bold text-white">{num(llm.gemini_calls)}</div>
+              <div className="text-[11px] text-slate-400">{money(llm.gemini_cost)}</div>
+            </div>
+            <div data-testid="admin-server-calls" className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-950/20 p-3">
+              <div className="text-[10px] uppercase text-fuchsia-300">Appels Serveur (Anthropic, OpenRouter…)</div>
+              <div className="text-2xl font-bold text-white">{num(llm.server_calls)}</div>
+              <div className="text-[11px] text-slate-400">{money(llm.server_cost)}</div>
+            </div>
+          </div>
           {Object.keys(llm.by_provider || {}).length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
               {Object.entries(llm.by_provider).map(([p, v]) => (
-                <span key={p} className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-slate-300">
+                <span key={p} data-testid={`admin-provider-${p}`} className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-slate-300">
                   <b className="text-white">{p}</b> · {num(v.calls)} appels · {money(v.cost)}
                 </span>
               ))}
@@ -202,6 +215,8 @@ export default function AdminDashboard() {
           <Bars title="Par semaine (12 s)" data={stats?.by_week || []} keys={["simulations", "ats", "cover_letters"]} />
           <Bars title="Par mois (12 m)" data={stats?.by_month || []} keys={["simulations", "ats", "cover_letters"]} />
         </div>
+
+        <SimulationsTable rows={stats?.simulations_detail || []} />
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/60 p-5">
           <h3 className="mb-3 text-sm font-semibold text-slate-200">Dernières analyses ATS (max 100)</h3>

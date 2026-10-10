@@ -309,13 +309,13 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
                     elif isinstance(ev, StreamDone):
                         break
                 if emitted:
-                    yield _sse("done", {})
+                    yield _sse("done", {"provider": provider, "model": model})
                     return
             except Exception as e:  # noqa: BLE001
                 errors.append(f"{provider}: {str(e)[:160]}")
                 logger.warning("Provider %s failed, trying next: %s", provider, e)
                 if emitted:
-                    yield _sse("done", {})
+                    yield _sse("done", {"provider": provider, "model": model})
                     return
 
     # Last resort: DeepSeek (OpenAI-compatible), user's own key.
@@ -334,7 +334,7 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
                     emitted = True
                     yield _sse("delta", {"content": delta})
             if emitted:
-                yield _sse("done", {})
+                yield _sse("done", {"provider": "deepseek", "model": "deepseek-chat"})
                 return
         except Exception as e:  # noqa: BLE001
             errors.append(f"deepseek: {str(e)[:160]}")
