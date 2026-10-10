@@ -3,7 +3,7 @@
 import * as store from "./storage";
 import { resolve as resolveState } from "./stateMachine";
 import { buildSystemMessage, buildTurnMessage } from "./promptClient";
-import { streamGemini } from "./gemini";
+import { streamGemini, describeGeminiError } from "./gemini";
 import { streamServer } from "./server";
 import { estimateTurnCost } from "./costEstimate";
 
@@ -64,46 +64,21 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 // repeated 9s timeout on every turn.
 let geminiUnavailable = false;
 
-// A direct browser->Google call can fail at the NETWORK/TLS layer (corporate SSL
-// inspection, antivirus/VPN interception, blocked domain, wrong system clock).
-// fetch() then rejects with `TypeError: Failed to fetch`, and Chrome logs
-// net::ERR_SSL_VERSION_OR_CIPHER_MISMATCH / ERR_CONNECTION_* to the console.
-// None of these are user barge-ins, so we must fall back to the Server provider.
-function isNetworkError(err) {
-  if (!err || err.name === "AbortError") return false;
-  const msg = String(err.message || err).toLowerCase();
-  return (
-    err.name === "TypeError" ||
-    msg.includes("failed to fetch") ||
-    msg.includes("networkerror") ||
-    msg.includes("ssl") ||
-    msg.includes("err_") ||
-    msg.includes("cipher") ||
-    msg.includes("cert")
-  );
-}
 // Any non-abort Gemini failure (network/SSL, 429/503, 9s watchdog) should route
 // the rest of the session to the Server provider.
 const shouldFallback = (err, emitted) => !emitted && err && err.name !== "AbortError";
-const fallbackReason = (err) =>
-  isNetworkError(err)
-    ? "Accès à Google bloqué (réseau/SSL) — bascule automatique sur le mode Serveur"
-    : String(err?.message || "Gemini indisponible — bascule serveur");
+const fallbackReason = (info) => `Gemini → Serveur : ${info.label} — ${String(info.detail).slice(0, 220)}`;
 
-// Flips the session to Server mode, logs a visible console trace, and exposes an
-// inspectable flag on window so you can verify the fallback fired from DevTools.
-function activateServerFallback(err) {
+// Flips the session to Server mode, logs the EXACT Gemini cause, and exposes it on
+// window.__geminiLastError (+ localStorage) so it is visible in Réglages/DevTools.
+function activateServerFallback(err, model) {
   geminiUnavailable = true;
-  const reason = fallbackReason(err);
-  const kind = isNetworkError(err) ? "NETWORK/SSL" : "API";
-  console.warn(
-    `[Gemini→Serveur] Fallback activé (${kind}). geminiUnavailable=true. Raison:`,
-    reason,
-    "| Erreur d'origine:",
-    err?.name, err?.message
-  );
-  if (typeof window !== "undefined") window.__geminiUnavailable = true;
-  return reason;
+  const info = describeGeminiError(err, model);
+  console.warn(`[Gemini→Serveur] Fallback activé (${info.kind}). Cause exacte :`, info.label, "|", info.detail, err);
+  if (typeof window !== "undefined") { window.__geminiUnavailable = true; window.__geminiLastError = info; }
+  try { localStorage.setItem("geminiLastError", JSON.stringify(info)); } catch { /* ignore */ }
+  trackEvent("gemini_error", "", { kind: info.kind, status: info.status, model, detail: String(info.detail).slice(0, 300) });
+  return fallbackReason(info);
 }
 
 import * as pdfjsLib from "pdfjs-dist";
@@ -281,7 +256,7 @@ export async function streamRaw({ systemMessage, userText, onDelta, onFallback, 
     await streamGemini({ apiKey: settings.geminiKey, model: settings.model || "gemini-3.8-flash", systemMessage, userText, signal, onDelta: wrapped });
   } catch (err) {
     if (shouldFallback(err, emitted)) {
-      onFallback?.(activateServerFallback(err));
+      onFallback?.(activateServerFallback(err, settings?.model));
       await streamServer({ systemMessage, userText, signal, onDelta });
     } else {
       throw err;
@@ -442,7 +417,7 @@ export function streamMessage(sessionId, body, handlers) {
           });
         } catch (err) {
           if (shouldFallback(err, emitted)) {
-            const reason = activateServerFallback(err);
+            const reason = activateServerFallback(err, settings?.model);
             handlers.onFallback?.(reason);
             full = "";
             providerUsed = "server";

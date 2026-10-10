@@ -229,7 +229,7 @@ export default function InterviewConsole() {
           toast.error("Erreur LLM : " + d);
         },
         onFallback: (reason) => {
-          toast(reason || "Gemini indisponible — bascule automatique sur le mode Serveur", { icon: "🔁", duration: 6000 });
+          toast(reason || "Gemini indisponible — bascule automatique sur le mode Serveur", { icon: "🔁", duration: 15000 });
         },
         onUsage: (u) => {
           api.trackEvent("llm_call", active?.id, {
@@ -364,7 +364,7 @@ export default function InterviewConsole() {
         systemMessage,
         userText: "Voici la transcription de l'entretien :\n\n" + transcript,
         onDelta: (c) => setRecap((r) => ({ ...r, text: r.text + c })),
-        onFallback: () => toast("Gemini surchargé — bascule sur le mode Serveur…"),
+        onFallback: (reason) => toast(reason || "Gemini indisponible — bascule sur le mode Serveur…", { duration: 15000 }),
       });
     } catch (e) {
       toast.error("Récap échoué : " + e.message);

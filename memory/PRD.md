@@ -210,3 +210,9 @@ ayant lancé une simulation ; rétention TTL 90j.
 - Dashboard: Gemini vs Serveur cards + "Dernières simulations" table (components/admin/SimulationsTable.jsx). Mirrored in deploy-export.
 - Tested: iteration_17 (100%). Temporary admin login debug display still active (remove once prod dashboard confirmed).
 - Prod blocker found: Render cannot reach Atlas (ServerSelectionTimeout) → user must allow 0.0.0.0/0 in Atlas Network Access.
+
+## 2026-10-10 — Gemini exact-error diagnostics
+- lib/gemini.js classifies errors: KEY_INVALID, KEY_DENIED, QUOTA, MODEL_UNAVAILABLE, GOOGLE_DOWN, BAD_REQUEST, TIMEOUT (9 s first-token), NETWORK (browser/SSL/CORS), EMPTY (blocked/filtered).
+- Fallback toast (15 s) + console + window.__geminiLastError + localStorage geminiLastError + trackEvent("gemini_error").
+- Settings: GeminiDiagnostic component ("Tester Gemini" button + last error box). Mirrored in deploy-export.
+- Self-tested: fake key → "Clé API invalide (HTTP 400) INVALID_ARGUMENT". Other branches not E2E-tested.

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { GeminiDiagnostic } from "./GeminiDiagnostic";
 import { X, KeyRound, Cpu, ExternalLink, Save, ShieldCheck, Server, Sparkles, AlignLeft, Drama, ListChecks, Lock } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -184,6 +185,8 @@ export default function SettingsPanel({ open, settings, onClose, onSave }) {
                       ))}
                     </div>
                   </div>
+
+                  <GeminiDiagnostic apiKey={key.trim()} model={model} />
 
                   <div className="flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-950/20 px-3 py-2.5 text-xs text-emerald-200/80">
                     <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
