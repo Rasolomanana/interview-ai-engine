@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Form, Request, Header
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -20,6 +20,10 @@ from emergentintegrations.llm.openai import OpenAISpeechToText
 
 import state_machine as sm
 import prompt as P
+from admin import (
+    create_admin_router, ensure_indexes, record_event,
+    record_ats_submission, anonymize_ip, client_ip,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -129,6 +133,8 @@ class ApplicationAnalyzeRequest(BaseModel):
     cv: str = ""
     poste: str = ""
     url: str = ""
+    consent: bool = False
+    session_id: str = ""
 
 
 # ----------------------------- Helpers -----------------------------
@@ -149,6 +155,21 @@ def _strip_data_url(b64: str) -> str:
 @api_router.get("/")
 async def root():
     return {"message": "Interview AI Engine v4"}
+
+
+class TrackRequest(BaseModel):
+    type: str
+    session_id: str = ""
+    meta: dict = Field(default_factory=dict)
+
+
+@api_router.post("/track")
+async def track(req: TrackRequest, request: Request):
+    """Anonymous analytics ping from the client (covers Gemini AND Server modes).
+    Types: 'simulation' (once per session), 'llm_call' (with token/cost meta)."""
+    ip = anonymize_ip(client_ip(request))
+    await record_event(db, req.type, req.session_id, ip, req.meta)
+    return {"ok": True}
 
 
 @api_router.post("/verify-server-access")
@@ -412,7 +433,7 @@ def _parse_json_object(raw: str):
         return _json.loads(m.group(0))
 
 
-async def _run_application_analysis(job_id: str, cv: str, poste: str, url: str):
+async def _run_application_analysis(job_id, cv, poste, url, consent=False, ip_trunc="", session_id=""):
     """Background worker: fetch site, call LLM chain, parse JSON, persist result
     to the job document. Runs decoupled from any client connection so it is
     immune to gateway / corporate-proxy request timeouts."""
@@ -444,6 +465,21 @@ async def _run_application_analysis(job_id: str, cv: str, poste: str, url: str):
             {"job_id": job_id},
             {"$set": {"status": "done", "result": result, "updated_at": _now_iso()}},
         )
+        # analytics + (consent-gated) ATS submission storage
+        await record_event(db, "ats", session_id, ip_trunc)
+        if (cv or "").strip():
+            await record_event(db, "cv", session_id, ip_trunc)
+        ats_report = (
+            f"Score: {result['score']}\n"
+            f"Entreprise: {result['company']}\n"
+            f"Lacunes: {result['gaps']}\n"
+            f"Mots-cles manquants: {result['missing_keywords']}\n"
+            f"Signaux d'alerte: {result['red_flags']}"
+        )
+        await record_ats_submission(
+            db, session_id, ip_trunc, consent,
+            result["score"], ats_report, cv, result["company"],
+        )
     except Exception as e:  # noqa: BLE001
         logger.exception("analysis job %s failed", job_id)
         await db.analysis_jobs.update_one(
@@ -453,7 +489,7 @@ async def _run_application_analysis(job_id: str, cv: str, poste: str, url: str):
 
 
 @api_router.post("/analyze-application")
-async def analyze_application(req: ApplicationAnalyzeRequest):
+async def analyze_application(req: ApplicationAnalyzeRequest, request: Request):
     """Start a recruiter-grade analysis job in the background and return a job_id
     immediately. The client polls GET /analyze-application/{job_id}. This avoids
     holding a 40s connection open (which corporate proxies / gateways truncate)."""
@@ -465,7 +501,11 @@ async def analyze_application(req: ApplicationAnalyzeRequest):
         "job_id": job_id, "status": "pending", "result": None, "error": None,
         "created_at": _now_iso(), "updated_at": _now_iso(),
     })
-    asyncio.create_task(_run_application_analysis(job_id, req.cv, req.poste, req.url))
+    ip_trunc = anonymize_ip(client_ip(request))
+    asyncio.create_task(_run_application_analysis(
+        job_id, req.cv, req.poste, req.url,
+        consent=req.consent, ip_trunc=ip_trunc, session_id=req.session_id,
+    ))
     return {"job_id": job_id, "status": "pending"}
 
 
@@ -482,6 +522,7 @@ class CoverLetterRequest(BaseModel):
     cv: str = ""
     poste: str = ""
     entreprise: str = ""
+    session_id: str = ""
 
 
 async def _run_cover_letter(job_id: str, cv: str, poste: str, entreprise: str):
@@ -521,7 +562,7 @@ async def _run_cover_letter(job_id: str, cv: str, poste: str, entreprise: str):
 
 
 @api_router.post("/cover-letter")
-async def cover_letter(req: CoverLetterRequest):
+async def cover_letter(req: CoverLetterRequest, request: Request):
     """Start a cover-letter job in the background; poll GET /analyze-application/{job_id}."""
     if not EMERGENT_LLM_KEY and not DEEPSEEK_API_KEY:
         raise HTTPException(status_code=500, detail="Aucun fournisseur LLM configuré")
@@ -531,6 +572,7 @@ async def cover_letter(req: CoverLetterRequest):
         "job_id": job_id, "status": "pending", "result": None, "error": None,
         "created_at": _now_iso(), "updated_at": _now_iso(),
     })
+    await record_event(db, "cover_letter", req.session_id, anonymize_ip(client_ip(request)))
     asyncio.create_task(_run_cover_letter(job_id, req.cv, req.poste, req.entreprise))
     return {"job_id": job_id, "status": "pending"}
 
@@ -709,6 +751,7 @@ def _sse(event: str, data: dict) -> str:
 
 
 app.include_router(api_router)
+app.include_router(create_admin_router(db))
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -716,6 +759,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def _admin_startup():
+    try:
+        await ensure_indexes(db)
+    except Exception:
+        logger.exception("admin TTL index setup failed")
 
 
 @app.on_event("shutdown")

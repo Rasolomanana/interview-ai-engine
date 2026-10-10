@@ -14,6 +14,7 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
   const [companyUrl, setCompanyUrl] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [genLetter, setGenLetter] = useState(false);
+  const [consent, setConsent] = useState(false);
   const pdfRef = useRef(null);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
     if (!form.cv.trim()) { toast.error("Ajoutez d'abord votre CV (import PDF ou collé)"); return; }
     setAnalyzing(true);
     try {
-      const r = await analyzeApplication({ cv: form.cv, poste: form.poste, url: companyUrl.trim() });
+      const r = await analyzeApplication({ cv: form.cv, poste: form.poste, url: companyUrl.trim(), consent, sessionId: session?.id });
       setForm((f) => ({
         ...f,
         atsCv: r.ats_cv || "",
@@ -55,7 +56,7 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
     if (!form.atsCv.trim() && !form.cv.trim()) { toast.error("Ajoutez votre CV (ou lancez l'analyse ATS) d'abord"); return; }
     setGenLetter(true);
     try {
-      const letter = await generateCoverLetter({ cv: form.atsCv || form.cv, poste: form.poste, entreprise: form.entreprise });
+      const letter = await generateCoverLetter({ cv: form.atsCv || form.cv, poste: form.poste, entreprise: form.entreprise, sessionId: session?.id });
       setForm((f) => ({ ...f, coverLetter: letter }));
       toast.success("Lettre de motivation générée");
     } catch (err) {
@@ -135,6 +136,17 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
                       placeholder="https://careers.exemple.com …" className="flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600" />
                   </div>
                 </Group>
+
+                <label data-testid="consent-checkbox-label" className="flex items-start gap-2 rounded-xl border border-white/10 bg-black/20 p-3 text-[11.5px] leading-relaxed text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    data-testid="consent-checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+                  />
+                  <span>J'accepte que mon CV et mon analyse soient enregistrés à des fins d'amélioration du service (facultatif). Sans cette case, l'analyse fonctionne mais votre CV n'est pas conservé. Données supprimées automatiquement après 90 jours.</span>
+                </label>
 
                 <button type="button" data-testid="analyze-company-btn" onClick={runAnalysis} disabled={analyzing}
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50">

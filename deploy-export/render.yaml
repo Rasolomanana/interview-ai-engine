@@ -40,3 +40,8 @@ services:
       # Shared password that gates MANUAL Server-mode selection in the UI.
       - key: SERVER_ACCESS_PASSWORD
         sync: false
+      # Password protecting /admin (if unset, /admin is inaccessible).
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_RETENTION_DAYS
+        value: "90"

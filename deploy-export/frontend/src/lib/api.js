@@ -7,6 +7,54 @@ import { streamGemini } from "./gemini";
 import { streamServer } from "./server";
 import { estimateTurnCost } from "./costEstimate";
 
+// Anonymous analytics ping (best-effort, never blocks the UI). Covers Gemini AND
+// Server modes because it is fired from the client.
+export function trackEvent(type, sessionId, meta) {
+  try {
+    fetch(`${process.env.REACT_APP_BACKEND_URL}/api/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, session_id: sessionId || "", meta: meta || {} }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch { /* ignore */ }
+}
+
+const ADMIN_BASE = () => `${process.env.REACT_APP_BACKEND_URL}/api/admin`;
+
+export async function adminLogin(password) {
+  const r = await fetch(`${ADMIN_BASE()}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  if (!r.ok) {
+    let d = ""; try { d = (await r.json())?.detail || ""; } catch { /* ignore */ }
+    throw new Error(d || `Erreur ${r.status}`);
+  }
+  return r.json();
+}
+
+export async function adminStats(password) {
+  const r = await fetch(`${ADMIN_BASE()}/stats`, { headers: { "X-Admin-Password": password } });
+  if (!r.ok) {
+    let d = ""; try { d = (await r.json())?.detail || ""; } catch { /* ignore */ }
+    throw new Error(d || `Erreur ${r.status}`);
+  }
+  return r.json();
+}
+
+export async function adminExport(password, fmt) {
+  const r = await fetch(`${ADMIN_BASE()}/export?fmt=${fmt}`, { headers: { "X-Admin-Password": password } });
+  if (!r.ok) throw new Error(`Export échoué (${r.status})`);
+  const blob = await r.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fmt === "xlsx" ? "analyses_ats.xlsx" : "analyses_ats.csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
 const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
 const now = () => new Date().toISOString();
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -110,11 +158,11 @@ export async function transcribeBlob(blob) {
 // Job + polling: start a background job, then poll (short requests) until done.
 // This never holds a long connection open, so corporate proxies / gateways
 // cannot truncate it (fixes the recurring "Analyse incomplète").
-export async function analyzeApplication({ cv, poste, url, onProgress, signal }) {
+export async function analyzeApplication({ cv, poste, url, consent, sessionId, onProgress, signal }) {
   const start = await fetch(`${BACKEND_URL}/api/analyze-application`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cv: cv || "", poste: poste || "", url: url || "" }),
+    body: JSON.stringify({ cv: cv || "", poste: poste || "", url: url || "", consent: !!consent, session_id: sessionId || "" }),
     signal,
   });
   if (!start.ok) {
@@ -147,11 +195,11 @@ export async function analyzeApplication({ cv, poste, url, onProgress, signal })
 
 // Generate a one-page cover letter tailored to the job offer + (ATS) CV.
 // Same job + polling model as analyzeApplication (immune to proxy timeouts).
-export async function generateCoverLetter({ cv, poste, entreprise, onProgress, signal }) {
+export async function generateCoverLetter({ cv, poste, entreprise, sessionId, onProgress, signal }) {
   const start = await fetch(`${BACKEND_URL}/api/cover-letter`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cv: cv || "", poste: poste || "", entreprise: entreprise || "" }),
+    body: JSON.stringify({ cv: cv || "", poste: poste || "", entreprise: entreprise || "", session_id: sessionId || "" }),
     signal,
   });
   if (!start.ok) {
