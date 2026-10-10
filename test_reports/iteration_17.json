@@ -1,0 +1,29 @@
+{
+  "summary": "Admin Lot B (Appels Gemini vs Serveur + simulations_detail) verified end-to-end. Backend: 6/6 pytest tests PASS in /app/backend/tests/test_admin_lotb.py — auth gating (401), stats shape (llm.gemini_calls/server_calls/gemini_cost/server_cost + simulations_detail present, ≤100), aggregation correctness (pure gemini session → gemini_calls=2,server=0,main=gemini,mixed=false; pure anthropic → 0/1/anthropic/false; mixed gemini+openrouter → 1/1/mixed=true, providers dict={gemini:1, openrouter:1}), sort newest-first, split consistency (gemini_calls+server_calls==calls and costs sum). SSE smoke test on /api/generate: last event is `event: done` with data `{\"provider\": \"anthropic\", \"model\": \"claude-sonnet-4-6\"}` — matches spec. Frontend E2E on preview URL: /admin login OK, data-testid admin-gemini-calls (6, $0.0080) and admin-server-calls (7, $0.0169) cards present; admin-provider-anthropic chip present (text: 'anthropic · 2 appels · $0.0080'); admin-simulations-table shows 9 rows including Anthropic rows, Gemini rows and 2 'mixte' badges (data-testid=admin-sim-mixed); legacy records with provider='server' render as 'Serveur (non détaillé)' as required. Admin login error debug block (admin-login-error) still works with wrong password (regression preserved from iteration 16). CSV/XLSX export buttons still wired to /api/admin/export (verified in iteration 16).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_lotb.py",
+    "/app/test_reports/pytest/lotb_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin.py:_simulations_detail aggregates by session_id (type=llm_call), truncates id to [:8] for display and correctly computes mixed = gemini>0 && server>0. OK.",
+    "admin.py:_stats computes server_calls = total - gemini which is correct even if provider is 'inconnu' or legacy 'server'.",
+    "server.py:_stream_with_fallback emits `event: done {provider, model}` on both success and fallback paths — matches contract consumed by frontend/src/lib/server.js.",
+    "frontend/src/pages/InterviewConsole.jsx:235 — trackEvent sends provider = real server provider when streaming via server (u.serverProvider), falling back to 'server' only if missing. Good.",
+    "Minor: SimulationsTable truncates session_id to 8 chars; two test sessions sharing first 8 chars would collide in the Mongo _id of the grouping (they do NOT collide since full id is used in $group, only the DISPLAY is truncated). Fine for a display column but worth a tooltip with full id for debugging.",
+    "No pagination on simulations_detail (hard-capped to 100) — acceptable for an admin preview."
+  ],
+  "updated_files": ["/app/backend/tests/test_admin_lotb.py"],
+  "success_rate": {"backend": "100% (6/6 new + regression preserved)", "frontend": "100%"},
+  "test_credentials": "ADMIN_PASSWORD=admin2026, SERVER_ACCESS_PASSWORD=interview2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created 5 llm_call events across 3 testsim* sessions (pure gemini x2, anthropic x1, mixed gemini+openrouter x2) via /api/track. Cleaned up at end: deleted 10 testsim_* events from admin_events (includes 2 leftovers from a prior iteration).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Lot B admin split is live and verified. Tests at /app/backend/tests/test_admin_lotb.py (6 tests, ~2.5s). The SimulationsTable testids: admin-simulations-table (tbody), admin-sim-row-{session_id_first_8}, admin-sim-mixed badge, admin-gemini-calls, admin-server-calls, admin-provider-{name}. SSE /api/generate requires body fields system_message + turn_message (not system/user)."
+}

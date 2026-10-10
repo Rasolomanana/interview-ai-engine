@@ -202,3 +202,11 @@ ayant lancé une simulation ; rétention TTL 90j.
 - Email Resend vers raskint09@gmail.com (CV + rapport ATS + score + date) UNIQUEMENT si consentement.
   Nécessite RESEND_API_KEY + domaine expéditeur vérifié. Prévoir bouton d'effacement (droit à l'oubli) dans /admin.
 - Note RGPD : transfert US (Gmail) sensible ; base légale/consentement sous responsabilité de l'exploitant.
+
+## 2026-10-10 — Admin: Gemini vs Serveur split + per-simulation provider
+- /api/generate SSE `done` event now carries {provider, model} (real server provider).
+- Frontend tracks llm_call with real provider (gemini / anthropic / openrouter / openai / deepseek), mode, model.
+- /api/admin/stats: llm.gemini_calls/server_calls/gemini_cost/server_cost + simulations_detail (last 100, mixed flag).
+- Dashboard: Gemini vs Serveur cards + "Dernières simulations" table (components/admin/SimulationsTable.jsx). Mirrored in deploy-export.
+- Tested: iteration_17 (100%). Temporary admin login debug display still active (remove once prod dashboard confirmed).
+- Prod blocker found: Render cannot reach Atlas (ServerSelectionTimeout) → user must allow 0.0.0.0/0 in Atlas Network Access.
