@@ -41,5 +41,8 @@ services:
       # Password protecting /admin (if unset, /admin is inaccessible).
       - key: ADMIN_PASSWORD
         sync: false
+      # CareerOS member accounts: long random secret signing JWT tokens (REQUIRED).
+      - key: JWT_SECRET
+        generateValue: true
       - key: ADMIN_RETENTION_DAYS
         value: "90"

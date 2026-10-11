@@ -13,7 +13,7 @@ OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")
 # Hybrid cost control: cheap text model by default, vision model ONLY when images
 # are actually attached to the request.
 OPENROUTER_VISION_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "openai/gpt-4o-mini")
-MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
+MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "4096"))
 
 
 def _detect_mime(b64: str) -> str:

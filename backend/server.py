@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field, ConfigDict
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent, TextDelta, StreamDone
 from emergentintegrations.llm.openai import OpenAISpeechToText
 
+from careeros.auth import create_auth, ensure_auth_indexes
+from careeros.router import create_careeros_router, ensure_careeros_indexes
 import state_machine as sm
 import prompt as P
 from admin import (
@@ -752,6 +754,9 @@ def _sse(event: str, data: dict) -> str:
 
 app.include_router(api_router)
 app.include_router(create_admin_router(db))
+auth_router, current_member = create_auth(db)
+app.include_router(auth_router)
+app.include_router(create_careeros_router(db, current_member, _generate_text, _fetch_page_text, _parse_json_object))
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -767,6 +772,11 @@ async def _admin_startup():
         await ensure_indexes(db)
     except Exception:
         logger.exception("admin TTL index setup failed")
+    try:
+        await ensure_auth_indexes(db)
+        await ensure_careeros_indexes(db)
+    except Exception:
+        logger.exception("careeros index setup failed")
 
 
 @app.on_event("shutdown")

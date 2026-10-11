@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import {
+import { Brain,
   Send, Mic, MicOff, ImagePlus, X, Zap, RotateCcw, SlidersHorizontal,
   Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound, FileText, Headphones, PictureInPicture2, MonitorUp, Coins,
 } from "lucide-react";
@@ -477,6 +477,7 @@ export default function InterviewConsole() {
                 <span className={`h-2 w-2 rounded-full ${liveActive ? "bg-red-500 animate-pulse" : "bg-emerald-400"}`} />
                 {liveActive ? "Live actif" : "Live"}
               </button>
+              <HeaderBtn onClick={() => { window.location.href = "/careeros"; }} testid="careeros-btn" icon={<Brain className="h-4 w-4" />} label="CareerOS" />
               <HeaderBtn onClick={openFloating} testid="floating-btn" icon={<PictureInPicture2 className="h-4 w-4" />} label="Flottant" active={!!pipRoot} />
               <HeaderBtn onClick={() => setShowListen((s) => !s)} testid="toggle-listen-btn" icon={<Headphones className="h-4 w-4" />} label="Écoute" active={listen.active} />
               <HeaderBtn onClick={doRecap} testid="recap-btn" icon={<FileText className="h-4 w-4" />} label="Récap" />
