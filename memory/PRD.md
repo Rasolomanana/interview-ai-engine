@@ -222,3 +222,17 @@ ayant lancé une simulation ; rétention TTL 90j.
 - Free entries keep their model even with images (no forced paid vision swap).
 - Frontend: default Gemini model gemini-flash-latest; cost estimate per real provider (free=0, anthropic 3/15 $/M); dashboard labels "OpenRouter gratuit"/"OpenRouter (payant)".
 - Verified via mocked-provider unit run (free 429 → paid). Real provider calls not tested (user keys).
+
+## 2026-10-11 — CareerOS Lot 1 : « Pack candidature en un clic » + comptes membres + Career Memory
+Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécution ; Gemini/OpenRouter/Anthropic = moteurs IA ; LinkedIn/Indeed = sources.
+- Backend package `backend/careeros/` (mirrored in deploy-export): auth.py (email/password, bcrypt, JWT Bearer 12h + refresh 30d, brute force 5→15 min), router.py (/api/careeros: meta, profile GET/PUT, packs POST, applications list/get/status/delete), ips.py (formule IPS propriétaire, 10 critères pondérés =100, knockout cap 40, A/B/C), prompts.py (prompts officiels CareerOS Brain + Interview AI Engine).
+- Pack = 6 appels LLM parallèles (decision JSON, cv_ats, cv_humain, letter, questions JSON, star JSON), résultats progressifs, statut done/partial/error.
+- Data model future-ready: applications.{pipeline_status, timeline, interviews, followups, calendar_events, emails}; career_profiles.skills_detected auto-enrichi.
+- Frontend: /connexion, /careeros (dashboard trié par priorité), /careeros/nouveau, /careeros/candidature/:id (8 onglets, Copier/DOCX/PDF), /careeros/memoire. jsPDF ajouté. Bouton CareerOS dans le copilote.
+- New env: JWT_SECRET (backend). Tested iteration_18: 23/23 backend, frontend 100%.
+
+## Backlog CareerOS
+- P1: Plan du Jour (actions priorisées impact/urgence/effort), suivi recruteurs, courriels (confirmation/remerciement), lancer simulation d'entrevue depuis un pack
+- P1: Google Calendar / Outlook (détection entrevue → événement + préparation)
+- P2: sources autorisées (API officielles, RSS) pour la veille marché ; CV exécutif ; mot de passe oublié (nécessite Resend) ; suppression de compte (RGPD)
+- Still pending: retirer l'affichage DEBUG du login admin quand prod confirmée ; Atlas Network Access 0.0.0.0/0
