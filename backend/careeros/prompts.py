@@ -56,7 +56,9 @@ Renvoie UNIQUEMENT un objet JSON valide (aucun texte autour, pas de markdown) av
    "gestionnaire": {"verdict": "passe|limite|rejet", "commentaire": "..."}
  },
  "risks": [{"risque": "...", "objection": "objection probable du recruteur", "correction": "comment la neutraliser"}],
- "skills_detected": ["compétences du membre confirmées par le CV"]
+ "skills_detected": ["compétences du membre confirmées par le CV"],
+ "decision_summary": "2-3 phrases : la recommandation CareerOS (postuler / optimiser d'abord / éviter) et POURQUOI",
+ "improvement_actions": [{"action": "action concrète pour augmenter les chances", "critere": "critère IPS visé", "impact_estime": "effet attendu"}]
 }
 Sois honnête et exigeant : un score flatteur ne sert pas le membre."""
 

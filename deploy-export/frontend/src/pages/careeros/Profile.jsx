@@ -6,7 +6,7 @@ import { careeros } from "@/lib/careeros";
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white outline-none focus:border-indigo-400/60";
 const TEXT = [["full_name", "Nom complet"], ["headline", "Titre professionnel"], ["location", "Localisation"], ["target_roles", "Postes visés"], ["sectors", "Secteurs visés"], ["salary_expectation", "Attentes salariales"]];
-const LISTS = [["skills", "Compétences"], ["certifications", "Certifications"], ["languages", "Langues"]];
+const LISTS = [["skills", "Compétences"], ["certifications", "Certifications"], ["education", "Formations"], ["languages", "Langues"]];
 
 export default function Profile() {
   const [p, setP] = useState(null);
@@ -57,6 +57,7 @@ export default function Profile() {
             {TEXT.map(([k, l]) => <label key={k}><span className="mb-1 block text-xs text-slate-400">{l}</span><input value={p[k] || ""} onChange={set(k)} className={inputCls} data-testid={`profile-${k}-input`} /></label>)}
           </div>
           {LISTS.map(([k, l]) => <label key={k} className="block"><span className="mb-1 block text-xs text-slate-400">{l} (séparées par des virgules)</span><input defaultValue={(p[k] || []).join(", ")} onBlur={setList(k)} className={inputCls} data-testid={`profile-${k}-input`} /></label>)}
+          <label className="block"><span className="mb-1 block text-xs text-slate-400">Promotions obtenues (12 derniers mois)</span><input type="number" min={0} max={50} value={p.promotions || 0} onChange={(e) => setP({ ...p, promotions: Math.max(0, Number(e.target.value) || 0) })} className={inputCls} data-testid="profile-promotions-input" /></label>
           <label className="block"><span className="mb-1 block text-xs text-slate-400">Réalisations clés</span><textarea rows={4} value={p.achievements || ""} onChange={set("achievements")} className={inputCls} data-testid="profile-achievements-input" /></label>
           {(p.skills_detected || []).length > 0 && (
             <div data-testid="skills-detected">

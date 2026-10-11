@@ -69,6 +69,10 @@ export const careeros = {
   get: (id) => call(`/careeros/applications/${id}`),
   setStatus: (id, pipeline_status) => call(`/careeros/applications/${id}/status`, { method: "PATCH", body: { pipeline_status } }),
   remove: (id) => call(`/careeros/applications/${id}`, { method: "DELETE" }),
+  reanalyze: (id, b) => call(`/careeros/applications/${id}/reanalyze`, { method: "POST", body: b }),
+  getVersion: (id, v) => call(`/careeros/applications/${id}/versions/${v}`),
+  compare: (id, a, b) => call(`/careeros/applications/${id}/compare?a=${a}&b=${b}`),
+  dossier: (id) => call(`/careeros/applications/${id}/dossier`),
 };
 
 export const PIPELINE_LABELS = {

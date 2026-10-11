@@ -2,6 +2,7 @@ import { CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { IpsGauge } from "./Ips";
 import { DocActions, Markdown } from "./DocTools";
 import { decisionMd, atsMd, simulationMd, questionsMd, starMd } from "@/lib/packExport";
+import { DecisionReport, decisionReportMd } from "./DecisionReport";
 
 const Card = ({ title, children, className = "", testid }) => (
   <section data-testid={testid} className={`rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-5 ${className}`}>
@@ -26,9 +27,10 @@ export const Pending = ({ label, error }) => (
 
 const Head = ({ md, name, testid }) => <div className="mb-4 flex justify-end"><DocActions markdown={md} name={name} testid={testid} /></div>;
 
-export const DecisionPanel = ({ d, ips }) => (
+export const DecisionPanel = ({ d, ips, report }) => (
   <div className="space-y-4">
-    <Head md={decisionMd(d, ips)} name="Decision-CareerOS" testid="decision" />
+    <Head md={decisionMd(d, ips, decisionReportMd(report))} name="Decision-CareerOS" testid="decision" />
+    <DecisionReport report={report} />
     <div className="grid gap-4 lg:grid-cols-5">
       <Card className="lg:col-span-2" testid="ips-card">
         <IpsGauge score={ips?.score} priority={ips?.priority} />

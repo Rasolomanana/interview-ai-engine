@@ -1,3 +1,4 @@
+import { createContext, useContext } from "react";
 import { Copy, FileDown, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { downloadAtsCvDocx, downloadCoverLetterDocx } from "@/lib/docxExport";
@@ -30,17 +31,23 @@ const Btn = ({ onClick, icon: Icon, children, testid }) => (
   </button>
 );
 
+// CareerOS reference (CO-YYYY-NNNNNN · vN) stamped on every export.
+export const PackRef = createContext("");
+
 export const DocActions = ({ markdown, name, kind = "md", testid }) => {
+  const reference = useContext(PackRef);
+  const stamped = reference ? `${markdown}\n\n---\nRéf. CareerOS : ${reference}` : markdown;
   const copy = async () => {
     await navigator.clipboard.writeText((markdown || "").replace(/\*\*/g, ""));
     toast.success("Copié dans le presse-papiers");
   };
-  const docx = () => (kind === "letter" ? downloadCoverLetterDocx(markdown, `${name}.docx`) : downloadAtsCvDocx(markdown, `${name}.docx`));
+  const file = reference ? `${reference.split(" ")[0]}_${name}` : name;
+  const docx = () => (kind === "letter" ? downloadCoverLetterDocx(stamped, `${file}.docx`) : downloadAtsCvDocx(stamped, `${file}.docx`));
   return (
     <div className="flex flex-wrap gap-2" data-testid={`${testid}-actions`}>
       <Btn onClick={copy} icon={Copy} testid={`${testid}-copy-btn`}>Copier</Btn>
       <Btn onClick={docx} icon={FileText} testid={`${testid}-docx-btn`}>DOCX</Btn>
-      <Btn onClick={() => downloadPdf(markdown, `${name}.pdf`)} icon={FileDown} testid={`${testid}-pdf-btn`}>PDF</Btn>
+      <Btn onClick={() => downloadPdf(markdown, `${file}.pdf`, reference)} icon={FileDown} testid={`${testid}-pdf-btn`}>PDF</Btn>
     </div>
   );
 };

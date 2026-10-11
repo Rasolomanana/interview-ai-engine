@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Archive, GitCompareArrows, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { careeros, PIPELINE_LABELS } from "@/lib/careeros";
+import { PackRef } from "@/components/careeros/DocTools";
+import { VersionBar, ReanalyzeDialog, CompareDialog } from "@/components/careeros/Versions";
 import { Pending, DecisionPanel, AtsPanel, SimulationPanel, QuestionsPanel, StarPanel, DocPanel } from "@/components/careeros/PackSections";
 
 const TABS = [
@@ -19,7 +21,7 @@ function TabBody({ tab, a }) {
   if (!p[part]) return <Pending label={TABS.find((t) => t[0] === tab)[1]} error={a.errors?.[part] || (a.status !== "generating" ? "génération échouée" : "")} />;
   const d = p.decision || {};
   switch (tab) {
-    case "decision": return <DecisionPanel d={d} ips={a.ips} />;
+    case "decision": return <DecisionPanel d={d} ips={a.ips} report={a.decision_report} />;
     case "ats": return <AtsPanel d={d} />;
     case "simulation": return <SimulationPanel d={d} />;
     case "questions": return <QuestionsPanel q={p.questions} />;
@@ -34,6 +36,10 @@ export default function PackView() {
   const nav = useNavigate();
   const [a, setA] = useState(null);
   const [tab, setTab] = useState("decision");
+  const [viewing, setViewing] = useState(null);
+  const [older, setOlder] = useState(null);
+  const [dialog, setDialog] = useState("");
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let alive = true, timer;
@@ -47,7 +53,12 @@ export default function PackView() {
     };
     load();
     return () => { alive = false; clearTimeout(timer); };
-  }, [id]);
+  }, [id, tick]);
+
+  const view = async (v) => {
+    if (v === a.current_version) { setViewing(null); setOlder(null); return; }
+    try { setOlder(await careeros.getVersion(id, v)); setViewing(v); } catch (e) { toast.error(e.message); }
+  };
 
   const changeStatus = async (s) => {
     await careeros.setStatus(id, s);
@@ -55,33 +66,49 @@ export default function PackView() {
     toast.success(`Statut : ${PIPELINE_LABELS[s]}`);
   };
   const remove = async () => {
-    if (!window.confirm("Supprimer définitivement cette candidature et ses documents ?")) return;
+    if (!window.confirm("Archiver cette candidature ? Elle disparaîtra du tableau de bord mais son historique complet reste conservé.")) return;
     await careeros.remove(id);
     nav("/careeros");
   };
 
   if (!a) return <Shell><Pending label="Chargement" /></Shell>;
-  const d = a.parts?.decision || {};
+  const shown = older && viewing ? older : a;
+  const shownVersion = viewing || a.current_version;
+  const d = shown.parts?.decision || a.parts?.decision || {};
   const done = Object.values(a.parts || {}).filter(Boolean).length;
+  const comparable = (a.versions || []).filter((v) => v.ips != null).length >= 2;
 
   return (
     <Shell>
       <button onClick={() => nav("/careeros")} className="mb-6 flex items-center gap-1.5 text-xs text-slate-500 hover:text-white" data-testid="back-to-dashboard"><ArrowLeft className="h-3.5 w-3.5" /> Tableau de bord</button>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300">Pack candidature</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300"><span data-testid="application-code" className="text-white">{a.code}</span> · Dossier de candidature · v{shownVersion}</p>
           <h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl" data-testid="pack-title">{d.poste || "Analyse en cours…"}</h1>
           <p className="mt-1 text-sm text-slate-400">{d.entreprise}</p>
         </div>
         <div className="flex items-center gap-3">
-          {a.ips && <><PriorityBadge priority={a.ips.priority} testid="header-priority" /><span className="font-mono text-sm text-slate-300" data-testid="header-ips">IPS {a.ips.score}</span></>}
+          {shown.ips && <><PriorityBadge priority={shown.ips.priority} testid="header-priority" /><span className="font-mono text-sm text-slate-300" data-testid="header-ips">IPS {shown.ips.score}</span></>}
           <select value={a.pipeline_status} onChange={(e) => changeStatus(e.target.value)} data-testid="pipeline-status-select"
             className="rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-slate-200 outline-none">
             {Object.entries(PIPELINE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
-          <button onClick={remove} className="rounded-full p-2 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300" data-testid="delete-application-btn" title="Supprimer"><Trash2 className="h-4 w-4" /></button>
+          <button onClick={remove} className="rounded-full p-2 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300" data-testid="delete-application-btn" title="Archiver"><Archive className="h-4 w-4" /></button>
         </div>
       </div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-[#121520]/60 px-4 py-3" data-testid="versions-panel">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">Historique IPS</span>
+          <VersionBar versions={a.versions || []} viewing={shownVersion} onView={view} />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setDialog("compare")} disabled={!comparable} data-testid="compare-versions-btn" className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:text-white disabled:opacity-40"><GitCompareArrows className="h-3.5 w-3.5" />Comparer les versions</button>
+          <button onClick={() => setDialog("reanalyze")} disabled={a.status === "generating"} data-testid="reanalyze-btn" className="flex items-center gap-1.5 rounded-full bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-400 disabled:opacity-40"><RefreshCw className="h-3.5 w-3.5" />Réanalyser</button>
+        </div>
+      </div>
+      {viewing && <p className="mb-4 rounded-lg border border-amber-400/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200" data-testid="viewing-old-version">Vous consultez la version v{viewing} (archivée, non modifiable) — {older?.change_note}. <button className="underline" onClick={() => view(a.current_version)}>Revenir à la version actuelle</button></p>}
+      {dialog === "reanalyze" && <ReanalyzeDialog open onOpenChange={() => setDialog("")} app={a} onStarted={() => { setViewing(null); setOlder(null); setTick((t) => t + 1); }} />}
+      {dialog === "compare" && <CompareDialog open onOpenChange={() => setDialog("")} app={a} />}
       {a.status === "generating" && (
         <div className="mb-6" data-testid="pack-progress">
           <div className="mb-1.5 flex justify-between text-xs text-slate-400"><span>Interview AI Engine génère votre pack…</span><span>{done}/6 documents</span></div>
@@ -92,11 +119,13 @@ export default function PackView() {
         {TABS.map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} data-testid={`pack-tab-${k}`}
             className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-medium transition-colors ${tab === k ? "border-indigo-400 text-white" : "border-transparent text-slate-500 hover:text-slate-200"}`}>
-            {l}{a.parts?.[PART_OF[k]] ? "" : " ·"}
+            {l}{shown.parts?.[PART_OF[k]] ? "" : " ·"}
           </button>
         ))}
       </div>
-      <TabBody tab={tab} a={a} />
+      <PackRef.Provider value={`${a.code} · v${shownVersion}`}>
+        <TabBody tab={tab} a={shown} />
+      </PackRef.Provider>
     </Shell>
   );
 }

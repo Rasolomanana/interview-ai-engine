@@ -5,11 +5,14 @@ const VERDICT = { passe: "Passe", limite: "Limite", rejet: "Rejet" };
 const QCATS = [["rh", "Questions RH"], ["gestionnaire", "Questions gestionnaire"], ["comportementales", "Questions comportementales"], ["techniques", "Questions techniques"]];
 const list = (arr) => (arr || []).map((x) => `- ${x}`).join("\n");
 
-export function decisionMd(d = {}, ips) {
+export function decisionMd(d = {}, ips, reportMd = "") {
   const rows = (ips?.criteria || []).map((c) => `- **${c.label}** (poids ${c.weight}) : ${c.score}/10 → ${c.points} pts — ${c.justification}`).join("\n");
   return `# Décision CareerOS — ${d.poste || "Poste"}${d.entreprise ? ` · ${d.entreprise}` : ""}
 
 ## IPS ${ips?.score ?? "—"}/100 · Priorité ${ips?.priority ?? "—"}
+${reportMd}
+
+## Détail du calcul IPS
 ${rows}
 
 ${ips?.formula || ""}
@@ -69,7 +72,7 @@ export function starMd(s = {}) {
 
 const clean = (t) => t.replace(/\*\*/g, "").replace(/[^\u0000-\u00FF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u20AC\u2026]/g, "");
 
-export function downloadPdf(markdown, filename) {
+export function downloadPdf(markdown, filename, reference = "") {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 48;
   let y = M;
@@ -90,6 +93,13 @@ export function downloadPdf(markdown, filename) {
     const b = line.match(/^[-*•]\s+(.*)$/);
     if (b) { write(`•  ${b[1]}`, 10, "normal", 10, 1); continue; }
     write(line, 10, /^\*\*.*\*\*$/.test(line) ? "bold" : "normal");
+  }
+  if (reference) {
+    const n = doc.getNumberOfPages();
+    for (let i = 1; i <= n; i++) {
+      doc.setPage(i); doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(130);
+      doc.text(`Réf. CareerOS : ${reference}   ·   ${i}/${n}`, M, H - 22);
+    }
   }
   doc.save(filename);
 }

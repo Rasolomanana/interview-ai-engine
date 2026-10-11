@@ -1,11 +1,15 @@
-"""CareerOS API: Career Memory (profile), one-click Application Pack, application history.
+"""CareerOS API — career dossiers built on immutable, versioned analyses.
 
-Data model (multi-user, built to host future engines):
-- users              : member accounts (auth.py)
-- career_profiles    : Career Memory — one living profile per member
-- applications       : one per opportunity — inputs, pack documents, IPS, pipeline status,
-                       plus reserved arrays for future engines (interviews, followups,
-                       calendar_events, emails, timeline) used by Plan du Jour / Automation / Calendar.
+Collections (multi-user; nothing is ever overwritten, only appended/versioned):
+- users / career_profiles (+ career_profile_versions snapshot on every save)
+- applications            : the career dossier. `code` CO-YYYY-NNNNNN is THE reference
+                            (plus technical `id`). Mirrors the latest version for fast reads.
+- application_versions    : one immutable doc per (re)analysis: inputs, profile snapshot,
+                            parts, IPS, Decision Report.
+- interviews / calendar_events / recruiters / followups / emails : dossier entities
+                            linked by application_id + application_code (models.py).
+- career_score_history    : every Career Score change.
+- counters                : yearly sequence for application codes.
 """
 import asyncio
 import logging
@@ -15,9 +19,14 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
+from pymongo import ReturnDocument
 
 from . import prompts as PR
 from .ips import compute_ips
+from .decision_report import build_decision_report
+from .career_score import compute_career_score
+from .compare import compare_versions
+from .models import ENTITIES, EntityPatch
 
 logger = logging.getLogger("careeros")
 
@@ -44,8 +53,10 @@ class ProfileBody(BaseModel):
     salary_expectation: str = ""
     skills: List[str] = []
     certifications: List[str] = []
+    education: List[str] = []
     languages: List[str] = []
     achievements: str = ""
+    promotions: int = Field(default=0, ge=0, le=50)
 
 
 class PackBody(BaseModel):
@@ -58,6 +69,15 @@ class PackBody(BaseModel):
     save_cv_to_memory: bool = False
 
 
+class ReanalyzeBody(BaseModel):
+    offer_text: Optional[str] = Field(default=None, max_length=30000)
+    cv_text: Optional[str] = Field(default=None, max_length=60000)
+    use_memory_cv: bool = False
+    posted_date: Optional[str] = None
+    network: Optional[str] = None
+    change_note: str = Field(default="", max_length=500)
+
+
 class StatusBody(BaseModel):
     pipeline_status: str
     note: Optional[str] = ""
@@ -66,102 +86,150 @@ class StatusBody(BaseModel):
 def _summary(a: dict) -> dict:
     d = (a.get("parts") or {}).get("decision") or {}
     return {
-        "id": a["id"], "created_at": a["created_at"], "status": a["status"],
-        "pipeline_status": a.get("pipeline_status"), "poste": d.get("poste") or a.get("title", ""),
+        "id": a["id"], "code": a.get("code"), "created_at": a["created_at"], "status": a["status"],
+        "pipeline_status": a.get("pipeline_status"), "poste": d.get("poste") or "",
         "entreprise": d.get("entreprise", ""), "ips": (a.get("ips") or {}).get("score"),
         "priority": (a.get("ips") or {}).get("priority"), "ats": (d.get("ats") or {}).get("score"),
+        "version": a.get("current_version", 1), "ips_history": a.get("ips_history", []),
+        "why": ((a.get("decision_report") or {}).get("summary") or "")[:220],
     }
+
+
+async def next_application_code(db) -> str:
+    year = datetime.now(timezone.utc).year
+    c = await db.counters.find_one_and_update(
+        {"_id": f"application_code_{year}"}, {"$inc": {"seq": 1}}, upsert=True, return_document=ReturnDocument.AFTER)
+    return f"CO-{year}-{c['seq']:06d}"
+
+
+def _version_summary(v: dict) -> dict:
+    return {"version": v["version"], "created_at": v["created_at"], "status": v["status"], "change_note": v.get("change_note", ""),
+            "ips": (v.get("ips") or {}).get("score"), "priority": (v.get("ips") or {}).get("priority"),
+            "ats": (((v.get("parts") or {}).get("decision") or {}).get("ats") or {}).get("score")}
 
 
 def create_careeros_router(db, current_user, generate_text, fetch_page_text, parse_json):
     router = APIRouter(prefix="/api/careeros", tags=["careeros"])
 
+    # ---------------- Career Score (stored + historised; not displayed yet) ----------------
+    async def recompute_career_score(user_id: str, trigger: str):
+        try:
+            profile = await db.career_profiles.find_one({"user_id": user_id}, {"_id": 0}) or {}
+            apps = [_summary(a) | {"had_interview": a.get("had_interview", False)}
+                    async for a in db.applications.find({"user_id": user_id, "archived": {"$ne": True}}, {"_id": 0})]
+            cs = compute_career_score(profile, apps)
+            prev = profile.get("career_score") or {}
+            await db.career_profiles.update_one({"user_id": user_id}, {"$set": {"career_score": cs | {"updated_at": _now()}}}, upsert=True)
+            if prev.get("score") != cs["score"] or prev.get("components") != cs["components"]:
+                await db.career_score_history.insert_one({"user_id": user_id, "at": _now(), "trigger": trigger, **cs})
+        except Exception:  # noqa: BLE001
+            logger.exception("career score recompute failed")
+
+    @router.get("/career-score")
+    async def career_score(user: dict = Depends(current_user)):
+        p = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0, "career_score": 1}) or {}
+        hist = [h async for h in db.career_score_history.find({"user_id": user["id"]}, {"_id": 0, "user_id": 0}).sort("at", -1).limit(100)]
+        return {"current": p.get("career_score"), "history": hist}
+
     # ---------------- Career Memory ----------------
     @router.get("/meta")
     async def meta():
-        return {"goals": GOALS, "pipeline": PIPELINE}
+        return {"goals": GOALS, "pipeline": PIPELINE, "entities": list(ENTITIES)}
 
     @router.get("/profile")
     async def get_profile(user: dict = Depends(current_user)):
-        p = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
-        return p or {"user_id": user["id"], **ProfileBody().model_dump(), "skills_detected": [], "updated_at": None}
+        p = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0, "career_score": 0})
+        return {**ProfileBody().model_dump(), "skills_detected": [], **(p or {}), "user_id": user["id"]}
 
     @router.put("/profile")
     async def put_profile(body: ProfileBody, user: dict = Depends(current_user)):
+        data = body.model_dump()
         await db.career_profiles.update_one(
-            {"user_id": user["id"]},
-            {"$set": {**body.model_dump(), "updated_at": _now()}, "$setOnInsert": {"skills_detected": []}},
-            upsert=True,
-        )
-        return await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+            {"user_id": user["id"]}, {"$set": {**data, "updated_at": _now()}, "$setOnInsert": {"skills_detected": []}}, upsert=True)
+        await db.career_profile_versions.insert_one({"user_id": user["id"], "at": _now(), **data})
+        await recompute_career_score(user["id"], "profile_saved")
+        return await get_profile(user)
 
-    # ---------------- Application Pack ----------------
-    async def _set(app_id, field, value):
-        await db.applications.update_one({"id": app_id}, {"$set": {field: value, "updated_at": _now()}})
+    # ---------------- Pack generation (writes into ONE immutable version) ----------------
+    async def _write(app_id, version, field, value):
+        await db.application_versions.update_one({"application_id": app_id, "version": version}, {"$set": {field: value}})
+        await db.applications.update_one({"id": app_id, "current_version": version}, {"$set": {field: value, "updated_at": _now()}})
 
-    async def _json_part(app_id, name, prompt_fn, ctx):
+    async def _json_part(app_id, version, name, prompt_fn, ctx):
         sysm, txt = prompt_fn(*ctx)
         data = parse_json((await generate_text(sysm, txt)).strip())
         if data is None:
             raise ValueError("Réponse illisible")
-        await _set(app_id, f"parts.{name}", data)
+        await _write(app_id, version, f"parts.{name}", data)
         return data
 
-    async def _text_part(app_id, name, prompt_fn, ctx):
+    async def _text_part(app_id, version, name, prompt_fn, ctx):
         sysm, txt = prompt_fn(*ctx)
         out = (await generate_text(sysm, txt)).strip()
         if not out:
             raise ValueError("Réponse vide")
-        await _set(app_id, f"parts.{name}", out)
+        await _write(app_id, version, f"parts.{name}", out)
         return out
 
-    async def _run_pack(app_id, user_id, body: PackBody, cv: str, profile: dict):
+    async def _run_pack(app_id, user_id, version, inputs: dict, profile: dict):
         try:
-            offer = body.offer_text.strip()
-            if body.offer_url.strip():
+            offer = (inputs.get("offer_text") or "").strip()
+            if (inputs.get("offer_url") or "").strip():
                 try:
-                    fetched = await fetch_page_text(body.offer_url.strip())
-                    offer = (offer + "\n\n" + fetched).strip()
+                    offer = (offer + "\n\n" + await fetch_page_text(inputs["offer_url"].strip())).strip()
                 except Exception as e:  # noqa: BLE001
                     logger.warning("offer fetch failed: %s", e)
                     if not offer:
                         raise ValueError("Impossible de lire le lien de l'offre (site protégé ?). Collez le texte de l'offre.")
             company = ""
-            if body.company_url.strip():
+            if (inputs.get("company_url") or "").strip():
                 try:
-                    company = await fetch_page_text(body.company_url.strip())
+                    company = await fetch_page_text(inputs["company_url"].strip())
                 except Exception as e:  # noqa: BLE001
                     logger.warning("company fetch failed: %s", e)
-            await _set(app_id, "inputs.offer_resolved", offer[:30000])
-            ctx = (cv, offer, company, profile)
+            await _write(app_id, version, "inputs.offer_resolved", offer[:30000])
+            ctx = (inputs["cv_text"], offer, company, profile)
             jobs = {
-                "decision": _json_part(app_id, "decision", PR.decision_prompt, ctx),
-                "cv_ats": _text_part(app_id, "cv_ats", lambda *c: PR.cv_prompt("ats", *c), ctx),
-                "cv_humain": _text_part(app_id, "cv_humain", lambda *c: PR.cv_prompt("humain", *c), ctx),
-                "letter": _text_part(app_id, "letter", PR.letter_prompt, ctx),
-                "questions": _json_part(app_id, "questions", PR.questions_prompt, ctx),
-                "star": _json_part(app_id, "star", PR.star_prompt, ctx),
+                "decision": _json_part(app_id, version, "decision", PR.decision_prompt, ctx),
+                "cv_ats": _text_part(app_id, version, "cv_ats", lambda *c: PR.cv_prompt("ats", *c), ctx),
+                "cv_humain": _text_part(app_id, version, "cv_humain", lambda *c: PR.cv_prompt("humain", *c), ctx),
+                "letter": _text_part(app_id, version, "letter", PR.letter_prompt, ctx),
+                "questions": _json_part(app_id, version, "questions", PR.questions_prompt, ctx),
+                "star": _json_part(app_id, version, "star", PR.star_prompt, ctx),
             }
-            results = await asyncio.gather(*jobs.values(), return_exceptions=True)
-            errors = {k: str(r)[:300] for k, r in zip(jobs, results) if isinstance(r, Exception)}
-            out = dict(zip(jobs, results))
-            decision = out["decision"] if not isinstance(out["decision"], Exception) else {}
-            ips = compute_ips(decision.get("ips_criteria"), decision.get("knockout"), decision.get("goal_fit"),
-                              body.posted_date, body.network, not isinstance(out["letter"], Exception))
+            results = dict(zip(jobs, await asyncio.gather(*jobs.values(), return_exceptions=True)))
+            errors = {k: str(r)[:300] for k, r in results.items() if isinstance(r, Exception)}
+            decision = results["decision"] if not isinstance(results["decision"], Exception) else {}
+            status = "done" if not errors else ("error" if len(errors) == len(jobs) else "partial")
             if decision:
-                await _set(app_id, "ips", ips)
+                ips = compute_ips(decision.get("ips_criteria"), decision.get("knockout"), decision.get("goal_fit"),
+                                  inputs.get("posted_date"), inputs.get("network"), not isinstance(results["letter"], Exception))
+                await _write(app_id, version, "ips", ips)
+                await _write(app_id, version, "decision_report", build_decision_report(ips, decision))
+                await db.applications.update_one({"id": app_id}, {"$push": {"ips_history": {
+                    "version": version, "score": ips["score"], "priority": ips["priority"],
+                    "ats": (decision.get("ats") or {}).get("score"), "at": _now()}}})
                 skills = [s for s in (decision.get("skills_detected") or []) if isinstance(s, str)][:40]
                 if skills:
                     await db.career_profiles.update_one(
                         {"user_id": user_id}, {"$addToSet": {"skills_detected": {"$each": skills}}, "$set": {"updated_at": _now()}}, upsert=True)
-            status = "done" if not errors else ("error" if len(errors) == len(jobs) else "partial")
-            await db.applications.update_one({"id": app_id}, {
-                "$set": {"status": status, "errors": errors, "updated_at": _now()},
-                "$push": {"timeline": {"at": _now(), "type": "pack_generated", "detail": status}},
-            })
+            await _write(app_id, version, "errors", errors)
+            await _write(app_id, version, "status", status)
+            await db.applications.update_one({"id": app_id}, {"$push": {"timeline": {"at": _now(), "type": "pack_generated", "version": version, "detail": status}}})
+            await recompute_career_score(user_id, f"pack_v{version}")
         except Exception as e:  # noqa: BLE001
-            logger.exception("pack %s failed", app_id)
-            await db.applications.update_one({"id": app_id}, {"$set": {"status": "error", "errors": {"pack": str(e)[:300]}, "updated_at": _now()}})
+            logger.exception("pack %s v%s failed", app_id, version)
+            await _write(app_id, version, "errors", {"pack": str(e)[:300]})
+            await _write(app_id, version, "status", "error")
+
+    async def _start_version(app: dict, version: int, inputs: dict, profile: dict, change_note: str):
+        snapshot = {k: profile.get(k) for k in ("goals", "skills", "certifications", "education", "languages", "target_roles", "headline")}
+        await db.application_versions.insert_one({
+            "application_id": app["id"], "application_code": app["code"], "user_id": app["user_id"], "version": version,
+            "created_at": _now(), "status": "generating", "change_note": change_note, "inputs": inputs,
+            "profile_snapshot": snapshot, "parts": {p: None for p in PARTS}, "ips": None, "decision_report": None, "errors": {},
+        })
+        asyncio.create_task(_run_pack(app["id"], app["user_id"], version, inputs, profile))
 
     @router.post("/packs")
     async def create_pack(body: PackBody, user: dict = Depends(current_user)):
@@ -175,56 +243,182 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
             raise HTTPException(status_code=400, detail="Valeur réseau invalide")
         if body.save_cv_to_memory and body.cv_text.strip():
             await db.career_profiles.update_one({"user_id": user["id"]}, {"$set": {"cv_text": cv, "updated_at": _now()}}, upsert=True)
-        app_id = str(uuid.uuid4())
-        await db.applications.insert_one({
-            "id": app_id, "user_id": user["id"], "created_at": _now(), "updated_at": _now(),
-            "status": "generating", "pipeline_status": "a_postuler",
-            "inputs": {"offer_text": body.offer_text[:30000], "offer_url": body.offer_url, "company_url": body.company_url,
-                       "cv_text": cv[:60000], "posted_date": body.posted_date, "network": body.network},
-            "parts": {p: None for p in PARTS}, "errors": {}, "ips": None,
-            "timeline": [{"at": _now(), "type": "created", "detail": ""}],
-            "interviews": [], "followups": [], "calendar_events": [], "emails": [],
-        })
-        asyncio.create_task(_run_pack(app_id, user["id"], body, cv, profile))
-        return {"id": app_id, "status": "generating"}
+        inputs = {"offer_text": body.offer_text[:30000], "offer_url": body.offer_url, "company_url": body.company_url,
+                  "cv_text": cv[:60000], "posted_date": body.posted_date, "network": body.network}
+        app = {
+            "id": str(uuid.uuid4()), "code": await next_application_code(db), "user_id": user["id"],
+            "created_at": _now(), "updated_at": _now(), "status": "generating", "pipeline_status": "a_postuler",
+            "current_version": 1, "inputs": inputs, "parts": {p: None for p in PARTS}, "errors": {}, "ips": None,
+            "decision_report": None, "ips_history": [], "had_interview": False, "archived": False,
+            "timeline": [{"at": _now(), "type": "created", "version": 1, "detail": ""}],
+        }
+        await db.applications.insert_one(dict(app))
+        await _start_version(app, 1, inputs, profile, "Analyse initiale")
+        return {"id": app["id"], "code": app["code"], "version": 1, "status": "generating"}
 
-    # ---------------- History ----------------
+    # ---------------- Dossier / history ----------------
     async def _own(app_id, user):
-        a = await db.applications.find_one({"id": app_id, "user_id": user["id"]}, {"_id": 0})
+        a = await db.applications.find_one({"id": app_id, "user_id": user["id"], "archived": {"$ne": True}}, {"_id": 0})
         if not a:
             raise HTTPException(status_code=404, detail="Candidature introuvable")
         return a
 
     @router.get("/applications")
     async def list_apps(user: dict = Depends(current_user)):
-        cur = db.applications.find({"user_id": user["id"]}, {"_id": 0, "inputs": 0}).sort("created_at", -1).limit(200)
+        cur = db.applications.find({"user_id": user["id"], "archived": {"$ne": True}}, {"_id": 0, "inputs": 0}).sort("created_at", -1).limit(300)
         return [_summary(a) async for a in cur]
 
     @router.get("/applications/{app_id}")
     async def get_app(app_id: str, user: dict = Depends(current_user)):
-        return await _own(app_id, user)
+        a = await _own(app_id, user)
+        a["versions"] = [_version_summary(v) async for v in db.application_versions.find(
+            {"application_id": app_id}, {"_id": 0, "inputs": 0}).sort("version", 1)]
+        return a
+
+    @router.post("/applications/{app_id}/reanalyze")
+    async def reanalyze(app_id: str, body: ReanalyzeBody, user: dict = Depends(current_user)):
+        a = await _own(app_id, user)
+        if a["status"] == "generating":
+            raise HTTPException(status_code=409, detail="Une analyse est déjà en cours pour cette candidature")
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+        inputs = dict(a["inputs"])
+        inputs.pop("offer_resolved", None)
+        if body.use_memory_cv and (profile.get("cv_text") or "").strip():
+            inputs["cv_text"] = profile["cv_text"][:60000]
+        elif body.cv_text is not None and body.cv_text.strip():
+            inputs["cv_text"] = body.cv_text.strip()[:60000]
+        if body.offer_text is not None and body.offer_text.strip():
+            inputs["offer_text"] = body.offer_text.strip()[:30000]
+        if body.posted_date is not None:
+            inputs["posted_date"] = body.posted_date
+        if body.network is not None:
+            if body.network not in ("aucun", "contact", "recommandation"):
+                raise HTTPException(status_code=400, detail="Valeur réseau invalide")
+            inputs["network"] = body.network
+        version = a.get("current_version", 1) + 1
+        await db.applications.update_one({"id": app_id}, {
+            "$set": {"current_version": version, "status": "generating", "inputs": inputs, "parts": {p: None for p in PARTS},
+                     "ips": None, "decision_report": None, "errors": {}, "updated_at": _now()},
+            "$push": {"timeline": {"at": _now(), "type": "reanalyze", "version": version, "detail": body.change_note}},
+        })
+        await _start_version(a, version, inputs, profile, body.change_note or f"Réanalyse v{version}")
+        return {"id": app_id, "code": a["code"], "version": version, "status": "generating"}
+
+    @router.get("/applications/{app_id}/versions/{version}")
+    async def get_version(app_id: str, version: int, user: dict = Depends(current_user)):
+        await _own(app_id, user)
+        v = await db.application_versions.find_one({"application_id": app_id, "version": version}, {"_id": 0})
+        if not v:
+            raise HTTPException(status_code=404, detail="Version introuvable")
+        return v
+
+    @router.get("/applications/{app_id}/compare")
+    async def compare(app_id: str, a: int, b: int, user: dict = Depends(current_user)):
+        await _own(app_id, user)
+        va = await db.application_versions.find_one({"application_id": app_id, "version": a}, {"_id": 0})
+        vb = await db.application_versions.find_one({"application_id": app_id, "version": b}, {"_id": 0})
+        if not va or not vb:
+            raise HTTPException(status_code=404, detail="Version introuvable")
+        return compare_versions(va, vb)
 
     @router.patch("/applications/{app_id}/status")
     async def set_status(app_id: str, body: StatusBody, user: dict = Depends(current_user)):
         if body.pipeline_status not in PIPELINE:
             raise HTTPException(status_code=400, detail="Statut invalide")
         await _own(app_id, user)
+        upd = {"pipeline_status": body.pipeline_status, "updated_at": _now()}
+        if body.pipeline_status in ("entrevue", "offre"):
+            upd["had_interview"] = True
         await db.applications.update_one({"id": app_id}, {
-            "$set": {"pipeline_status": body.pipeline_status, "updated_at": _now()},
-            "$push": {"timeline": {"at": _now(), "type": "status", "detail": body.pipeline_status, "note": body.note or ""}},
-        })
+            "$set": upd, "$push": {"timeline": {"at": _now(), "type": "status", "detail": body.pipeline_status, "note": body.note or ""}}})
+        await recompute_career_score(user["id"], "status_changed")
         return {"ok": True, "pipeline_status": body.pipeline_status}
 
     @router.delete("/applications/{app_id}")
-    async def delete_app(app_id: str, user: dict = Depends(current_user)):
+    async def archive_app(app_id: str, user: dict = Depends(current_user)):
         await _own(app_id, user)
-        await db.applications.delete_one({"id": app_id})
-        return {"ok": True}
+        await db.applications.update_one({"id": app_id}, {"$set": {"archived": True, "archived_at": _now()},
+                                                          "$push": {"timeline": {"at": _now(), "type": "archived", "detail": ""}}})
+        await recompute_career_score(user["id"], "archived")
+        return {"ok": True, "archived": True}
+
+    # ---------------- Dossier entities (interviews, calendar, recruiters, followups, emails) ----------------
+    @router.get("/applications/{app_id}/dossier")
+    async def dossier(app_id: str, user: dict = Depends(current_user)):
+        a = await _own(app_id, user)
+        out = {"code": a["code"], "id": app_id}
+        for name in ENTITIES:
+            out[name] = [d async for d in db[name].find({"application_id": app_id}, {"_id": 0}).sort("created_at", 1)]
+        return out
+
+    def _entity_routes(name, model):
+        @router.post(f"/applications/{{app_id}}/{name}", name=f"create_{name}")
+        async def create_entity(app_id: str, body: model, user: dict = Depends(current_user)):
+            a = await _own(app_id, user)
+            doc = {"id": str(uuid.uuid4()), "user_id": user["id"], "application_id": app_id, "application_code": a["code"],
+                   "source": "member", "created_at": _now(), "updated_at": _now(), "revisions": [], **body.model_dump()}
+            await db[name].insert_one(dict(doc))
+            await db.applications.update_one({"id": app_id}, {"$push": {"timeline": {"at": _now(), "type": f"{name}_added", "detail": doc["id"]}}})
+            return doc
+
+        @router.patch(f"/applications/{{app_id}}/{name}/{{entity_id}}", name=f"update_{name}")
+        async def update_entity(app_id: str, entity_id: str, body: EntityPatch, user: dict = Depends(current_user)):
+            await _own(app_id, user)
+            cur = await db[name].find_one({"id": entity_id, "application_id": app_id}, {"_id": 0, "revisions": 0})
+            if not cur:
+                raise HTTPException(status_code=404, detail="Élément introuvable")
+            merged = model(**{**{k: cur.get(k) for k in model.model_fields if k in cur}, **body.changes}).model_dump()
+            await db[name].update_one({"id": entity_id}, {"$set": {**merged, "updated_at": _now()},
+                                                          "$push": {"revisions": {"at": _now(), "previous": {k: cur.get(k) for k in model.model_fields}}}})
+            return await db[name].find_one({"id": entity_id}, {"_id": 0})
+
+    for _name, _model in ENTITIES.items():
+        _entity_routes(_name, _model)
 
     return router
 
 
 async def ensure_careeros_indexes(db):
     await db.career_profiles.create_index("user_id", unique=True)
+    await db.career_profile_versions.create_index([("user_id", 1), ("at", -1)])
     await db.applications.create_index([("user_id", 1), ("created_at", -1)])
     await db.applications.create_index("id", unique=True)
+    await db.applications.create_index("code", unique=True, sparse=True)
+    await db.application_versions.create_index([("application_id", 1), ("version", 1)], unique=True)
+    await db.application_versions.create_index("application_code")
+    await db.career_score_history.create_index([("user_id", 1), ("at", -1)])
+    for name in ENTITIES:
+        await db[name].create_index([("application_id", 1), ("created_at", 1)])
+        await db[name].create_index("application_code")
+        await db[name].create_index("id", unique=True)
+    await _migrate_legacy(db)
+    await _recover_interrupted(db)
+
+
+async def _recover_interrupted(db):
+    """Background generations die with the process (deploy/restart): flag them so the
+    member can relaunch — the partial results already written stay in the version."""
+    msg = {"pack": "Génération interrompue (redémarrage du serveur). Relancez une réanalyse."}
+    async for v in db.application_versions.find({"status": "generating"}, {"_id": 0, "application_id": 1, "version": 1}):
+        await db.application_versions.update_one({"application_id": v["application_id"], "version": v["version"]},
+                                                 {"$set": {"status": "error", "errors": msg}})
+        await db.applications.update_one({"id": v["application_id"], "current_version": v["version"]},
+                                         {"$set": {"status": "error", "errors": msg}})
+
+
+async def _migrate_legacy(db):
+    """Give pre-versioning applications a CO code + an immutable v1 version."""
+    async for a in db.applications.find({"code": {"$exists": False}}, {"_id": 0}):
+        code = await next_application_code(db)
+        ips = a.get("ips")
+        decision = (a.get("parts") or {}).get("decision") or {}
+        report = build_decision_report(ips, decision) if ips else None
+        hist = [{"version": 1, "score": ips["score"], "priority": ips["priority"], "ats": (decision.get("ats") or {}).get("score"), "at": a["created_at"]}] if ips else []
+        await db.application_versions.update_one({"application_id": a["id"], "version": 1}, {"$setOnInsert": {
+            "application_id": a["id"], "application_code": code, "user_id": a["user_id"], "version": 1, "created_at": a["created_at"],
+            "status": a.get("status"), "change_note": "Analyse initiale", "inputs": a.get("inputs"), "profile_snapshot": {},
+            "parts": a.get("parts"), "ips": ips, "decision_report": report, "errors": a.get("errors", {})}}, upsert=True)
+        await db.applications.update_one({"id": a["id"]}, {
+            "$set": {"code": code, "current_version": 1, "decision_report": report, "ips_history": hist,
+                     "had_interview": a.get("pipeline_status") in ("entrevue", "offre"), "archived": False},
+            "$unset": {"interviews": "", "followups": "", "calendar_events": "", "emails": ""}})

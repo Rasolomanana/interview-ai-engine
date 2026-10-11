@@ -18,11 +18,12 @@ const Row = ({ a }) => (
     className="group grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-white/5 px-2 py-3.5 transition-colors hover:bg-white/[0.02]">
     <PriorityBadge priority={a.priority} testid={`row-priority-${a.id}`} />
     <div className="min-w-0">
-      <p className="truncate text-sm font-medium text-white">{a.poste || "Analyse en cours…"}</p>
-      <p className="truncate text-xs text-slate-500">{a.entreprise || "—"} · {new Date(a.created_at).toLocaleDateString("fr-CA")} · {PIPELINE_LABELS[a.pipeline_status]}</p>
+      <p className="truncate text-sm font-medium text-white"><span className="mr-2 font-mono text-[11px] text-indigo-300" data-testid={`row-code-${a.id}`}>{a.code}</span>{a.poste || "Analyse en cours…"}</p>
+      <p className="truncate text-xs text-slate-500">{a.entreprise || "—"} · {new Date(a.created_at).toLocaleDateString("fr-CA")} · {PIPELINE_LABELS[a.pipeline_status]}{a.version > 1 ? ` · v${a.version}` : ""}</p>
+      {a.why && <p className="mt-0.5 truncate text-[11px] text-slate-400" data-testid={`row-why-${a.id}`}>{a.why}</p>}
     </div>
     <div className="flex items-center gap-4">
-      <span className="hidden font-mono text-xs text-slate-400 sm:block">IPS {a.ips ?? "—"} · ATS {a.ats ?? "—"}</span>
+      <span className="hidden font-mono text-xs text-slate-400 sm:block">IPS {(a.ips_history || []).map((h) => h.score).join(" → ") || "—"} · ATS {a.ats ?? "—"}</span>
       {a.status === "generating" && <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] text-indigo-300">génération</span>}
       <ChevronRight className="h-4 w-4 text-slate-600 transition-transform group-hover:translate-x-0.5" />
     </div>
