@@ -236,3 +236,12 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - P1: Google Calendar / Outlook (détection entrevue → événement + préparation)
 - P2: sources autorisées (API officielles, RSS) pour la veille marché ; CV exécutif ; mot de passe oublié (nécessite Resend) ; suppression de compte (RGPD)
 - Still pending: retirer l'affichage DEBUG du login admin quand prod confirmée ; Atlas Network Access 0.0.0.0/0
+
+## 2026-10-12 — CareerOS V1 finalisation (iteration_19, 100%)
+- Application code CO-YYYY-NNNNNN (counters collection, unique index) + technical id; shown in dossier, history, PDF footer, DOCX/PDF filenames + stamp.
+- Immutable versions: application_versions (inputs, profile_snapshot, parts, ips, decision_report); applications mirrors latest; ips_history; POST /reanalyze; GET /versions/{n}; GET /compare?a&b (careeros/compare.py).
+- Mandatory Decision Report (careeros/decision_report.py): summary, why_priority, strengths, weaknesses, actions, potential_gains — shown on Décision tab, exports, dashboard "why" line.
+- Career Score (careeros/career_score.py) 20/25/15/25/15, quality-not-volume, levels; stored on career_profiles.career_score + career_score_history; GET /api/careeros/career-score (not displayed in UI).
+- Dossier entities (careeros/models.py): interviews, calendar_events, recruiters, followups, emails — POST/PATCH (revisions[]) + GET /dossier, linked by application_id + application_code.
+- Delete = archive (history preserved). Profile snapshots in career_profile_versions. Profile adds education[], promotions.
+- Startup recovery: versions stuck "generating" after a restart are marked error "interrompue" (relaunch via Réanalyser).

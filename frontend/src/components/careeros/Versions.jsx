@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { GitCompareArrows, Loader2, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { careeros } from "@/lib/careeros";
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400/60";
@@ -39,7 +39,7 @@ export const ReanalyzeDialog = ({ open, onOpenChange, app, onStarted }) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="border-white/10 bg-[#121520] text-slate-100 sm:max-w-lg" data-testid="reanalyze-dialog">
         <DialogHeader><DialogTitle className="font-display">Réanalyser {app.code}</DialogTitle></DialogHeader>
-        <p className="text-xs text-slate-400">Une nouvelle version sera créée. Les versions précédentes restent conservées intégralement.</p>
+        <DialogDescription className="text-xs text-slate-400">Une nouvelle version sera créée. Les versions précédentes restent conservées intégralement.</DialogDescription>
         <label className="block text-xs text-slate-400">Qu'est-ce qui a changé ?
           <input value={f.change_note} onChange={(e) => setF({ ...f, change_note: e.target.value })} className={`${inputCls} mt-1`} placeholder="Ex. CV optimisé + certification PL-300" data-testid="reanalyze-note-input" /></label>
         <label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" className="accent-indigo-500" checked={f.use_memory_cv} onChange={(e) => setF({ ...f, use_memory_cv: e.target.checked })} data-testid="reanalyze-use-memory-cv" />Utiliser le CV actuel de ma Career Memory</label>
@@ -79,13 +79,13 @@ export const CompareDialog = ({ open, onOpenChange, app }) => {
   };
   const sel = (v, set, tid) => (
     <select value={v} onChange={(e) => { set(Number(e.target.value)); setRes(null); }} className={inputCls} data-testid={tid}>
-      {done.map((x) => <option key={x.version} value={x.version}>v{x.version} — IPS {x.ips}</option>)}
+      {done.map((x) => <option key={x.version} value={x.version}>{`v${x.version} — IPS ${x.ips}`}</option>)}
     </select>
   );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-[#121520] text-slate-100 sm:max-w-2xl" data-testid="compare-dialog">
-        <DialogHeader><DialogTitle className="font-display">Comparer les versions — {app.code}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display">Comparer les versions — {app.code}</DialogTitle><DialogDescription className="text-xs text-slate-400">Ce qui a changé, ce qui a amélioré et ce qui a détérioré l'IPS.</DialogDescription></DialogHeader>
         <div className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
           {sel(a, setA, "compare-from-select")}<span className="text-slate-500">→</span>{sel(b, setB, "compare-to-select")}
           <button onClick={run} disabled={busy || a === b} data-testid="compare-run-btn" className="flex items-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">

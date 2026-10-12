@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 19 (Career Score + versioning + dossier entities + readable codes) fully validated. Backend: 20 pytest cases in /app/backend/tests/test_careeros_v2.py all pass (plus 1 cleanup fixture skip — manually cleaned via pymongo). Covered: Career Score level_for boundaries (0/39/40/59/60/79/80/89/90/100), WEIGHTS sum == 100, components shape (5 items with key/label/weight/ratio/points/raison/actions), and the critical no-volume-reward invariant (200 priority-C poor applications score strictly LOWER than 20 priority-A/B apps with 5 interviews). Codes: seed app code CO-2026-000001 matches ^CO-\\d{4}-\\d{6}$. Versioning: GET /applications/{id} returns code, current_version=3, versions[] with v1/v2/v3 summaries, ips_history, non-empty decision_report (summary/why_priority/strengths/weaknesses/actions). GET /versions/1 returns IPS 65 immutable; /versions/999 → 404. Compare v1 vs v3: ips.avant=65, apres=76, delta=+11, trend=amélioration, improved[] + input_changes + explanation present. Career Memory: PUT /profile with education[] + promotions int persists; promotions=-1 → 422. Career-score endpoint returns {current, history} and requires auth. Dossier entities: POST interview carries application_code CO-2026-…; PATCH keeps revisions[] with previous values; GET /dossier returns all 5 entity lists; cross-user POST → 404; recruiters + emails also persist with application_code. Archive DELETE on fake id → 404. Frontend (preview URL, seed user): dashboard row shows row-code-* (CO-2026-000001), row-why-* non-empty, IPS → arrow visible; PackView header shows application-code, versions-panel with 3 version-chip-* chips, decision tab has decision-report-summary (497 chars), -why (124), -strengths (452), -weaknesses (497), -actions (1607 chars); clicking version-chip-1 shows viewing-old-version banner + header-ips 'IPS 65' (immutable v1 archived); compare-versions-btn opens compare-dialog, selecting v1→v3 + compare-run-btn yields compare-ips-delta 'IPS 65 → 76 (+11)' + compare-improved block; reanalyze-btn opens reanalyze-dialog (NOT submitted — budget preserved); PDF/DOCX exports from cv_ats tab download with filenames CO-2026-000001_CV-ATS.pdf and CO-2026-000001_CV-ATS.docx (code prefix verified); /careeros/memoire shows profile-education-input + profile-promotions-input, saving 3 + 'BAC Info 2015, MBA 2020' persists after full reload. Career Score deliberately not surfaced in UI per spec — confirmed absent from dashboard/pack views.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Compare dialog (Versions.jsx)", "issues": ["React hydration warning: <span> inside <option> element (line ~82 Versions.jsx). Caused by framework instrumentation injecting x-* spans into <option> children. Cosmetic (console-only), does not affect functionality.", "Radix DialogContent missing aria-describedby / <DialogDescription> — a11y warning in console."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_careeros_v2.py",
+    "/app/test_reports/pytest/careeros_v2_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Add aria-describedby or <DialogDescription> to reanalyze-dialog and compare-dialog to silence Radix a11y warning.",
+    "(Optional) In Versions.jsx compare select options, use plain text instead of dynamic <span>-wrapped expressions to avoid React 'span cannot be a child of option' hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "career_score.py:_activite uses regularity=min(n,10)/10 (saturates at 10) and penalty -0.4*poor ratio — correctly stops rewarding sheer volume. The volume-vs-quality invariant holds in unit test (good 20 priority-A/B with 5 interviews > poor 200 priority-C).",
+    "career_score.py:_ips_moyen falls back to all apps with ips if no 'applied' ones exist — reasonable default.",
+    "router.py:next_application_code uses find_one_and_update $inc + upsert with ReturnDocument.AFTER on counters collection keyed by year — atomic, race-safe, yearly reset. Unique index on applications.code enforces uniqueness.",
+    "router.py:_run_pack writes every part+ips+decision_report into application_versions collection AND mirrors into applications (fast reads) — storage doubled but intentional to keep each version immutable. ips_history appended via $push on applications.",
+    "router.py:reanalyze returns 409 when current status is 'generating' — guards concurrent reanalyses. Good.",
+    "router.py:_recover_interrupted marks any version left as 'generating' at startup as error 'Génération interrompue' — correct for hot-reload scenarios (as noted in agent context about v2 of seed app).",
+    "compare.py: deterministic diff by criterion key with points delta; input_changes extend to profile_snapshot (certifications/skills/goals adds) — covers Career Memory evolution.",
+    "decision_report.py: builds from IPS rows deterministically (strengths = top-3 ≥7, weaknesses = bottom-3 <6) and merges AI-provided improvement_actions when available — never empty by construction.",
+    "models.py EntityPatch uses `changes: dict` which bypasses per-field validation on PATCH. Non-blocking: router.py update_entity passes `{...cur, **changes}` through the full model_dump — invalid Literal values would still raise 422 via pydantic. OK.",
+    "router.py:DELETE sets archived:true + archived_at + timeline entry; _own filters archived:{$ne:true} so archived apps return 404 on GET as required. Versions remain in application_versions. OK.",
+    "PackView.jsx passes `${a.code} · v${shownVersion}` as PackRef; DocTools splits on space and uses `${code}_${name}` for file names — all PDF/DOCX downloads start with CO-… as spec'd."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_careeros_v2.py (new)",
+    "/app/test_reports/pytest/careeros_v2_results.xml (generated)"
+  ],
+  "success_rate": {"backend": "100% (19/19 passed, 1 cleanup fixture skip resolved manually)", "frontend": "100% (login, dashboard row-code/row-why/IPS arrow, pack header code, versions panel 3 chips, decision report 5 sub-blocks, viewing-old-version banner + v1 IPS 65, compare dialog v1→v3 IPS 65→76(+11), reanalyze dialog opens, PDF/DOCX filenames start with CO-, profile education+promotions persist)"},
+  "test_credentials": "Seed: membre.test@careeros.dev / CareerOS2026! (CO-2026-000001 id=abea3957-1d44-4403-81c0-5752a76e91cd, v1 IPS 65 priority B, v2 error 'interrompue', v3 IPS 76 priority A). Ephemeral test_v2_<rand>@careeros.dev / Secret123! created and cleaned.",
+  "seed_data_creation": "No new pack / reanalysis generated (LLM budget preserved per agent-to-agent note). TEST_ dossier entities (1 interview, 1 recruiter, 1 email) added to seed app for PATCH-revisions test, cleaned via pymongo (1+1+1 docs deleted). 2 ephemeral test_v2_* users cleaned.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend coverage: /app/backend/tests/test_careeros.py (iter 18, 23 tests) + /app/backend/tests/test_careeros_v2.py (iter 19, 20 tests). All green. Seed app abea3957 has versions v1(65,B) v2(error 'interrompue' by design — don't retry generating this) v3(76,A); use compare a=1 b=3 for deterministic assertion. Career Score endpoint is /api/careeros/career-score (auth-gated); UI deliberately does not show the score. Dossier entities: POST /applications/{id}/{interviews|calendar_events|recruiters|followups|emails} + PATCH /applications/{id}/{entity}/{entity_id} with body {changes:{...}} — PATCH stores previous values in revisions[]. Testids added in iter 19: row-code-*, row-why-*, application-code, versions-panel, version-chip-N, viewing-old-version, compare-versions-btn, compare-dialog, compare-from-select, compare-to-select, compare-run-btn, compare-result, compare-ips-delta, compare-improved, compare-worsened, compare-explanation, compare-input-changes, reanalyze-btn, reanalyze-dialog, reanalyze-note-input, reanalyze-use-memory-cv, reanalyze-cv-input, reanalyze-network-select, reanalyze-date-input, reanalyze-submit-btn, decision-report, decision-report-summary/why/strengths/weaknesses/actions, profile-education-input, profile-promotions-input. Known cosmetic: Radix Dialog aria-describedby + React option/span hydration warnings in Versions.jsx compare dialog — do NOT touch unless requested.",
+  "rca of the issue": "N/A — no bugs found."
+}
