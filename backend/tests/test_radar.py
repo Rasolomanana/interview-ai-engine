@@ -93,6 +93,27 @@ class TestRadarSettings:
         r = requests.post(f"{API}/careeros/radar/portal/detect", headers=seed_h,
                           json={"url": "https://emploi.hydroquebec.com/", "name": "Hydro-Québec"}, timeout=30).json()
         assert r["ok"] is False and r["kind"] == ""
+        assert "Jooble" in (r.get("message") or "")
+
+    def test_portal_detect_requires_auth(self):
+        r = requests.post(f"{API}/careeros/radar/portal/detect", json={"url": "https://x.wd1.myworkdayjobs.com/foo"}, timeout=15)
+        assert r.status_code in (401, 403)
+
+    def test_portal_detect_desjardins_workday(self, seed_h):
+        r = requests.post(f"{API}/careeros/radar/portal/detect", headers=seed_h,
+                          json={"url": "https://desjardins.wd10.myworkdayjobs.com/fr-CA/Desjardins", "name": "Desjardins"},
+                          timeout=60).json()
+        assert r["kind"] == "workday", r
+        assert r["ok"] is True, r
+        assert r["count"] > 0, r
+
+    def test_settings_no_boards_key_and_companies_objects(self, seed_h):
+        d = requests.get(f"{API}/careeros/radar/settings", headers=seed_h, timeout=15).json()
+        assert "boards" not in d
+        for c in d["companies"]:
+            assert set(["name", "enabled", "portal_url", "kind", "slug"]).issubset(c.keys())
+        for k in ("jooble", "adzuna", "workday", "boards"):
+            assert k in d["configured"]
 
 
 # ---------------- Run + Dashboard + Dedupe ----------------
@@ -130,9 +151,15 @@ class TestRadarRun:
         for k in ("top_a", "top_b", "ignored", "packed", "new_today"):
             assert isinstance(d.get(k), list), k
         lr = d["last_run"]
-        for k in ("fetched", "new", "known", "analyzed", "skipped_limit", "errors", "status"):
+        for k in ("fetched", "new", "known", "analyzed", "skipped_limit", "errors", "status", "selected_sources", "by_source"):
             assert k in lr, k
-        assert set(d["sources_status"]["configured"]) >= {"jooble", "workday", "boards", "adzuna"}
+        for src in ("jooble", "workday", "boards", "adzuna"):
+            assert src in lr["by_source"] and set(lr["by_source"][src].keys()) >= {"fetched", "analyzed"}, lr["by_source"]
+        ss = d.get("sources_status") or {}
+        assert set(ss["configured"]) >= {"jooble", "workday", "boards", "adzuna"}
+        assert isinstance(ss.get("selected"), list)
+        # Daily limit respected
+        assert d["analyzed_today"] <= 50
 
     def test_dedupe_second_run(self, seed_h):
         d_before = requests.get(f"{API}/careeros/radar/dashboard", headers=seed_h, timeout=15).json()

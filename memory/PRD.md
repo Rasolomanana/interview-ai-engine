@@ -270,3 +270,13 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - radar.py : radar_settings / radar_offers (dédoublonnage titre+entreprise+lieu par membre) / radar_runs ; 1 appel IA par NOUVELLE offre (IPS Radar = formule officielle, réseau « aucun », lettre neutre) + Decision Report ; limite RADAR_DAILY_LIMIT=50 ; /run en tâche de fond (409 si déjà en cours) ; /dashboard (nouvelles, top A, top B, ignorées, compteurs) ; /offers/{id}/ignore|pack (pack = flux existant, origin.type=radar) ; /cron (X-Cron-Secret = RADAR_CRON_SECRET) pour planificateur externe (cron-job.org à 6 h) car Render gratuit s'endort.
 - followup.py : brouillons IA (confirmation/remerciement/relance) statut brouillon→pret→envoye uniquement par le membre ; .ics entrevue (Google/Outlook/Apple). UI : page /careeros/radar + Réglages, onglet « Suivi & agenda » dans le dossier.
 - À FAIRE (Lot 2) : OAuth Google Calendar + Outlook (création directe d'événements, envoi direct de courriels après validation) — nécessite identifiants Google Cloud + Microsoft Entra fournis par l'utilisateur ; appeler integration_expert avant.
+
+## 2026-06 — Radar V2.1 : Adzuna optionnel, Workday, entreprises configurables
+- Sources : Jooble (principale, JOOBLE_API_KEY), Workday (public CXS, filtre pays Canada), sites carrières (Greenhouse/Lever/Ashby/amazon.jobs), Adzuna optionnel (non sélectionnable sans clé, rejeté côté serveur).
+- Entreprises suivies 100 % configurables par le membre : objets {name, enabled, portal_url, kind, slug} ; ajout, retrait, import de liste (« Nom | URL »), activation/désactivation ; aucune liste codée en dur. Migration auto des anciens réglages (companies texte + boards).
+- POST /api/careeros/radar/portal/detect : reconnaît et vérifie l'URL d'un portail carrières.
+- Écran Radar : panneau Sources (Actif / Non configuré / Désactivé + offres par source) et total analysé ; last_run.by_source.
+- Les offres reportées par la limite de 50/jour sont analysées lors des passages suivants (backlog).
+- Portails vérifiés : Desjardins, Intelcom, Walmart, Couche-Tard (Workday) ; Amazon (amazon.jobs). SuccessFactors/Phenom/UKG (Hydro-Québec, Bombardier, Purolator, Air Canada, ABB, DHL, CPKC…) → via Jooble.
+- Tests : iteration_22 — backend 23/23, frontend OK. Non publié en production.
+- Backlog : publier V2 (Save to GitHub + Render + Cloudflare), ajouter JOOBLE_API_KEY sur Render, OAuth Google/Outlook (à cadrer).
