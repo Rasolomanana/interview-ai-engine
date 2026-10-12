@@ -56,28 +56,43 @@ class TestRadarSettings:
         # No Adzuna/Jooble keys in preview
         assert d["configured"].get("adzuna") is False
         assert d["configured"].get("jooble") is False
-        assert d["configured"].get("greenhouse") is True
-        # Already configured member — keywords set, boards include greenhouse/ashby
+        assert d["configured"].get("workday") is True and d["configured"].get("boards") is True
         assert isinstance(d.get("companies"), list)
+        assert all(isinstance(c, dict) and "name" in c and "enabled" in c for c in d["companies"])
+        assert "boards" not in d
 
     def test_get_settings_requires_auth(self):
         r = requests.get(f"{API}/careeros/radar/settings", timeout=10)
         assert r.status_code in (401, 403)
 
-    def test_put_settings_invalid_board_kind(self, seed_h):
-        body = {"enabled": True, "keywords": ["Data"], "location": "Québec",
-                "companies": [], "sources": ["boards"],
-                "boards": [{"company": "X", "kind": "WRONG", "slug": "x"}]}
+    def test_put_settings_invalid_portal_kind(self, seed_h):
+        body = {"enabled": True, "keywords": ["Data"], "location": "Québec", "sources": ["boards"],
+                "companies": [{"name": "X", "kind": "WRONG", "slug": "x"}]}
         r = requests.put(f"{API}/careeros/radar/settings", headers=seed_h, json=body, timeout=15)
         assert r.status_code == 422, r.text
 
     def test_put_settings_roundtrip(self, seed_h):
         # Fetch, PUT same back, confirm persistence
         cur = requests.get(f"{API}/careeros/radar/settings", headers=seed_h, timeout=15).json()
-        body = {k: cur[k] for k in ("enabled", "keywords", "location", "companies", "boards", "sources")}
+        body = {k: cur[k] for k in ("enabled", "keywords", "location", "companies", "sources")}
         r = requests.put(f"{API}/careeros/radar/settings", headers=seed_h, json=body, timeout=15)
         assert r.status_code == 200, r.text
         assert r.json()["keywords"] == cur["keywords"]
+
+
+    def test_adzuna_dropped_without_key_and_portal_parsed(self, seed_h, other_h):
+        body = {"enabled": True, "keywords": ["analyste"], "location": "Québec", "sources": ["jooble", "workday", "adzuna"],
+                "companies": ["Metro", {"name": "Desjardins", "portal_url": "https://desjardins.wd10.myworkdayjobs.com/fr-CA/Desjardins"},
+                              {"name": "metro", "enabled": False}]}
+        d = requests.put(f"{API}/careeros/radar/settings", headers=other_h, json=body, timeout=15).json()
+        assert "adzuna" not in d["sources"]
+        assert [c["name"] for c in d["companies"]] == ["Metro", "Desjardins"]
+        assert d["companies"][1]["kind"] == "workday" and d["companies"][1]["slug"] == "desjardins.wd10/Desjardins"
+
+    def test_portal_detect(self, seed_h):
+        r = requests.post(f"{API}/careeros/radar/portal/detect", headers=seed_h,
+                          json={"url": "https://emploi.hydroquebec.com/", "name": "Hydro-Québec"}, timeout=30).json()
+        assert r["ok"] is False and r["kind"] == ""
 
 
 # ---------------- Run + Dashboard + Dedupe ----------------
@@ -117,6 +132,7 @@ class TestRadarRun:
         lr = d["last_run"]
         for k in ("fetched", "new", "known", "analyzed", "skipped_limit", "errors", "status"):
             assert k in lr, k
+        assert set(d["sources_status"]["configured"]) >= {"jooble", "workday", "boards", "adzuna"}
 
     def test_dedupe_second_run(self, seed_h):
         d_before = requests.get(f"{API}/careeros/radar/dashboard", headers=seed_h, timeout=15).json()

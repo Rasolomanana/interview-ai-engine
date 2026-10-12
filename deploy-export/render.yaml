@@ -44,12 +44,12 @@ services:
       # CareerOS member accounts: long random secret signing JWT tokens (REQUIRED).
       - key: JWT_SECRET
         generateValue: true
-      # CareerOS Radar
+      # CareerOS Radar — Jooble = main source; Adzuna optional (paid plan), ignored when empty
+      - key: JOOBLE_API_KEY
+        sync: false
       - key: ADZUNA_APP_ID
         sync: false
       - key: ADZUNA_APP_KEY
-        sync: false
-      - key: JOOBLE_API_KEY
         sync: false
       - key: RADAR_DAILY_LIMIT
         value: "50"

@@ -82,6 +82,7 @@ export const radar = {
   dashboard: () => call("/careeros/radar/dashboard"),
   ignore: (id) => call(`/careeros/radar/offers/${id}/ignore`, { method: "POST" }),
   pack: (id) => call(`/careeros/radar/offers/${id}/pack`, { method: "POST" }),
+  detectPortal: (b) => call("/careeros/radar/portal/detect", { method: "POST", body: b }),
 };
 
 export const followup = {

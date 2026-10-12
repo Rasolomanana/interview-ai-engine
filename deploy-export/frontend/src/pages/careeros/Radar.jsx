@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { RadarSettingsDialog } from "@/components/careeros/RadarSettings";
+import { SourceStatus } from "@/components/careeros/SourceStatus";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
 import { radar } from "@/lib/careeros";
 
@@ -88,6 +89,7 @@ export default function Radar() {
             <Stat label="Déjà connues" value={lr?.known ?? 0} testid="radar-stat-known" />
             <Stat label="Priorité A" value={d.top_a.length} testid="radar-stat-a" />
           </div>
+          <SourceStatus status={d.sources_status} run={lr} />
           {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
           {errs.length > 0 && <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-200" data-testid="radar-errors">{errs.map(([k, v]) => <p key={k}>{k} : {v}</p>)}</div>}
           <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" onPack={onPack} onIgnore={onIgnore} busy={busy} />
