@@ -44,5 +44,16 @@ services:
       # CareerOS member accounts: long random secret signing JWT tokens (REQUIRED).
       - key: JWT_SECRET
         generateValue: true
+      # CareerOS Radar
+      - key: ADZUNA_APP_ID
+        sync: false
+      - key: ADZUNA_APP_KEY
+        sync: false
+      - key: JOOBLE_API_KEY
+        sync: false
+      - key: RADAR_DAILY_LIMIT
+        value: "50"
+      - key: RADAR_CRON_SECRET
+        generateValue: true
       - key: ADMIN_RETENTION_DAYS
         value: "90"

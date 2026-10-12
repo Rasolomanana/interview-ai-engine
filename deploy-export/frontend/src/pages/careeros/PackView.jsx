@@ -9,15 +9,17 @@ import { PackRef } from "@/components/careeros/DocTools";
 import { VersionBar, ReanalyzeDialog, CompareDialog } from "@/components/careeros/Versions";
 import { Pending, DecisionPanel, AtsPanel, SimulationPanel, QuestionsPanel, StarPanel, DocPanel } from "@/components/careeros/PackSections";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
+import { FollowupPanel } from "@/components/careeros/Followup";
 
 const TABS = [
   ["decision", "Décision & IPS"], ["ats", "Analyse ATS"], ["cv_ats", "CV ATS"], ["cv_humain", "CV humain"],
-  ["letter", "Lettre"], ["questions", "Questions"], ["star", "Réponses STAR"], ["simulation", "Simulation recruteur"],
+  ["letter", "Lettre"], ["questions", "Questions"], ["star", "Réponses STAR"], ["simulation", "Simulation recruteur"], ["suivi", "Suivi & agenda"],
 ];
 const PART_OF = { decision: "decision", ats: "decision", simulation: "decision", cv_ats: "cv_ats", cv_humain: "cv_humain", letter: "letter", questions: "questions", star: "star" };
 
-function TabBody({ tab, a }) {
+function TabBody({ tab, a, app }) {
   const p = a.parts || {};
+  if (tab === "suivi") return <FollowupPanel app={app} />;
   const part = PART_OF[tab];
   if (!p[part]) return <Pending label={TABS.find((t) => t[0] === tab)[1]} error={a.errors?.[part] || (a.status !== "generating" ? "génération échouée" : "")} />;
   const d = p.decision || {};
@@ -121,12 +123,12 @@ export default function PackView() {
         {TABS.map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} data-testid={`pack-tab-${k}`}
             className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-medium transition-colors ${tab === k ? "border-indigo-400 text-white" : "border-transparent text-slate-500 hover:text-slate-200"}`}>
-            {l}{shown.parts?.[PART_OF[k]] ? "" : " ·"}
+            {l}{k === "suivi" || shown.parts?.[PART_OF[k]] ? "" : " ·"}
           </button>
         ))}
       </div>
       <PackRef.Provider value={`${a.code} · v${shownVersion}`}>
-        <TabBody tab={tab} a={shown} />
+        <TabBody tab={tab} a={shown} app={a} />
       </PackRef.Provider>
     </Shell>
   );

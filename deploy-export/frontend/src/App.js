@@ -11,6 +11,7 @@ import NewPack from "@/pages/careeros/NewPack";
 import PackView from "@/pages/careeros/PackView";
 import Profile from "@/pages/careeros/Profile";
 import { useTheme } from "@/components/careeros/ThemeToggle";
+import Radar from "@/pages/careeros/Radar";
 
 const member = (el) => <RequireMember>{el}</RequireMember>;
 
@@ -27,6 +28,7 @@ function App() {
             <Route path="/careeros/nouveau" element={member(<NewPack />)} />
             <Route path="/careeros/memoire" element={member(<Profile />)} />
             <Route path="/careeros/candidature/:id" element={member(<PackView />)} />
+            <Route path="/careeros/radar" element={member(<Radar />)} />
             <Route path="/careeros/copilote" element={member(<InterviewConsole />)} />
             <Route path="/" element={<RootRedirect />} />
             <Route path="*" element={<RootRedirect />} />

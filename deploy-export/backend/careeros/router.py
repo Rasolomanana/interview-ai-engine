@@ -242,6 +242,9 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
 
     @router.post("/packs")
     async def create_pack(body: PackBody, user: dict = Depends(current_user)):
+        return await _create_pack(body, user)
+
+    async def _create_pack(body: PackBody, user: dict, origin: Optional[dict] = None):
         profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
         cv = body.cv_text.strip() or (profile.get("cv_text") or "").strip()
         if len(cv) < 80:
@@ -260,6 +263,7 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
             "current_version": 1, "inputs": inputs, "parts": {p: None for p in PARTS}, "errors": {}, "ips": None,
             "decision_report": None, "ips_history": [], "had_interview": False, "archived": False,
             "timeline": [{"at": _now(), "type": "created", "version": 1, "detail": ""}],
+            "origin": origin or {"type": "manual"},
         }
         await db.applications.insert_one(dict(app))
         await _start_version(app, 1, inputs, profile, "Analyse initiale")
@@ -386,6 +390,8 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
     for _name, _model in ENTITIES.items():
         _entity_routes(_name, _model)
 
+    router.create_pack_internal = _create_pack
+    router.own_application = _own
     return router
 
 

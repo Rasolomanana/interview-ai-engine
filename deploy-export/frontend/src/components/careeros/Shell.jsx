@@ -21,6 +21,7 @@ export const Shell = ({ children }) => {
           </Link>
           <nav className="ml-2 hidden items-center gap-1 sm:flex">
             <NavLink end to="/careeros" className={tab} data-testid="nav-dashboard">Tableau de bord</NavLink>
+            <NavLink to="/careeros/radar" className={tab} data-testid="nav-radar">Radar</NavLink>
             <NavLink to="/careeros/nouveau" className={tab} data-testid="nav-new-pack">Pack candidature</NavLink>
             <NavLink to="/careeros/memoire" className={tab} data-testid="nav-memory">Career Memory</NavLink>
           </nav>
@@ -37,6 +38,7 @@ export const Shell = ({ children }) => {
         </div>
         <nav className="flex gap-1 overflow-x-auto px-4 pb-2 sm:hidden">
           <NavLink end to="/careeros" className={tab}>Tableau de bord</NavLink>
+          <NavLink to="/careeros/radar" className={tab}>Radar</NavLink>
           <NavLink to="/careeros/nouveau" className={tab}>Pack</NavLink>
           <NavLink to="/careeros/memoire" className={tab}>Memory</NavLink>
           <NavLink to="/careeros/copilote" className={tab} data-testid="nav-interview-console-mobile">Copilote</NavLink>

@@ -75,6 +75,29 @@ export const careeros = {
   dossier: (id) => call(`/careeros/applications/${id}/dossier`),
 };
 
+export const radar = {
+  settings: () => call("/careeros/radar/settings"),
+  saveSettings: (b) => call("/careeros/radar/settings", { method: "PUT", body: b }),
+  run: () => call("/careeros/radar/run", { method: "POST" }),
+  dashboard: () => call("/careeros/radar/dashboard"),
+  ignore: (id) => call(`/careeros/radar/offers/${id}/ignore`, { method: "POST" }),
+  pack: (id) => call(`/careeros/radar/offers/${id}/pack`, { method: "POST" }),
+};
+
+export const followup = {
+  draft: (appId, b) => call(`/careeros/applications/${appId}/emails/draft`, { method: "POST", body: b }),
+  addInterview: (appId, b) => call(`/careeros/applications/${appId}/interviews`, { method: "POST", body: b }),
+  patch: (appId, entity, id, changes) => call(`/careeros/applications/${appId}/${entity}/${id}`, { method: "PATCH", body: { changes } }),
+  async downloadIcs(appId, interviewId, code) {
+    const t = tokens.get();
+    const r = await fetch(`${BASE()}/careeros/applications/${appId}/interviews/${interviewId}/ics`, { headers: { Authorization: `Bearer ${t?.access_token}` } });
+    if (!r.ok) throw new Error("Fichier .ics indisponible");
+    const url = URL.createObjectURL(await r.blob());
+    Object.assign(document.createElement("a"), { href: url, download: `${code}_entrevue.ics` }).click();
+    URL.revokeObjectURL(url);
+  },
+};
+
 export const PIPELINE_LABELS = {
   a_postuler: "À postuler", postule: "Postulé", entrevue: "Entrevue", offre: "Offre", refuse: "Refusé", abandonne: "Abandonné",
 };
