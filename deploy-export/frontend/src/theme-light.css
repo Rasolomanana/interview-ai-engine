@@ -27,7 +27,7 @@ html.light .text-slate-200{color:#1e293b}
 html.light .text-slate-300{color:#334155}
 html.light .text-slate-400{color:#475569}
 html.light .text-slate-500{color:#556070}
-html.light .text-slate-600{color:#64748b}
+html.light .text-slate-600{color:#4b5563}
 html.light .hover\:text-white:hover,html.light .hover\:text-slate-200:hover,html.light .hover\:text-slate-300:hover,html.light .hover\:text-indigo-200:hover{color:#0f172a}
 html.light .placeholder\:text-slate-600::placeholder,html.light input::placeholder,html.light textarea::placeholder{color:#8a94a6}
 html.light .text-indigo-50,html.light .text-indigo-100,html.light .text-indigo-200,html.light .text-indigo-300,html.light .text-indigo-400,html.light .text-indigo-200\/70,html.light .text-indigo-200\/80,html.light .text-indigo-200\/90,html.light .text-indigo-300\/70,html.light .text-indigo-300\/80,html.light .text-indigo-300\/90,html.light .text-indigo-400\/70,html.light .text-indigo-400\/80,html.light .text-indigo-400\/90{color:#4338ca}
@@ -60,3 +60,7 @@ html.light [class*="bg-fuchsia-950"]{background-color:#fdf4ff}
 html.light [class*="bg-indigo-950"]{background-color:#eef2ff}
 html.light [class*="bg-rose-950"]{background-color:#fff1f2}
 html.light [class*="bg-violet-950"]{background-color:#f5f3ff}
+/* WCAG AA: primary buttons (white text) and rich toasts */
+.bg-indigo-500{background-color:#4f46e5}
+.hover\:bg-indigo-400:hover{background-color:#4338ca}
+html.light [data-sonner-toaster]{--success-text:#047857;--error-text:#b91c1c;--warning-text:#92400e;--info-text:#1d4ed8}

@@ -1,0 +1,48 @@
+{
+  "summary": "Frontend-only review of CareerOS theme management, titles, favicon and routing. All functional checks pass: html.light / html.dark driven by prefers-color-scheme on fresh storage; theme-toggle-btn present on connexion, dashboard, memoire, nouveau, candidature, copilote and admin; icon swap moon<->sun works; toggle writes localStorage['careeros.theme'] and fires PATCH /api/auth/preferences (observed network call) when authenticated; theme restored from profile after clearing localStorage and logging back in (verified: forced local 'light' before login was overridden to 'dark' because profile had dark saved). Page titles exact (CareerOS | Connexion / Tableau de bord / Career Memory / Pack candidature / Pack candidature · CO-2026-000001 / Administration / Copilote d'entrevue); none contain 'Emergent'. Favicon served at /favicon.svg with Content-Type image/svg+xml (200). Routing: logged-in / -> /careeros, logged-out / -> /connexion, logged-out /careeros/copilote -> /connexion?next=%2Fcareeros%2Fcopilote and after login redirects back to /careeros/copilote. Light-mode visual audit on dashboard, memoire, nouveau, candidature (all 8 tabs), copilote, admin, Réanalyser dialog, Comparer les versions dialog, privacy banner, settings modal area — no dark leftovers, no white-on-white. Dark-mode regression on candidature confirmed unchanged. WCAG contrast scan flagged only borderline cases (ratios 4.26-4.47) — see minor issues below.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Pack candidature /careeros/nouveau (light)",
+        "issues": [
+          "Small hint spans .text-[11px].text-slate-600 (texts: 'texte complet recommandé', 'optionnel', 'fraîcheur de l\\'offre', 'force du réseau', 'chargé depuis votre Career Memory') have contrast ratio 4.44:1 on bg #f6f7f9 — just below WCAG AA 4.5 for normal text at 11px. Suggest bumping to text-slate-700 (#334155) which gives ~7.5:1."
+        ]
+      },
+      {
+        "screen": "Primary indigo buttons (dashboard, memoire, candidature, copilote)",
+        "issues": [
+          "Buttons .bg-indigo-500 with white text have contrast 4.47:1 (just under 4.5 AA for 14px normal text). Per the brief 'primary buttons keep white text on indigo' this is accepted, but using bg-indigo-600 (#4f46e5) would raise it to ~5.4:1 and pass AA cleanly."
+        ]
+      },
+      {
+        "screen": "Toasts (copilote, 'Session créée')",
+        "issues": [
+          "Toast with fg rgb(0,138,46) on bg rgb(236,253,243) measures 4.26:1 — slightly below 4.5 AA. Darken text color to emerald-700 (#047857) for AA compliance."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Optional, cosmetic) Replace .text-[11px].text-slate-600 hint labels on /careeros/nouveau with text-slate-700 to clear WCAG AA for 11px copy.",
+    "(Optional) Switch primary buttons from bg-indigo-500 to bg-indigo-600 to clear 4.5:1 AA with white text.",
+    "(Optional) Darken success-toast text to #047857 for AA."
+  ],
+  "critical_code_review_comments": [
+    "theme.js dispatches a CustomEvent on applyTheme — good; ThemeToggle reads currentTheme on mount which includes a system-preference fallback, consistent with the pre-paint inline script in index.html (no FOUC).",
+    "AuthProvider.restoreTheme runs on both initial /auth/me and after login/register — correctly keeps server as source of truth. Register also PATCHes current local theme to profile which is nice.",
+    "theme-light.css relies on remapping Tailwind utility classes under html.light. This works but is fragile: any new dark utility added by future components (e.g. bg-slate-700, text-slate-50) won't be remapped automatically. Consider centralising via CSS variables + Tailwind `dark:` variant going forward.",
+    "ThemeToggle PATCH call swallows errors silently (.catch(() => {})) — fine for UX but means a user could think theme is saved to profile when server actually rejected it. Consider a tiny toast on failure."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (not tested per request)", "frontend": "100% functional, 3 minor contrast nits" },
+  "test_credentials": "membre.test@careeros.dev / CareerOS2026! (used)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Theme toggle + titles + favicon + routing all pass. Only cosmetic contrast nits remain (listed in design_issues). Backend preferences endpoint PATCH /api/auth/preferences returns success (verified via network observation during toggle); 422 for invalid values was not re-tested but code path exists in backend/careeros/auth.py.",
+  "rca of the issue": "n/a — no bugs reproduced."
+}

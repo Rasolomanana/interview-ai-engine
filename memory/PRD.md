@@ -258,3 +258,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 ## 2026-10-12 — Navigation : CareerOS = produit principal
 - "/" (et toute URL inconnue) → /careeros si connecté, sinon /connexion (RootRedirect dans AuthProvider.jsx).
 - Copilote d'entrevue déplacé en fonctionnalité interne : /careeros/copilote (connexion requise ; retour à la page demandée après connexion). Liens : en-tête CareerOS (desktop + mobile), bouton CareerOS dans le copilote. Liens « Retour » de /admin → /careeros. /admin inchangé.
+
+## 2026-10-12 — Thèmes clair/sombre + marque CareerOS
+- Thèmes : html.light|dark ; défaut = thème OS sinon clair ; script pré-rendu dans index.html (pas de flash) ; ThemeToggle (soleil/lune) dans Shell, connexion, admin, copilote ; sauvegarde localStorage + profil membre (PATCH /api/auth/preferences, users.preferences.theme), restauré à la connexion. Mode clair = frontend/src/theme-light.css (remap des utilitaires sombres, WCAG AA ; boutons primaires indigo-600). Toaster suit le thème.
+- Titres d'onglet « CareerOS | <page> » (usePageTitle) ; favicon CareerOS public/favicon.svg ; index.html deploy-export nettoyé (aucun script Emergent/PostHog).
+- Prompt CAREEROS_BRAIN mis à jour avec l'identité officielle (pas un chatbot, résultats > volume, IPS officiel unique).
+- Testé : iteration_20 (100 % fonctionnel ; 3 micro-contrastes corrigés ensuite).
