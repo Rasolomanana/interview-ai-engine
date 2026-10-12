@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Brain, Loader2 } from "lucide-react";
 import { useAuth } from "@/components/careeros/AuthProvider";
+import { ThemeToggle, usePageTitle } from "@/components/careeros/ThemeToggle";
 
 const Field = ({ label, ...p }) => (
   <label className="block">
@@ -15,6 +16,7 @@ export default function AuthPage() {
   const nav = useNavigate();
   const [params] = useSearchParams();
   const [mode, setMode] = useState("login");
+  usePageTitle(mode === "login" ? "Connexion" : "Créer un compte");
   const [form, setForm] = useState({ email: "", password: "", name: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -31,7 +33,8 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="grid min-h-screen bg-[#090a0f] text-slate-100 lg:grid-cols-2">
+    <div className="relative grid min-h-screen bg-[#090a0f] text-slate-100 lg:grid-cols-2">
+      <ThemeToggle className="absolute right-4 top-4 z-10" />
       <section className="relative hidden flex-col justify-between overflow-hidden border-r border-white/5 p-12 lg:flex">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(99,102,241,0.18),transparent_50%),radial-gradient(circle_at_80%_90%,rgba(16,185,129,0.10),transparent_45%)]" />
         <div className="relative flex items-center gap-2"><Brain className="h-5 w-5 text-indigo-300" /><span className="font-display text-xl font-bold">CareerOS</span></div>

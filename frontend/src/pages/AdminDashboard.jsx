@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { adminLogin, adminStats, adminExport } from "@/lib/api";
 import { SimulationsTable } from "@/components/admin/SimulationsTable";
+import { ThemeToggle, usePageTitle } from "@/components/careeros/ThemeToggle";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(4)}`;
 const num = (n) => (Number(n) || 0).toLocaleString();
@@ -53,6 +54,7 @@ function Bars({ title, data, keys }) {
 }
 
 export default function AdminDashboard() {
+  usePageTitle("Administration");
   const [pwd, setPwd] = useState("");
   const [authed, setAuthed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -115,7 +117,8 @@ export default function AdminDashboard() {
 
   if (!authed) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
+      <div className="relative flex min-h-screen items-center justify-center bg-slate-950 px-4">
+        <ThemeToggle className="absolute right-4 top-4" />
         <form onSubmit={doLogin} data-testid="admin-login-form" className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/70 p-7">
           <div className="mb-5 flex items-center gap-2 text-white">
             <Lock className="h-5 w-5 text-amber-400" />
@@ -152,6 +155,7 @@ export default function AdminDashboard() {
             <span className="rounded-md border border-white/10 bg-black/30 px-2 py-0.5 font-mono text-[10px] text-slate-400">rétention {stats?.retention_days ?? 90} j</span>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <button onClick={() => load(sessionStorage.getItem("adminPwd"))} data-testid="admin-refresh-btn" className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs hover:border-white/20">
               <RefreshCw className="h-3.5 w-3.5" /> Rafraîchir
             </button>

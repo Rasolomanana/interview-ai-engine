@@ -3,12 +3,14 @@ import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
 import { careeros } from "@/lib/careeros";
+import { usePageTitle } from "@/components/careeros/ThemeToggle";
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white outline-none focus:border-indigo-400/60";
 const TEXT = [["full_name", "Nom complet"], ["headline", "Titre professionnel"], ["location", "Localisation"], ["target_roles", "Postes visés"], ["sectors", "Secteurs visés"], ["salary_expectation", "Attentes salariales"]];
 const LISTS = [["skills", "Compétences"], ["certifications", "Certifications"], ["education", "Formations"], ["languages", "Langues"]];
 
 export default function Profile() {
+  usePageTitle("Career Memory");
   const [p, setP] = useState(null);
   const [goals, setGoals] = useState([]);
   const [busy, setBusy] = useState(false);

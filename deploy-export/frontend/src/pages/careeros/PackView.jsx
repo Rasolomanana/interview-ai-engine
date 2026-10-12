@@ -8,6 +8,7 @@ import { careeros, PIPELINE_LABELS } from "@/lib/careeros";
 import { PackRef } from "@/components/careeros/DocTools";
 import { VersionBar, ReanalyzeDialog, CompareDialog } from "@/components/careeros/Versions";
 import { Pending, DecisionPanel, AtsPanel, SimulationPanel, QuestionsPanel, StarPanel, DocPanel } from "@/components/careeros/PackSections";
+import { usePageTitle } from "@/components/careeros/ThemeToggle";
 
 const TABS = [
   ["decision", "Décision & IPS"], ["ats", "Analyse ATS"], ["cv_ats", "CV ATS"], ["cv_humain", "CV humain"],
@@ -36,6 +37,7 @@ export default function PackView() {
   const nav = useNavigate();
   const [a, setA] = useState(null);
   const [tab, setTab] = useState("decision");
+  usePageTitle(a?.code ? `Pack candidature · ${a.code}` : "Pack candidature");
   const [viewing, setViewing] = useState(null);
   const [older, setOlder] = useState(null);
   const [dialog, setDialog] = useState("");

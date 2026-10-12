@@ -10,10 +10,12 @@ import Dashboard from "@/pages/careeros/Dashboard";
 import NewPack from "@/pages/careeros/NewPack";
 import PackView from "@/pages/careeros/PackView";
 import Profile from "@/pages/careeros/Profile";
+import { useTheme } from "@/components/careeros/ThemeToggle";
 
 const member = (el) => <RequireMember>{el}</RequireMember>;
 
 function App() {
+  const theme = useTheme();
   return (
     <div className="App">
       <BrowserRouter>
@@ -32,7 +34,7 @@ function App() {
         </AuthProvider>
         <PrivacyBanner />
       </BrowserRouter>
-      <Toaster theme="dark" position="top-center" richColors />
+      <Toaster theme={theme} position="top-center" richColors />
     </div>
   );
 }

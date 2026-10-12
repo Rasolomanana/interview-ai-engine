@@ -5,12 +5,14 @@ import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
 import { careeros } from "@/lib/careeros";
 import { extractPdf } from "@/lib/api";
+import { usePageTitle } from "@/components/careeros/ThemeToggle";
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-indigo-400/60";
 const Label = ({ children, hint }) => <div className="mb-1.5 flex items-baseline justify-between"><span className="text-xs font-medium text-slate-300">{children}</span>{hint && <span className="text-[11px] text-slate-600">{hint}</span>}</div>;
 const OUTPUTS = ["Analyse ATS", "IPS + priorité A/B/C", "Pourquoi postuler / éviter", "CV ATS", "CV humain", "Lettre personnalisée", "Questions RH · gestionnaire · comportementales · techniques", "Réponses STAR", "Simulation recruteur", "Risques & objections"];
 
 export default function NewPack() {
+  usePageTitle("Pack candidature");
   const nav = useNavigate();
   const fileRef = useRef(null);
   const [f, setF] = useState({ offer_text: "", offer_url: "", company_url: "", cv_text: "", posted_date: "", network: "aucun", save_cv_to_memory: true });

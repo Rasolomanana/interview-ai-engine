@@ -9,6 +9,8 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 from fastapi import APIRouter, HTTPException, Request, Depends
+from typing import Literal
+
 from pydantic import BaseModel, EmailStr, Field
 
 ALGO = "HS256"
@@ -55,7 +57,8 @@ def _decode(token: str, kind: str) -> str:
 
 
 def _public(user: dict) -> dict:
-    return {"id": user["id"], "email": user["email"], "name": user.get("name", ""), "created_at": user.get("created_at")}
+    return {"id": user["id"], "email": user["email"], "name": user.get("name", ""), "created_at": user.get("created_at"),
+            "preferences": user.get("preferences") or {}}
 
 
 class RegisterBody(BaseModel):
@@ -67,6 +70,10 @@ class RegisterBody(BaseModel):
 class LoginBody(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
+
+
+class PreferencesBody(BaseModel):
+    theme: Literal["light", "dark"]
 
 
 class RefreshBody(BaseModel):
@@ -129,6 +136,11 @@ def create_auth(db):
     @router.get("/me")
     async def me(user: dict = Depends(current_user)):
         return _public(user)
+
+    @router.patch("/preferences")
+    async def preferences(body: PreferencesBody, user: dict = Depends(current_user)):
+        await db.users.update_one({"id": user["id"]}, {"$set": {"preferences.theme": body.theme, "updated_at": _now().isoformat()}})
+        return {"preferences": {**(user.get("preferences") or {}), "theme": body.theme}}
 
     return router, current_user
 

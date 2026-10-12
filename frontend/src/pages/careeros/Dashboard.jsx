@@ -5,6 +5,7 @@ import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { useAuth } from "@/components/careeros/AuthProvider";
 import { careeros, PIPELINE_LABELS } from "@/lib/careeros";
+import { usePageTitle } from "@/components/careeros/ThemeToggle";
 
 const Stat = ({ label, value, testid }) => (
   <div className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4" data-testid={testid}>
@@ -31,6 +32,7 @@ const Row = ({ a }) => (
 );
 
 export default function Dashboard() {
+  usePageTitle("Tableau de bord");
   const { user } = useAuth();
   const [apps, setApps] = useState(null);
   useEffect(() => { careeros.list().then(setApps).catch(() => setApps([])); }, []);

@@ -1,9 +1,11 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { auth, tokens } from "@/lib/careeros";
+import { auth, call, tokens } from "@/lib/careeros";
+import { applyTheme, currentTheme } from "@/lib/theme";
 
 const AuthCtx = createContext(null);
+const restoreTheme = (u) => { const t = u?.preferences?.theme; if (t === "light" || t === "dark") applyTheme(t); };
 
 export const AuthProvider = ({ children }) => {
   // null = checking, false = signed out, object = member
@@ -11,13 +13,17 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (!tokens.get()) { setUser(false); return; }
-    auth.me().then(setUser).catch(() => { tokens.clear(); setUser(false); });
+    auth.me().then((u) => { restoreTheme(u); setUser(u); }).catch(() => { tokens.clear(); setUser(false); });
   }, []);
 
   const value = {
     user,
-    login: async (e, p) => setUser(await auth.login(e, p)),
-    register: async (e, p, n) => setUser(await auth.register(e, p, n)),
+    login: async (e, p) => { const u = await auth.login(e, p); restoreTheme(u); setUser(u); },
+    register: async (e, p, n) => {
+      const u = await auth.register(e, p, n);
+      call("/auth/preferences", { method: "PATCH", body: { theme: currentTheme() } }).catch(() => {});
+      setUser(u);
+    },
     logout: () => { auth.logout(); setUser(false); },
   };
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;

@@ -17,6 +17,7 @@ import MessageBubble from "@/components/console/MessageBubble";
 import AutoListenBar from "@/components/console/AutoListenBar";
 import RecapPanel from "@/components/console/RecapPanel";
 import FloatingAnswer from "@/components/console/FloatingAnswer";
+import { ThemeToggle, usePageTitle } from "@/components/careeros/ThemeToggle";
 
 const BADGE = {
   NEUTRE: "border-slate-600 bg-slate-800/80 text-slate-300",
@@ -29,6 +30,7 @@ const cleanDisplay = (t) => (t || "").replace(MARKER_RE, "").trim();
 const ZERO_COST = { cost: 0, inputTokens: 0, outputTokens: 0, turns: 0, lastProvider: null };
 
 export default function InterviewConsole() {
+  usePageTitle("Copilote d'entrevue");
   const [sessions, setSessions] = useState([]);
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -477,6 +479,7 @@ export default function InterviewConsole() {
                 <span className={`h-2 w-2 rounded-full ${liveActive ? "bg-red-500 animate-pulse" : "bg-emerald-400"}`} />
                 {liveActive ? "Live actif" : "Live"}
               </button>
+              <ThemeToggle className="!rounded-lg !p-1.5" />
               <HeaderBtn onClick={() => { window.location.href = "/careeros"; }} testid="careeros-btn" icon={<Brain className="h-4 w-4" />} label="CareerOS" />
               <HeaderBtn onClick={openFloating} testid="floating-btn" icon={<PictureInPicture2 className="h-4 w-4" />} label="Flottant" active={!!pipRoot} />
               <HeaderBtn onClick={() => setShowListen((s) => !s)} testid="toggle-listen-btn" icon={<Headphones className="h-4 w-4" />} label="Écoute" active={listen.active} />
