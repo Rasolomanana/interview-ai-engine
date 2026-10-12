@@ -264,3 +264,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Titres d'onglet « CareerOS | <page> » (usePageTitle) ; favicon CareerOS public/favicon.svg ; index.html deploy-export nettoyé (aucun script Emergent/PostHog).
 - Prompt CAREEROS_BRAIN mis à jour avec l'identité officielle (pas un chatbot, résultats > volume, IPS officiel unique).
 - Testé : iteration_20 (100 % fonctionnel ; 3 micro-contrastes corrigés ensuite).
+
+## 2026-10-12 — V2 démarrée : CareerOS Radar — Lot 1 (iteration_21 : 18/18 backend, frontend 100 %)
+- Sources légales : Adzuna API + Jooble API (clés ADZUNA_APP_ID/ADZUNA_APP_KEY/JOOBLE_API_KEY, non configurées en preview → ignorées), sites carrières publics Greenhouse/Lever/Ashby (radar_sources.py). Entreprises suivies (10 par défaut) = recherches ciblées Adzuna/Jooble (la plupart utilisent Workday/Taleo, pas Greenhouse/Lever).
+- radar.py : radar_settings / radar_offers (dédoublonnage titre+entreprise+lieu par membre) / radar_runs ; 1 appel IA par NOUVELLE offre (IPS Radar = formule officielle, réseau « aucun », lettre neutre) + Decision Report ; limite RADAR_DAILY_LIMIT=50 ; /run en tâche de fond (409 si déjà en cours) ; /dashboard (nouvelles, top A, top B, ignorées, compteurs) ; /offers/{id}/ignore|pack (pack = flux existant, origin.type=radar) ; /cron (X-Cron-Secret = RADAR_CRON_SECRET) pour planificateur externe (cron-job.org à 6 h) car Render gratuit s'endort.
+- followup.py : brouillons IA (confirmation/remerciement/relance) statut brouillon→pret→envoye uniquement par le membre ; .ics entrevue (Google/Outlook/Apple). UI : page /careeros/radar + Réglages, onglet « Suivi & agenda » dans le dossier.
+- À FAIRE (Lot 2) : OAuth Google Calendar + Outlook (création directe d'événements, envoi direct de courriels après validation) — nécessite identifiants Google Cloud + Microsoft Entra fournis par l'utilisateur ; appeler integration_expert avant.

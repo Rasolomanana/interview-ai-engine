@@ -1,0 +1,34 @@
+{
+  "summary": "CareerOS V2 Radar + Follow-up (lot 1) full backend+frontend testing. Backend: 18/18 pytest tests pass (test_radar.py) covering settings GET/PUT with defaults + auth guard + 422 for invalid board kind, /run returning {started:true} immediately with 409 on concurrent run, dashboard shape (last_run status running->done, fetched/new/known/analyzed/skipped_limit/errors, analyzed_today, daily_limit=50, top_a/top_b/ignored/packed/pending), dedupe on second run (new=0, known>=1, analyzed_today unchanged), IPS shape with score + priority A/B/C and decision_report.summary starting with 'IPS officiel CareerOS : N/100 — priorité X.', ignore + pack flows (pack creates application with CO-YYYY-NNNNNN + origin.type='radar', idempotent returns already:true, cross-member 404), cron auth (missing/wrong -> 401, correct -> {started:true}), follow-up email draft creation (status 'brouillon', requires_member_validation true, application_code set), PATCH to status 'pret', interview creation + .ics endpoint returning text/calendar with BEGIN:VCALENDAR, DTSTART, SUMMARY and CO code in DESCRIPTION, cross-member ics 404. Frontend: Radar nav tab present (nav-radar), /careeros/radar renders all 4 stat cards (analyzed 21/50, new 0, known 21, A 0), 'Rechercher maintenant' + 'Réglages' buttons, three sections top-a/top-b/ignored with 21 offer cards (ips, why, open link, ignore buttons work; ignore hidden when status==ignoree per code), last-run label, errors banner. Réglages dialog has all fields (enabled checkbox, keywords 'Data, Analyst, Analytics', location, companies, sources adzuna/jooble/boards with 'clé manquante' hint, boards GitLab/Greenhouse/gitlab + Cohere/Ashby/cohere, add-board, save). Pack page: 'Suivi & agenda' tab (pack-tab-suivi) loads followup-panel with interview form (stage select, datetime-local input, mode, location, add button) + email form (recruiter name, 3 kind buttons: confirmation/remerciement/relance). Existing drafts (2) and interviews (2) with .ics download buttons render. Light + dark themes both render on the Radar page.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_radar.py",
+    "/app/test_reports/pytest/radar_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "radar.py uses `asyncio.create_task(run_for_user(...))` fire-and-forget on the FastAPI event loop. If the worker is killed mid-run, the task is orphaned; the `interrompue` recovery in ensure_radar_indexes handles stale 'running' rows at startup — good — but there is no heartbeat, so a crashed-but-still-marked-running task will block /run for 15 minutes (the busy window). Consider a stricter 'last heartbeat' column.",
+    "radar.py `/run` 15-minute busy window: a legitimate long run (e.g. 20+ new offers at ~5s each with sem=4) may fit, but if a user packs many offers simultaneously the ThreadPool can get saturated. Semaphore(4) is a sensible cap.",
+    "radar.py dashboard builds `top_a`/`top_b` by scanning up to 400 offers in memory and sorting in Python — fine for small volumes; add an index on (user_id, ips.score) once scale grows.",
+    "radar.py `cron` endpoint deduplicates users via a list membership check (`if p['user_id'] not in users`) which is O(n²) over users; use a set.",
+    "followup.py build_ics escapes semicolons/commas/newlines correctly but does not fold lines at 75 octets as per RFC 5545 — most calendar clients tolerate it, but strict parsers (some corporate Outlook policies) may reject >75 char lines.",
+    "Followup.jsx `email-mark-sent` relies on `window.confirm` — works but not stylable; consider a shadcn AlertDialog for consistency.",
+    "Radar.jsx `datetime-local` input in Followup.jsx is the browser-native picker (not shadcn Calendar). Matches the earlier design-review guidance for the Suivi tab since it is a time input, but note the mismatch with other date pickers in the app.",
+    "RadarSettings.jsx uses `defaultValue={csv(s.keywords)}` with onBlur — state updates only when the user leaves the field; if a member types then clicks 'Enregistrer' directly, the blur fires in time in Chrome but Safari sometimes drops it. Prefer value/onChange or key the form on `s`."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_radar.py"
+  ],
+  "success_rate": { "backend": "100% (18/18)", "frontend": "100% functional" },
+  "test_credentials": "membre.test@careeros.dev / CareerOS2026! (used); test_radar_other_<uuid>@careeros.dev created for isolation checks.",
+  "seed_data_creation": "During pack test: converted one Radar C-priority offer into an application via POST /radar/offers/{id}/pack (CO-YYYY-NNNNNN code, origin.type='radar'). During followup tests: created 1 email draft (confirmation, PATCHed to 'pret') and 1 interview (stage rh, visio, +3 days) on the seeded CO-2026-000001 application. These are visible in the Suivi tab UI.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend regression file is /app/backend/tests/test_radar.py — 18 tests, ~20s wall. It relies on seed member having at least one analyzed radar offer (21 present) and one application. Adzuna/Jooble keys remain unset in preview; `configured.adzuna/jooble` is false, boards (greenhouse:gitlab + ashby:cohere) provide the real feed. RADAR_CRON_SECRET=648949d252cd1552ed7b0de0f5669328. The pack idempotency test prefers an offer with status=='nouvelle'; the ignore test consumes one such offer, so when running pytest serially the pack test falls back to any analyzed non-pack offer in the top_a/top_b/ignored buckets.",
+  "rca of the issue": "n/a — no bugs reproduced. One transient 'radar-keywords-input MISSING' was observed during the initial Playwright pass but confirmed to be a timing issue (the dialog's `<Loader2>` was still shown while the GET /radar/settings call completed). Adding a wait on `radar-enabled-checkbox` before probing other fields resolves it. Not a product bug."
+}
