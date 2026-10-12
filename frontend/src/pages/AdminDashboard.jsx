@@ -133,7 +133,7 @@ export default function AdminDashboard() {
           <button type="submit" disabled={loading || !pwd} data-testid="admin-login-btn" className="w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-amber-400 disabled:opacity-50">
             {loading ? "Connexion…" : "Se connecter"}
           </button>
-          <a href="/" className="mt-4 block text-center text-xs text-slate-500 hover:text-slate-300">← Retour à l'application</a>
+          <a href="/careeros" className="mt-4 block text-center text-xs text-slate-500 hover:text-slate-300">← Retour à l'application</a>
         </form>
       </div>
     );
@@ -252,7 +252,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <a href="/" className="mt-6 block text-center text-xs text-slate-500 hover:text-slate-300">← Retour à l'application</a>
+        <a href="/careeros" className="mt-6 block text-center text-xs text-slate-500 hover:text-slate-300">← Retour à l'application</a>
       </div>
     </div>
   );

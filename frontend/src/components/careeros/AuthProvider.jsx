@@ -25,16 +25,23 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => useContext(AuthCtx);
 
+const Checking = () => (
+  <div className="flex min-h-screen items-center justify-center bg-[#090a0f]" data-testid="auth-checking">
+    <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
+  </div>
+);
+
+// CareerOS is the main product: "/" → /careeros when signed in, else /connexion.
+export const RootRedirect = () => {
+  const { user } = useAuth();
+  if (user === null) return <Checking />;
+  return <Navigate to={user ? "/careeros" : "/connexion"} replace />;
+};
+
 export const RequireMember = ({ children }) => {
   const { user } = useAuth();
   const loc = useLocation();
-  if (user === null) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#090a0f]" data-testid="auth-checking">
-        <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
-      </div>
-    );
-  }
+  if (user === null) return <Checking />;
   if (!user) return <Navigate to={`/connexion?next=${encodeURIComponent(loc.pathname)}`} replace />;
   return children;
 };

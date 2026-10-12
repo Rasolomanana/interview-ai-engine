@@ -254,3 +254,7 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 ## 2026-10-12 — CAREEROS V1 OFFICIELLEMENT PUBLIÉ ET GELÉ
 - Validation finale post-publication 17/17 + UI (admin propre, Decision Report officiel, pack CO-2026-000002, exports PDF/DOCX). Voir memory/prod_validation/REPORT.md.
 - V2 suspendue jusqu'aux retours d'utilisation réels.
+
+## 2026-10-12 — Navigation : CareerOS = produit principal
+- "/" (et toute URL inconnue) → /careeros si connecté, sinon /connexion (RootRedirect dans AuthProvider.jsx).
+- Copilote d'entrevue déplacé en fonctionnalité interne : /careeros/copilote (connexion requise ; retour à la page demandée après connexion). Liens : en-tête CareerOS (desktop + mobile), bouton CareerOS dans le copilote. Liens « Retour » de /admin → /careeros. /admin inchangé.

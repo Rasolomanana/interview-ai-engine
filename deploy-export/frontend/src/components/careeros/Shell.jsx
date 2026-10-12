@@ -24,7 +24,7 @@ export const Shell = ({ children }) => {
             <NavLink to="/careeros/memoire" className={tab} data-testid="nav-memory">Career Memory</NavLink>
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <Link to="/" className="hidden items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:text-white md:flex" data-testid="nav-interview-console">
+            <Link to="/careeros/copilote" className="hidden items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:text-white md:flex" data-testid="nav-interview-console">
               <Mic className="h-3.5 w-3.5" /> Copilote d'entrevue
             </Link>
             <span className="hidden max-w-[160px] truncate text-xs text-slate-500 lg:block" data-testid="member-email">{user?.email}</span>
@@ -37,6 +37,7 @@ export const Shell = ({ children }) => {
           <NavLink end to="/careeros" className={tab}>Tableau de bord</NavLink>
           <NavLink to="/careeros/nouveau" className={tab}>Pack</NavLink>
           <NavLink to="/careeros/memoire" className={tab}>Memory</NavLink>
+          <NavLink to="/careeros/copilote" className={tab} data-testid="nav-interview-console-mobile">Copilote</NavLink>
         </nav>
       </header>
       <main className="relative mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>
