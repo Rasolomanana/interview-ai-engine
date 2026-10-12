@@ -29,3 +29,13 @@ Fichiers d'export téléchargés depuis la production : `CO-2026-000001_CV-ATS.{
 
 ## Rejouer
 `python3 prod_auth.py` (crée de nouveaux comptes + ctx.json) puis `python3 pack_iso.py` (≈ 6 appels IA).
+
+## Validation finale post-publication — 2026-10-12 (bundle main.1b366b93.js)
+| Contrôle | Résultat |
+|---|---|
+| /admin : aucun débogage dans le bundle, mauvais mot de passe → « Mot de passe administrateur incorrect », aucun bloc technique affiché | ✅ |
+| Authentification : 3 connexions consécutives 200, /me 200, sans jeton 401 | ✅ |
+| Decision Report CO-2026-000001 (existant) : v2, « IPS officiel CareerOS : 64/100 — priorité B. », aucune estimation IA chiffrée | ✅ |
+| Nouveau pack CO-2026-000002 : 6 documents en 80 s, IPS 59 = somme des points, Decision Report officiel, aucune estimation IA | ✅ |
+| Exports production CO-2026-000002 (CV ATS + lettre, PDF + DOCX) : nom avec code, référence dans le document, accents OK | ✅ |
+`post_publish_check.py` : 17/17. **CareerOS V1 officiellement publié et gelé fonctionnellement.**

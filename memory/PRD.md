@@ -250,3 +250,7 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Validation prod complète (commit 02fa6dd) : rapport + scripts dans /app/memory/prod_validation/ et deploy-export/docs/validation-production-v1/.
 - Corrections post-validation autorisées : (1) Decision Report = seule valeur chiffrée l'IPS officiel (prompt + filtre déterministe _no_ai_numbers, résumé préfixé « IPS officiel CareerOS : N/100 — priorité X », impacts en mots, anciens rapports re-dérivés à la lecture, report.version=2) ; (2) /admin : debug retiré, messages propres, détail technique uniquement dans les logs (stats → 503 générique).
 - Règle : AUCUNE nouvelle fonctionnalité avant usage réel. V2 = nouveau cycle de planification : Calendar Agent, Recruiter CRM, Follow-Up Agent, Plan du Jour, Notifications, Google Calendar, Outlook.
+
+## 2026-10-12 — CAREEROS V1 OFFICIELLEMENT PUBLIÉ ET GELÉ
+- Validation finale post-publication 17/17 + UI (admin propre, Decision Report officiel, pack CO-2026-000002, exports PDF/DOCX). Voir memory/prod_validation/REPORT.md.
+- V2 suspendue jusqu'aux retours d'utilisation réels.
