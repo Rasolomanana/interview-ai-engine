@@ -117,6 +117,18 @@ def _version_summary(v: dict) -> dict:
             "ats": (((v.get("parts") or {}).get("decision") or {}).get("ats") or {}).get("score")}
 
 
+REQUIRED_KEYS = {"decision": ("ats", "ips_criteria", "recruiter_simulation")}
+INVALID_CONTENT = "Le contenu généré par l'IA était incomplet ou mal formé."
+
+
+class PartError(Exception):
+    """Error whose message is safe to show to the member."""
+
+
+def _friendly(e: Exception) -> str:
+    return str(e)[:300] if isinstance(e, PartError) else "La génération a été interrompue (service IA indisponible ou réponse invalide)."
+
+
 def create_careeros_router(db, current_user, generate_text, fetch_page_text, parse_json):
     router = APIRouter(prefix="/api/careeros", tags=["careeros"])
 
@@ -166,9 +178,15 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
 
     async def _json_part(app_id, version, name, prompt_fn, ctx):
         sysm, txt = prompt_fn(*ctx)
-        data = parse_json((await generate_text(sysm, txt)).strip())
-        if data is None:
-            raise ValueError("Réponse illisible")
+        data = None
+        for attempt in range(2):  # one retry when the AI returns malformed or truncated JSON
+            data = parse_json((await generate_text(sysm, txt)).strip())
+            if isinstance(data, dict) and all(isinstance(data.get(k), dict) for k in REQUIRED_KEYS.get(name, ())):
+                break
+            data = None
+            logger.warning("pack %s v%s part %s: invalid JSON (attempt %s)", app_id, version, name, attempt + 1)
+        if not isinstance(data, dict):
+            raise PartError(INVALID_CONTENT)
         await _write(app_id, version, f"parts.{name}", data)
         return data
 
@@ -176,11 +194,11 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
         sysm, txt = prompt_fn(*ctx)
         out = (await generate_text(sysm, txt)).strip()
         if not out:
-            raise ValueError("Réponse vide")
+            raise PartError("Le service IA a renvoyé une réponse vide.")
         await _write(app_id, version, f"parts.{name}", out)
         return out
 
-    async def _run_pack(app_id, user_id, version, inputs: dict, profile: dict):
+    async def _run_pack(app_id, user_id, version, inputs: dict, profile: dict, only: Optional[list] = None):
         try:
             offer = (inputs.get("offer_text") or "").strip()
             if (inputs.get("offer_url") or "").strip():
@@ -189,7 +207,7 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
                 except Exception as e:  # noqa: BLE001
                     logger.warning("offer fetch failed: %s", e)
                     if not offer:
-                        raise ValueError("Impossible de lire le lien de l'offre (site protégé ?). Collez le texte de l'offre.")
+                        raise PartError("Impossible de lire le lien de l'offre (site protégé ?). Collez le texte de l'offre.")
             company = ""
             if (inputs.get("company_url") or "").strip():
                 try:
@@ -206,13 +224,24 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
                 "questions": _json_part(app_id, version, "questions", PR.questions_prompt, ctx),
                 "star": _json_part(app_id, version, "star", PR.star_prompt, ctx),
             }
+            existing = {}
+            if only:
+                for k in [k for k in jobs if k not in only]:
+                    jobs.pop(k).close()
+                v = await db.application_versions.find_one({"application_id": app_id, "version": version}, {"_id": 0, "parts": 1, "errors": 1})
+                existing = v or {}
             results = dict(zip(jobs, await asyncio.gather(*jobs.values(), return_exceptions=True)))
-            errors = {k: str(r)[:300] for k, r in results.items() if isinstance(r, Exception)}
-            decision = results["decision"] if not isinstance(results["decision"], Exception) else {}
-            status = "done" if not errors else ("error" if len(errors) == len(jobs) else "partial")
+            for k, r in results.items():
+                if isinstance(r, Exception) and not isinstance(r, PartError):
+                    logger.error("pack %s v%s part %s failed: %r", app_id, version, k, r)
+            errors = {**{k: e for k, e in (existing.get("errors") or {}).items() if k not in results},
+                      **{k: _friendly(r) for k, r in results.items() if isinstance(r, Exception)}}
+            done_parts = {**(existing.get("parts") or {}), **{k: r for k, r in results.items() if not isinstance(r, Exception)}}
+            decision = done_parts.get("decision") if "decision" in results else None
+            status = "done" if not errors else ("error" if not any(done_parts.get(p) for p in PARTS) else "partial")
             if decision:
                 ips = compute_ips(decision.get("ips_criteria"), decision.get("knockout"), decision.get("goal_fit"),
-                                  inputs.get("posted_date"), inputs.get("network"), not isinstance(results["letter"], Exception))
+                                  inputs.get("posted_date"), inputs.get("network"), bool(done_parts.get("letter")))
                 await _write(app_id, version, "ips", ips)
                 await _write(app_id, version, "decision_report", build_decision_report(ips, decision))
                 await db.applications.update_one({"id": app_id}, {"$push": {"ips_history": {
@@ -228,7 +257,7 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
             await recompute_career_score(user_id, f"pack_v{version}")
         except Exception as e:  # noqa: BLE001
             logger.exception("pack %s v%s failed", app_id, version)
-            await _write(app_id, version, "errors", {"pack": str(e)[:300]})
+            await _write(app_id, version, "errors", {"pack": _friendly(e)})
             await _write(app_id, version, "status", "error")
 
     async def _start_version(app: dict, version: int, inputs: dict, profile: dict, change_note: str):
@@ -317,6 +346,23 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
         })
         await _start_version(a, version, inputs, profile, body.change_note or f"Réanalyse v{version}")
         return {"id": app_id, "code": a["code"], "version": version, "status": "generating"}
+
+    @router.post("/applications/{app_id}/retry")
+    async def retry_parts(app_id: str, user: dict = Depends(current_user)):
+        """Regenerate only the failed sections of the current version (same inputs, nothing overwritten)."""
+        a = await _own(app_id, user)
+        if a["status"] == "generating":
+            raise HTTPException(status_code=409, detail="Une analyse est déjà en cours pour cette candidature")
+        missing = [p for p in PARTS if not (a.get("parts") or {}).get(p)]
+        if not missing:
+            raise HTTPException(status_code=400, detail="Toutes les sections sont déjà disponibles")
+        version = a.get("current_version", 1)
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+        await _write(app_id, version, "status", "generating")
+        await db.applications.update_one({"id": app_id}, {"$push": {"timeline": {"at": _now(), "type": "retry", "version": version, "detail": ",".join(missing)}}})
+        inputs = {k: v for k, v in a["inputs"].items() if k != "offer_resolved"}
+        asyncio.create_task(_run_pack(app_id, a["user_id"], version, inputs, profile, only=missing))
+        return {"id": app_id, "version": version, "retrying": missing}
 
     @router.get("/applications/{app_id}/versions/{version}")
     async def get_version(app_id: str, version: int, user: dict = Depends(current_user)):

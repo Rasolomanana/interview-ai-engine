@@ -70,6 +70,7 @@ export const careeros = {
   setStatus: (id, pipeline_status) => call(`/careeros/applications/${id}/status`, { method: "PATCH", body: { pipeline_status } }),
   remove: (id) => call(`/careeros/applications/${id}`, { method: "DELETE" }),
   reanalyze: (id, b) => call(`/careeros/applications/${id}/reanalyze`, { method: "POST", body: b }),
+  retry: (id) => call(`/careeros/applications/${id}/retry`, { method: "POST" }),
   getVersion: (id, v) => call(`/careeros/applications/${id}/versions/${v}`),
   compare: (id, a, b) => call(`/careeros/applications/${id}/compare?a=${a}&b=${b}`),
   dossier: (id) => call(`/careeros/applications/${id}/dossier`),

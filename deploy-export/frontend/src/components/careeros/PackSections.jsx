@@ -19,9 +19,16 @@ const Bullets = ({ items, icon: Icon, tone }) => (
   </ul>
 );
 
-export const Pending = ({ label, error }) => (
-  <div className="flex items-center gap-3 rounded-2xl border border-dashed border-white/10 p-8 text-sm text-slate-400" data-testid="part-pending">
-    {error ? <><XCircle className="h-4 w-4 text-rose-400" /> {label} indisponible : {error}</> : <><Loader2 className="h-4 w-4 animate-spin text-indigo-400" /> {label} en cours de génération…</>}
+const TECHNICAL = /expecting|delimiter|line \d+ column|char \d+|traceback|exception|json|errno|timeout|http/i;
+export const friendlyError = (e) => (TECHNICAL.test(e || "") ? "Le contenu généré par l'IA était incomplet ou mal formé." : e);
+
+export const Pending = ({ label, error, onRetry }) => (
+  <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-white/10 p-8 text-sm text-slate-400" data-testid="part-pending">
+    {error ? <>
+      <XCircle className="h-4 w-4 text-rose-400" />
+      <span data-testid="part-error">{label} indisponible : {friendlyError(error)}</span>
+      {onRetry && <button onClick={onRetry} data-testid="part-retry-btn" className="rounded-full border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/10">Régénérer les sections manquantes</button>}
+    </> : <><Loader2 className="h-4 w-4 animate-spin text-indigo-400" /> {label} en cours de génération…</>}
   </div>
 );
 

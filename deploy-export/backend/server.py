@@ -412,13 +412,19 @@ def _parse_json_object(raw: str):
         raw = raw.strip("`")
         if raw[:4].lower() == "json":
             raw = raw[4:]
-    try:
-        return _json.loads(raw)
-    except Exception:
-        m = _re.search(r"\{.*\}", raw, _re.DOTALL)
-        if not m:
-            return None
-        return _json.loads(m.group(0))
+    m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+    for candidate in (raw, m.group(0) if m else None):
+        if candidate:
+            try:
+                return _json.loads(candidate)
+            except ValueError:
+                pass
+    try:  # LLM JSON with missing commas, unescaped quotes or truncation
+        from json_repair import repair_json
+        data = repair_json(m.group(0) if m else raw, return_objects=True)
+        return data if isinstance(data, dict) and data else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 async def _run_application_analysis(job_id, cv, poste, url, consent=False, ip_trunc="", session_id=""):

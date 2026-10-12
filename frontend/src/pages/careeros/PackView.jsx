@@ -17,11 +17,11 @@ const TABS = [
 ];
 const PART_OF = { decision: "decision", ats: "decision", simulation: "decision", cv_ats: "cv_ats", cv_humain: "cv_humain", letter: "letter", questions: "questions", star: "star" };
 
-function TabBody({ tab, a, app }) {
+function TabBody({ tab, a, app, onRetry }) {
   const p = a.parts || {};
   if (tab === "suivi") return <FollowupPanel app={app} />;
   const part = PART_OF[tab];
-  if (!p[part]) return <Pending label={TABS.find((t) => t[0] === tab)[1]} error={a.errors?.[part] || (a.status !== "generating" ? "génération échouée" : "")} />;
+  if (!p[part]) return <Pending label={TABS.find((t) => t[0] === tab)[1]} error={a.errors?.[part] || a.errors?.pack || (a.status !== "generating" ? "génération échouée" : "")} onRetry={onRetry} />;
   const d = p.decision || {};
   switch (tab) {
     case "decision": return <DecisionPanel d={d} ips={a.ips} report={a.decision_report} />;
@@ -68,6 +68,9 @@ export default function PackView() {
     await careeros.setStatus(id, s);
     setA({ ...a, pipeline_status: s });
     toast.success(`Statut : ${PIPELINE_LABELS[s]}`);
+  };
+  const retry = async () => {
+    try { await careeros.retry(id); toast.success("Régénération des sections manquantes lancée"); setTick((t) => t + 1); } catch (e) { toast.error(e.message); }
   };
   const remove = async () => {
     if (!window.confirm("Archiver cette candidature ? Elle disparaîtra du tableau de bord mais son historique complet reste conservé.")) return;
@@ -128,7 +131,7 @@ export default function PackView() {
         ))}
       </div>
       <PackRef.Provider value={`${a.code} · v${shownVersion}`}>
-        <TabBody tab={tab} a={shown} app={a} />
+        <TabBody tab={tab} a={shown} app={a} onRetry={!viewing && a.status !== "generating" ? retry : null} />
       </PackRef.Provider>
     </Shell>
   );
