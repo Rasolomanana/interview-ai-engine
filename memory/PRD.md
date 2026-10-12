@@ -245,3 +245,8 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Dossier entities (careeros/models.py): interviews, calendar_events, recruiters, followups, emails — POST/PATCH (revisions[]) + GET /dossier, linked by application_id + application_code.
 - Delete = archive (history preserved). Profile snapshots in career_profile_versions. Profile adds education[], promotions.
 - Startup recovery: versions stuck "generating" after a restart are marked error "interrompue" (relaunch via Réanalyser).
+
+## 2026-10-12 — PRODUCTION VALIDÉE · CareerOS V1 GELÉE FONCTIONNELLEMENT
+- Validation prod complète (commit 02fa6dd) : rapport + scripts dans /app/memory/prod_validation/ et deploy-export/docs/validation-production-v1/.
+- Corrections post-validation autorisées : (1) Decision Report = seule valeur chiffrée l'IPS officiel (prompt + filtre déterministe _no_ai_numbers, résumé préfixé « IPS officiel CareerOS : N/100 — priorité X », impacts en mots, anciens rapports re-dérivés à la lecture, report.version=2) ; (2) /admin : debug retiré, messages propres, détail technique uniquement dans les logs (stats → 503 générique).
+- Règle : AUCUNE nouvelle fonctionnalité avant usage réel. V2 = nouveau cycle de planification : Calendar Agent, Recruiter CRM, Follow-Up Agent, Plan du Jour, Notifications, Google Calendar, Outlook.

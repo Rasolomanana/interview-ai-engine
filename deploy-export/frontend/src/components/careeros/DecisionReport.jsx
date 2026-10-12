@@ -6,7 +6,6 @@ const Factor = ({ f, good }) => (
       <span className={`flex items-center gap-1.5 font-medium ${good ? "text-emerald-200" : "text-rose-200"}`}>
         {good ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}{f.critere}
       </span>
-      <span className="font-mono text-[11px] text-slate-500">{f.score}/10</span>
     </div>
     <p className="mt-0.5 pl-5 text-xs text-slate-400">{f.raison}</p>
   </li>
@@ -48,10 +47,10 @@ ${r.summary}
 ${l(r.why_priority, (w) => `- ${w}`)}
 
 ### Ce qui porte l'IPS
-${l(r.strengths, (f) => `- **${f.critere}** (${f.score}/10) : ${f.raison}`)}
+${l(r.strengths, (f) => `- **${f.critere}** : ${f.raison}`)}
 
 ### Ce qui le freine
-${l(r.weaknesses, (f) => `- **${f.critere}** (${f.score}/10) : ${f.raison}`)}
+${l(r.weaknesses, (f) => `- **${f.critere}** : ${f.raison}`)}
 
 ### Actions pour l'améliorer
 ${l(r.actions, (a) => `- ${a.action}${a.impact_estime ? ` (${a.impact_estime})` : ""}`)}`;

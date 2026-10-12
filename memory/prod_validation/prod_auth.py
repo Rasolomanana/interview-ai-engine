@@ -1,4 +1,4 @@
-import json, time, sys, requests
+import json, os, time, sys, requests
 
 B = "https://interview-ai-engine.onrender.com/api"
 R = []
@@ -44,5 +44,5 @@ ok("Career Score components = 5, weights sum 100", len(cs.get("components", []))
 ok("Career Score points sum == score", abs(round(sum(c["points"] for c in cs["components"])) - cs["score"]) <= 1)
 
 r = requests.post(f"{B}/auth/register", json=Bm, timeout=60); HB = {"Authorization": f"Bearer {r.json()['access_token']}"}
-json.dump({"A": A, "B": Bm, "HA": HA, "HB": HB}, open("/tmp/prod_ctx.json", "w"))
+json.dump({"A": A, "B": Bm}, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ctx.json"), "w"), indent=1)
 print("SUMMARY", sum(1 for x in R if x[1]), "/", len(R))

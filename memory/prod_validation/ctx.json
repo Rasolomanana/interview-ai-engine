@@ -1,1 +1,14 @@
-{"A": {"email": "validation+prod1791765658@careeros.dev", "password": "ProdCheck2026!", "name": "Validation Prod"}, "B": {"email": "validation+iso1791765658@careeros.dev", "password": "ProdCheck2026!", "name": "Isolation"}, "HA": {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlNzk2ODU2Yi02YzM1LTRlYzYtODdmZS1hMzM0ZmRmMmUwZTAiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkxODA4ODYyfQ.xj_UHxP0SMRy8uIVvJRqdIIw5lj9DnQOSEyRJqW-MHQ"}, "HB": {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NzYxN2U3Ny04NGQ3LTRmYjYtYWUwMi1hN2ViMmFjYTEyMTUiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkxODA4ODc3fQ.q_WyoVyNyyd6aLUmLDEmmaH_uI4IXCQNE7tUTP-By54"}, "app_id": "ff6581e8-a58f-4d68-9384-a5270b477228", "code": "CO-2026-000001"}
+{
+ "A": {
+  "email": "validation+prod1791765658@careeros.dev",
+  "password": "ProdCheck2026!",
+  "name": "Validation Prod"
+ },
+ "B": {
+  "email": "validation+iso1791765658@careeros.dev",
+  "password": "ProdCheck2026!",
+  "name": "Isolation"
+ },
+ "app_id": "ff6581e8-a58f-4d68-9384-a5270b477228",
+ "code": "CO-2026-000001"
+}

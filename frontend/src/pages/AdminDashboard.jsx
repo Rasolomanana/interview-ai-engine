@@ -59,8 +59,10 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [err, setErr] = useState("");
 
-  const debugErr = (step, url, e) =>
-    `[DEBUG] Étape : ${step}\nURL : ${url}\nerror.name : ${e?.name}\nerror.message : ${e?.message}\nerror.stack : ${e?.stack}`;
+  const friendlyErr = (e) =>
+    e?.name === "TypeError" || /failed to fetch|networkerror|load failed/i.test(String(e?.message))
+      ? "Impossible de joindre le serveur. Réessayez dans quelques instants."
+      : e?.message || "Une erreur est survenue. Réessayez.";
 
   const load = async (password) => {
     setLoading(true);
@@ -70,8 +72,7 @@ export default function AdminDashboard() {
       setAuthed(true);
       sessionStorage.setItem("adminPwd", password);
     } catch (e) {
-      console.error("[admin] stats error", e);
-      setErr(debugErr("GET /stats", `${process.env.REACT_APP_BACKEND_URL}/api/admin/stats`, e));
+      setErr(friendlyErr(e));
       setAuthed(false);
       sessionStorage.removeItem("adminPwd");
     } finally {
@@ -91,8 +92,7 @@ export default function AdminDashboard() {
     try {
       await adminLogin(pwd);
     } catch (e2) {
-      console.error("[admin] login error", e2);
-      setErr(debugErr("POST /login", `${process.env.REACT_APP_BACKEND_URL}/api/admin/login`, e2));
+      setErr(friendlyErr(e2));
       return;
     }
     await load(pwd);
@@ -129,7 +129,7 @@ export default function AdminDashboard() {
             placeholder="Mot de passe administrateur"
             className="mb-3 w-full rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-amber-500/60"
           />
-          {err && <pre data-testid="admin-login-error" className="mb-3 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-black/60 p-2 text-[10px] text-red-400">{err}</pre>}
+          {err && <p data-testid="admin-login-error" className="mb-3 text-xs text-red-400">{err}</p>}
           <button type="submit" disabled={loading || !pwd} data-testid="admin-login-btn" className="w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-amber-400 disabled:opacity-50">
             {loading ? "Connexion…" : "Se connecter"}
           </button>

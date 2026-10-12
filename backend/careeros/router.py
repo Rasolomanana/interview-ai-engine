@@ -83,6 +83,15 @@ class StatusBody(BaseModel):
     note: Optional[str] = ""
 
 
+def _report(doc: dict):
+    """Serve the Decision Report in its current official form (older stored reports are
+    re-derived on read from the stored IPS + decision — storage is never rewritten)."""
+    r = doc.get("decision_report")
+    if r and r.get("version") != 2 and doc.get("ips"):
+        r = build_decision_report(doc["ips"], (doc.get("parts") or {}).get("decision") or {})
+    return r
+
+
 def _summary(a: dict) -> dict:
     d = (a.get("parts") or {}).get("decision") or {}
     return {
@@ -91,7 +100,7 @@ def _summary(a: dict) -> dict:
         "entreprise": d.get("entreprise", ""), "ips": (a.get("ips") or {}).get("score"),
         "priority": (a.get("ips") or {}).get("priority"), "ats": (d.get("ats") or {}).get("score"),
         "version": a.get("current_version", 1), "ips_history": a.get("ips_history", []),
-        "why": ((a.get("decision_report") or {}).get("summary") or "")[:220],
+        "why": ((_report(a) or {}).get("summary") or "")[:220],
     }
 
 
@@ -271,6 +280,7 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
     @router.get("/applications/{app_id}")
     async def get_app(app_id: str, user: dict = Depends(current_user)):
         a = await _own(app_id, user)
+        a["decision_report"] = _report(a)
         a["versions"] = [_version_summary(v) async for v in db.application_versions.find(
             {"application_id": app_id}, {"_id": 0, "inputs": 0}).sort("version", 1)]
         return a
@@ -310,6 +320,7 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
         v = await db.application_versions.find_one({"application_id": app_id, "version": version}, {"_id": 0})
         if not v:
             raise HTTPException(status_code=404, detail="Version introuvable")
+        v["decision_report"] = _report(v)
         return v
 
     @router.get("/applications/{app_id}/compare")

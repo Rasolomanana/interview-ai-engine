@@ -60,7 +60,10 @@ Renvoie UNIQUEMENT un objet JSON valide (aucun texte autour, pas de markdown) av
  "decision_summary": "2-3 phrases : la recommandation CareerOS (postuler / optimiser d'abord / éviter) et POURQUOI",
  "improvement_actions": [{"action": "action concrète pour augmenter les chances", "critere": "critère IPS visé", "impact_estime": "effet attendu"}]
 }
-Sois honnête et exigeant : un score flatteur ne sert pas le membre."""
+Sois honnête et exigeant : un score flatteur ne sert pas le membre.
+IMPORTANT : l'IPS officiel est calculé par CareerOS, pas par toi. Dans "decision_summary" et "improvement_actions",
+n'écris JAMAIS de score, note, pourcentage de probabilité ni estimation chiffrée d'IPS (ex. « 48/100 », « +10 points », « ~70 »).
+Explique uniquement les raisons, les points forts, les freins et les actions ; l'impact s'exprime en mots (élevé, moyen, faible)."""
 
 
 def cv_prompt(kind, cv, offer, company, profile):

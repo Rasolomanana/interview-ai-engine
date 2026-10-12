@@ -8,7 +8,10 @@ import os
 import io
 import csv
 import hmac
+import logging
 from collections import Counter
+
+logger = logging.getLogger("admin")
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Header, Request, Response
@@ -163,8 +166,9 @@ def create_admin_router(db):
         _check_admin(x_admin_password)
         try:
             return await _stats(db)
-        except Exception as e:  # surface real error with CORS headers (temporary debug)
-            raise HTTPException(status_code=500, detail=f"stats: {type(e).__name__}: {e}")
+        except Exception:  # keep CORS headers on failure; details only in server logs
+            logger.exception("admin stats failed")
+            raise HTTPException(status_code=503, detail="Statistiques momentanément indisponibles. Réessayez dans quelques instants.")
 
     async def _stats(db):
         now = _now()

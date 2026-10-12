@@ -1,8 +1,11 @@
-import json, time, requests
+import json, os, time, requests
 
 B = "https://interview-ai-engine.onrender.com/api"
-ctx = json.load(open("/app/memory/prod_validation/ctx.json"))
-HA, HB = ctx["HA"], ctx["HB"]
+ctx = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ctx.json")))
+def _login(m):
+    t = requests.post(f"{B}/auth/login", json={"email": m["email"], "password": m["password"]}, timeout=60).json()["access_token"]
+    return {"Authorization": f"Bearer {t}"}
+HA, HB = _login(ctx["A"]), _login(ctx["B"])
 R = []
 def ok(name, cond, info=""):
     R.append((name, bool(cond))); print(("PASS " if cond else "FAIL ") + name, info)
@@ -20,7 +23,7 @@ p = r.json(); app_id, code = p["id"], p["code"]
 import re
 ok("code format CO-YYYY-NNNNNN", re.fullmatch(r"CO-\d{4}-\d{6}", code), code)
 ctx["app_id"], ctx["code"] = app_id, code
-json.dump(ctx, open("/app/memory/prod_validation/ctx.json", "w"))
+json.dump(ctx, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ctx.json"), "w"))
 
 # isolation while generating
 ok("B cannot read A app (404)", requests.get(f"{B}/careeros/applications/{app_id}", headers=HB, timeout=60).status_code == 404)
