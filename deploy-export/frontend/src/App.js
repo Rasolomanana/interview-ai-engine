@@ -5,6 +5,8 @@ import InterviewConsole from "@/pages/InterviewConsole";
 import AdminDashboard from "@/pages/AdminDashboard";
 import PrivacyBanner from "@/components/PrivacyBanner";
 import { AuthProvider, RequireMember, RootRedirect } from "@/components/careeros/AuthProvider";
+import { GuideProvider } from "@/components/careeros/guide/GuideProvider";
+import { GuidedTour } from "@/components/careeros/guide/Tour";
 import AuthPage from "@/pages/careeros/AuthPage";
 import Dashboard from "@/pages/careeros/Dashboard";
 import NewPack from "@/pages/careeros/NewPack";
@@ -21,6 +23,8 @@ function App() {
     <div className="App">
       <BrowserRouter>
         <AuthProvider>
+          <GuideProvider>
+          <GuidedTour />
           <Routes>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/connexion" element={<AuthPage />} />
@@ -33,6 +37,7 @@ function App() {
             <Route path="/" element={<RootRedirect />} />
             <Route path="*" element={<RootRedirect />} />
           </Routes>
+          </GuideProvider>
         </AuthProvider>
         <PrivacyBanner />
       </BrowserRouter>

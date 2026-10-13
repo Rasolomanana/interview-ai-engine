@@ -1,3 +1,4 @@
+import { DateField } from "@/components/careeros/DateField";
 import { ConceptRow } from "@/components/careeros/guide/InfoTip";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -55,7 +56,7 @@ export default function NewPack() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div><Label hint="optionnel">Lien de l'offre</Label><input value={f.offer_url} onChange={set("offer_url")} className={inputCls} placeholder="https://…" data-testid="offer-url-input" /></div>
             <div><Label hint="optionnel">Site de l'entreprise</Label><input value={f.company_url} onChange={set("company_url")} className={inputCls} placeholder="https://…" data-testid="company-url-input" /></div>
-            <div><Label hint="fraîcheur de l'offre">Date de publication</Label><input type="date" value={f.posted_date} onChange={set("posted_date")} className={inputCls} data-testid="posted-date-input" /></div>
+            <div><Label hint="fraîcheur de l'offre">Date de publication</Label><DateField value={f.posted_date} onChange={(v) => setF((x) => ({ ...x, posted_date: v }))} className={inputCls} testid="posted-date-input" /></div>
             <div>
               <Label hint="force du réseau">Contact dans l'entreprise</Label>
               <select value={f.network} onChange={set("network")} className={inputCls} data-testid="network-select">
