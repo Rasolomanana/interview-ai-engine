@@ -1,0 +1,15 @@
+Objet : Candidature au poste de Senior Cloud Security Operations Analyst
+
+Madame, Monsieur,
+
+Intelcom soutient une cadence logistique critique à travers plus de cent stations de tri, où la résilience des infrastructures infonuagiques et l’intégrité des flux de données conditionnent directement la fiabilité du dernier kilomètre. C’est avec la volonté d’appliquer une démarche méthodique d'investigation et d'exploitation des données à vos opérations de sécurité que je vous soumets ma candidature.
+
+Mon parcours de six ans en analyse de données et systèmes dans le secteur financier m'a permis de développer une solide expertise dans le traitement d'environnements complexes. À la Banque Nationale, j’ai notamment automatisé des processus d'extraction et de surveillance via SQL et Python, réduisant de 30 % les délais de traitement opérationnels tout en renforçant le suivi des accès et la gouvernance. Auparavant chez Intact, j'ai piloté des analyses de processus et assuré la coordination TI pour sécuriser des flux opérationnels sensibles et garantir la conformité aux exigences réglementaires.
+
+Votre équipe cherche à consolider la surveillance des signaux en temps réel, à affiner l'analyse des journaux d'événements et à structurer les rapports d'audit de sécurité. Bien que ma trajectoire prenne racine dans l'analyse de données et d'affaires, ma rigueur dans le requêtage de télémétrie complexe (SQL, Python), ma capacité à isoler les anomalies au sein de volumétries importantes et mon habitude de vulgariser les écarts techniques auprès des parties prenantes représentent des leviers immédiats pour appuyer la détection des vulnérabilités d'accès et optimiser vos règles de surveillance.
+
+Je serais ravi d'échanger avec vous afin d'exposer plus en détail la manière dont mon profil analytique peut contribuer concrètement à rehausser la posture opérationnelle de Dragonfly.
+
+Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.
+
+[Votre nom]
