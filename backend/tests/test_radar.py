@@ -191,8 +191,55 @@ class TestIpsShape:
         rep = o.get("decision_report") or {}
         summary = rep.get("summary") or ""
         assert summary.startswith("IPS Radar CareerOS :"), summary[:120]
+        assert "(provisoire, recalculé dans le pack)" in summary, summary[:200]
         assert f"{ips['score']}/100" in summary
         assert f"priorité {ips['priority']}" in summary
+        # Radar V2: stage=='radar' and 8 criteria (exclude qualite_lettre + force_reseau)
+        assert ips.get("stage") == "radar", ips
+        rows = ips.get("criteria") or []
+        keys = [c["key"] for c in rows]
+        assert "qualite_lettre" not in keys and "force_reseau" not in keys, keys
+        assert len(rows) == 8, rows
+        # Priority consistency with thresholds
+        score, prio, ko, gf = ips["score"], ips["priority"], ips.get("knockout"), ips.get("goal_fit", 5)
+        if prio == "A":
+            assert score >= 70 and gf >= 6 and not ko
+        elif prio == "B":
+            assert score >= 50 and not ko
+        else:  # C
+            assert ko or score < 50 or (score < 70 or gf < 6)
+        # excerpt flag exists on the offer
+        assert "excerpt" in o, "offer missing excerpt field"
+
+    def test_runs_endpoint(self, seed_h):
+        r = requests.get(f"{API}/careeros/radar/runs?days=30", headers=seed_h, timeout=15)
+        assert r.status_code == 200, r.text
+        runs = r.json()
+        assert isinstance(runs, list)
+        if runs:
+            for run in runs[:3]:
+                assert "user_id" not in run, "runs leaks user_id"
+                assert "at" in run and "status" in run
+
+    def test_pack_gives_official_ips_stage_pack(self, seed_h):
+        """After packing a radar offer, the generated application pack should have the official IPS (stage=pack, 10 criteria)."""
+        aid = getattr(pytest, "app_from_pack", None)
+        if not aid:
+            pytest.skip("No application from pack test available")
+        a = requests.get(f"{API}/careeros/applications/{aid}", headers=seed_h, timeout=30).json()
+        ips = a.get("ips") or {}
+        if not ips:
+            pytest.skip("Application pack has no IPS yet (generation may be async)")
+        assert ips.get("stage") == "pack", ips.get("stage")
+        rows = ips.get("criteria") or []
+        if rows:
+            keys = [c["key"] for c in rows]
+            assert "qualite_lettre" in keys and "force_reseau" in keys, keys
+            assert len(rows) == 10
+        rep = a.get("decision_report") or {}
+        summary = rep.get("summary") or ""
+        if summary:
+            assert summary.startswith("IPS officiel CareerOS :"), summary[:120]
 
 
 # ---------------- Ignore / Pack / Isolation ----------------
