@@ -1,10 +1,10 @@
-# Validation production — Radar V2 (2026-10-13 00:24 UTC)
+# Validation production — Radar V2 (2026-10-13 02:55 UTC)
 
 API : https://interview-ai-engine.onrender.com/api
 
-**39/40 contrôles réussis**
+**43/43 contrôles réussis**
 
-Run 1 : {"fetched": 36, "new": 36, "known": 0, "analyzed": 36, "skipped_limit": 0} · par source : {"jooble": {"fetched": 0, "analyzed": 0}, "workday": {"fetched": 28, "analyzed": 28}, "boards": {"fetched": 8, "analyzed": 8}, "adzuna": {"fetched": 0, "analyzed": 0}}
+Run 1 : {"fetched": 90, "new": 90, "known": 0, "analyzed": 50, "skipped_limit": 40} · par source : {"jooble": {"fetched": 54, "analyzed": 50}, "workday": {"fetched": 28, "analyzed": 0}, "boards": {"fetched": 8, "analyzed": 0}, "adzuna": {"fetched": 0, "analyzed": 0}}
 
 - ✅ settings without token -> 401
 - ✅ portal detect without token -> 401
@@ -24,7 +24,7 @@ Run 1 : {"fetched": 36, "new": 36, "known": 0, "analyzed": 36, "skipped_limit": 
 - ✅ run started
 - ✅ concurrent run -> 409
 - ✅ run 1 done
-- ❌ Jooble returns offers — {'fetched': 0, 'analyzed': 0}
+- ✅ Jooble returns offers
 - ✅ Workday returns offers
 - ✅ amazon.jobs / sites carrières return offers
 - ✅ no Jooble error
@@ -32,7 +32,10 @@ Run 1 : {"fetched": 36, "new": 36, "known": 0, "analyzed": 36, "skipped_limit": 
 - ✅ sources_status shown
 - ✅ offers analyzed with official IPS
 - ✅ IPS 0-100 + priority A/B/C
-- ✅ Decision Report starts with official IPS
+- ✅ Decision Report starts with IPS Radar
+- ✅ radar calibration: 8 criteria, stage radar
+- ✅ A/B/C consistent with official thresholds
+- ✅ Jooble offers flagged as excerpt
 - ✅ no pack generated automatically
 - ✅ run 2: already-known offers deduplicated
 - ✅ run 2: analyzed offers not re-analyzed
