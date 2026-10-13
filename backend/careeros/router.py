@@ -125,8 +125,16 @@ class PartError(Exception):
     """Error whose message is safe to show to the member."""
 
 
+AI_DOWN = ("Le service IA du serveur est temporairement indisponible (fournisseurs IA épuisés ou non configurés). "
+           "Réessayez plus tard avec « Régénérer les sections manquantes ».")
+
+
 def _friendly(e: Exception) -> str:
-    return str(e)[:300] if isinstance(e, PartError) else "La génération a été interrompue (service IA indisponible ou réponse invalide)."
+    if isinstance(e, PartError):
+        return str(e)[:300]
+    if getattr(e, "status_code", None) == 502:
+        return AI_DOWN
+    return "La génération a été interrompue (service IA indisponible ou réponse invalide)."
 
 
 def create_careeros_router(db, current_user, generate_text, fetch_page_text, parse_json):

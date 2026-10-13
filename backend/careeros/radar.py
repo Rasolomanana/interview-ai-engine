@@ -223,16 +223,25 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             todo, run["skipped_limit"] = queue[:budget], max(0, len(queue) - budget)
             sem = asyncio.Semaphore(4)
 
+            fails = {"n": 0}
+
             async def one(doc):
                 async with sem:
+                    if fails["n"] >= 3:  # AI service down: keep the remaining offers pending for the next run
+                        return False
                     try:
                         await _analyze(doc, cv, profile)
                         run["by_source"][S.group(doc["source"])]["analyzed"] += 1
+                        fails["n"] = 0
                         return True
                     except Exception as e:  # noqa: BLE001
+                        fails["n"] += 1
                         logger.warning("radar analyze %s failed: %s", doc["id"], e)
                         return False
             run["analyzed"] = sum(await asyncio.gather(*(one(d) for d in todo)))
+            if fails["n"] >= 3:
+                run["errors"]["ia"] = ("Service IA du serveur indisponible : analyses suspendues, les offres restantes seront "
+                                       "analysées lors de la prochaine recherche.")
         run["status"], run["finished_at"] = "done", _now().isoformat()
         await db.radar_runs.update_one({"id": run["id"]}, {"$set": run})
         return run

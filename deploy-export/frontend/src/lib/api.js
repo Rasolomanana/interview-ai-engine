@@ -35,6 +35,12 @@ export async function adminLogin(password) {
   return r.json();
 }
 
+export async function adminLlmHealth(password) {
+  const r = await fetch(`${ADMIN_BASE()}/llm-health`, { headers: { "X-Admin-Password": password } });
+  if (!r.ok) throw new Error(`Erreur ${r.status}`);
+  return r.json();
+}
+
 export async function adminStats(password) {
   const r = await fetch(`${ADMIN_BASE()}/stats`, { headers: { "X-Admin-Password": password } });
   if (!r.ok) {

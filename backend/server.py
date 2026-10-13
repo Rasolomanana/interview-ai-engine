@@ -380,6 +380,24 @@ async def _generate_text(system_message: str, user_text: str) -> str:
     raise HTTPException(status_code=502, detail="Analyse indisponible (fournisseurs LLM)")
 
 
+async def _llm_health() -> list:
+    """Admin diagnostic: one tiny call per provider of the server chain."""
+    out = []
+    for provider, model in SERVER_CHAIN:
+        try:
+            chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message="Réponds uniquement OK.").with_model(provider, model)
+            txt = []
+            async for ev in chat.stream_message(UserMessage(text="Test")):
+                if isinstance(ev, TextDelta):
+                    txt.append(ev.content)
+                elif isinstance(ev, StreamDone):
+                    break
+            out.append({"provider": provider, "model": model, "ok": bool(txt), "error": "" if txt else "réponse vide"})
+        except Exception as e:  # noqa: BLE001
+            out.append({"provider": provider, "model": model, "ok": False, "error": str(e)[:200]})
+    return out
+
+
 async def _fetch_page_text(url: str) -> str:
     import httpx
     from bs4 import BeautifulSoup
@@ -761,7 +779,7 @@ def _sse(event: str, data: dict) -> str:
 
 
 app.include_router(api_router)
-app.include_router(create_admin_router(db))
+app.include_router(create_admin_router(db, _llm_health))
 auth_router, current_member = create_auth(db)
 app.include_router(auth_router)
 careeros_router = create_careeros_router(db, current_member, _generate_text, _fetch_page_text, _parse_json_object)

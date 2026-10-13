@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { adminLogin, adminStats, adminExport } from "@/lib/api";
 import { SimulationsTable } from "@/components/admin/SimulationsTable";
+import { LlmHealth } from "@/components/admin/LlmHealth";
 import { ThemeToggle, usePageTitle } from "@/components/careeros/ThemeToggle";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(4)}`;
@@ -178,6 +179,8 @@ export default function AdminDashboard() {
           <StatCard icon={FileText} label="CV analysés" value={num(t.cvs_analyzed)} accent="text-cyan-400" />
           <StatCard icon={Mail} label="Lettres" value={num(t.cover_letters)} accent="text-amber-400" />
         </div>
+
+        <LlmHealth />
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/60 p-5">
           <div className="mb-3 flex items-center gap-2">

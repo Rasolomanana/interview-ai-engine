@@ -153,8 +153,14 @@ async def _simulations_detail(db, limit=100):
     return out
 
 
-def create_admin_router(db):
+def create_admin_router(db, llm_health=None):
     router = APIRouter(prefix="/api/admin")
+
+    @router.get("/llm-health")
+    async def admin_llm_health(x_admin_password: str = Header(None)):
+        _check_admin(x_admin_password)
+        providers = await llm_health() if llm_health else []
+        return {"providers": providers, "any_ok": any(p["ok"] for p in providers)}
 
     @router.post("/login")
     async def admin_login(body: AdminLogin):
