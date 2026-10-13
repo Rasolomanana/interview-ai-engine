@@ -47,33 +47,35 @@ SERVER_ACCESS_PASSWORD = os.environ.get("SERVER_ACCESS_PASSWORD")
 
 
 def _build_server_chain():
-    """Server chain (label, provider, model), cheapest-first; Anthropic strictly LAST:
-    OpenRouter free -> OpenRouter paid (cheap) -> Anthropic. Entries need their key."""
+    """Economical chain for analyses (label, provider, model), cheapest-first:
+    Gemini Flash (free tier) -> OpenRouter free -> OpenRouter DeepSeek. No Anthropic. Entries need their key."""
     chain = []
+    if os.environ.get("GEMINI_API_KEY"):
+        chain.append(("gemini", "gemini", os.environ.get("GEMINI_SERVER_MODEL", "gemini-2.5-flash")))
     if OPENROUTER_API_KEY:
         free = os.environ.get("OPENROUTER_FREE_MODEL", "openrouter/free").strip()
         if free:
             chain.append(("openrouter_free", "openrouter", free))
         chain.append(("openrouter", "openrouter", os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")))
-    if ANTHROPIC_API_KEY:
-        chain.append(("anthropic", "anthropic", os.environ.get("ANTHROPIC_ECO_MODEL", "claude-haiku-4-5-20251001")))
     return chain
 
 
 def _build_premium_chain():
-    """Premium chain (letters + interview simulations): high-end model first, economical chain as fallback."""
+    """Premium chain (letters + interview simulations): Gemini 2.5 Pro via OpenRouter, then the economical
+    models, Anthropic strictly as the last resort."""
     chain = []
     if OPENROUTER_API_KEY:
-        chain.append(("openrouter_premium", "openrouter", os.environ.get("OPENROUTER_PREMIUM_MODEL", "anthropic/claude-sonnet-4.5")))
+        chain.append(("openrouter_premium", "openrouter", os.environ.get("OPENROUTER_PREMIUM_MODEL", "google/gemini-2.5-pro")))
+    chain += [c for c in SERVER_CHAIN if c[0] != "openrouter_free"]
     if ANTHROPIC_API_KEY:
         chain.append(("anthropic", "anthropic", os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")))
-    return chain + [c for c in SERVER_CHAIN if c[0] != "openrouter_free"]
+    return chain
 
 
 SERVER_CHAIN = _build_server_chain()
 PREMIUM_CHAIN = _build_premium_chain()
 LLM_MODEL = SERVER_CHAIN[0][1:] if SERVER_CHAIN else ("anthropic", "claude-sonnet-4-6")
-LLM_ENABLED = bool(SERVER_CHAIN)
+LLM_ENABLED = bool(SERVER_CHAIN or PREMIUM_CHAIN)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

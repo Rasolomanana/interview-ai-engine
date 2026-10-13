@@ -74,7 +74,7 @@ class LlmChat:
                 })
             content.append({"type": "text", "text": um.text})
             async with client.messages.stream(
-                model=ANTHROPIC_MODEL, max_tokens=MAX_TOKENS,
+                model=self.model or ANTHROPIC_MODEL, max_tokens=MAX_TOKENS,
                 system=self.system_message,
                 messages=[{"role": "user", "content": content}],
             ) as stream:
@@ -100,6 +100,9 @@ class LlmChat:
                 # Free entries keep their model: openrouter/free auto-picks a vision-capable free model.
                 if imgs and not (model.endswith(":free") or model == "openrouter/free"):
                     model = OPENROUTER_VISION_MODEL
+            elif self.provider == "gemini":  # Google AI Studio, OpenAI-compatible endpoint
+                client = AsyncOpenAI(api_key=os.environ["GEMINI_API_KEY"], base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+                model = self.model or "gemini-2.5-flash"
             else:
                 client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
                 model = OPENAI_MODEL
@@ -108,8 +111,10 @@ class LlmChat:
                 mime = _detect_mime(ic.image_base64)
                 content.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{ic.image_base64}"}})
             messages = [{"role": "system", "content": self.system_message}, {"role": "user", "content": content}]
+            # Gemini 2.5 models "think" inside the token budget: give them room so answers are not truncated
+            budget = max(MAX_TOKENS, 16384) if "gemini" in model else MAX_TOKENS
             stream = await client.chat.completions.create(
-                model=model, messages=messages, stream=True, max_tokens=MAX_TOKENS,
+                model=model, messages=messages, stream=True, max_tokens=budget,
             )
             async for chunk in stream:
                 delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""

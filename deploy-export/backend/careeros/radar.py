@@ -27,6 +27,11 @@ DEFAULT_SOURCES = ["jooble", "workday", "boards"]
 AI_TOP = int(os.environ.get("RADAR_AI_TOP") or 5)  # AI confirmation of the best rule-scored offers, per member per day
 DEEP_LIMIT = int(os.environ.get("RADAR_DEEP_LIMIT") or 20)  # extra on-demand AI analyses per member per day
 ACTIVE_DAYS = 7
+SOURCE_RANK = {"workday": 0, "amazon": 1, "greenhouse": 2, "lever": 2, "ashby": 2, "jooble": 3, "adzuna": 4}
+
+
+def _source_rank(o: dict) -> int:
+    return SOURCE_RANK.get(o.get("source"), 3)
 JOOBLE_COMPANY_LIMIT = 20
 
 
@@ -239,7 +244,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             fresh_ids = {d["id"] for d in fresh}
             backlog = [d async for d in db.radar_offers.find({"user_id": user_id, "ips": None, "status": "nouvelle"}, {"_id": 0}).sort("first_seen", -1).limit(DAILY_LIMIT * 4)
                        if d["id"] not in fresh_ids]  # offers deferred by an earlier daily limit
-            queue = fresh + backlog
+            queue = sorted(fresh, key=_source_rank) + sorted(backlog, key=_source_rank)  # full descriptions first
             todo, run["skipped_limit"] = queue[:budget], max(0, len(queue) - budget)
             scored = []
             for doc in todo:  # free deterministic pre-scoring
@@ -249,6 +254,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             start = _now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
             pool = [d async for d in db.radar_offers.find({"user_id": user_id, "method": "regles", "analyzed_at": {"$gte": start},
                                                            "ips.knockout": False, "status": "nouvelle"}, {"_id": 0}).sort("ips.score", -1)]
+            pool.sort(key=lambda d: (-d["ips"]["score"], _source_rank(d)))
             ai_todo = pool[:max(0, AI_TOP - await _ai_today(user_id))]
             fails, run["ai_analyzed"] = {"n": 0}, 0
             for doc in ai_todo:  # AI confirmation of the best offers of the day only
