@@ -99,8 +99,13 @@ ok("offers analyzed with official IPS", an, len(an))
 if an:
     o = an[0]
     ok("IPS 0-100 + priority A/B/C", 0 <= o["ips"]["score"] <= 100 and o["ips"]["priority"] in "ABC", o["ips"].get("score"))
-    ok("Decision Report starts with official IPS", (o.get("decision_report") or {}).get("summary", "").startswith(
-        f"IPS officiel CareerOS : {o['ips']['score']}/100 — priorité {o['ips']['priority']}."), (o.get("decision_report") or {}).get("summary", "")[:90])
+    ok("Decision Report starts with IPS Radar", (o.get("decision_report") or {}).get("summary", "").startswith(
+        f"IPS Radar CareerOS : {o['ips']['score']}/100 — priorité {o['ips']['priority']}"), (o.get("decision_report") or {}).get("summary", "")[:90])
+    ok("radar calibration: 8 criteria, stage radar", o["ips"].get("stage") == "radar" and len(o["ips"]["criteria"]) == 8, o["ips"].get("stage"))
+    ok("A/B/C consistent with official thresholds", all(x["ips"]["priority"] == ("A" if x["ips"]["score"] >= 70 and x["ips"]["goal_fit"] >= 6 and not x["ips"]["knockout"]
+        else "B" if x["ips"]["score"] >= 50 and not x["ips"]["knockout"] else "C") for x in an))
+    jo = [x for x in an if x.get("source") == "jooble"]
+    ok("Jooble offers flagged as excerpt", all(x.get("excerpt") for x in jo), len(jo))
     ok("no pack generated automatically", d1["packed"] == [] and all(o.get("application_id") is None for o in offers))
 analyzed_at = {o["id"]: o.get("analyzed_at") for o in an}
 

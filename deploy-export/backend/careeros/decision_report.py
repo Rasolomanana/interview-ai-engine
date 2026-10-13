@@ -68,7 +68,8 @@ def build_decision_report(ips: dict, decision: dict) -> dict:
                                "impact_estime": impact if impact and not _SCORE_RE.search(impact) else ""})
     missing = (decision.get("ats") or {}).get("keywords_missing") or []
 
-    official = f"IPS officiel CareerOS : {score}/100 — priorité {priority}."
+    official = (f"IPS Radar CareerOS : {score}/100 — priorité {priority} (provisoire, recalculé dans le pack)."
+                if (ips or {}).get("stage") == "radar" else f"IPS officiel CareerOS : {score}/100 — priorité {priority}.")
     ai_summary = _no_ai_numbers(decision.get("decision_summary", ""))
     summary = official + " " + (ai_summary or (
         f"Principal atout : {strengths[0]['label'].lower() if strengths else '—'}. "

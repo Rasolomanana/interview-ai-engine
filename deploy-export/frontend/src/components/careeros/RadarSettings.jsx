@@ -13,18 +13,27 @@ const list = (v) => v.split(",").map((x) => x.trim()).filter(Boolean);
 export const RadarSettingsDialog = ({ onClose }) => {
   const [s, setS] = useState(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { radar.settings().then(setS).catch((e) => toast.error(e.message)); }, []);
+  const [initial, setInitial] = useState("");
+  useEffect(() => { radar.settings().then((r) => { setS(r); setInitial(JSON.stringify(r)); }).catch((e) => toast.error(e.message)); }, []);
+  const close = () => {
+    if (s && JSON.stringify(s) !== initial && !window.confirm("Vos modifications ne sont pas enregistrées. Fermer sans enregistrer ?")) return;
+    onClose();
+  };
   const save = async () => {
     setBusy(true);
     try {
       const { enabled, keywords, location, companies, sources } = s;
-      await radar.saveSettings({ enabled, keywords, location, companies: companies.filter((c) => c.name.trim()), sources });
-      toast.success("Réglages Radar enregistrés"); onClose();
+      const r = await radar.saveSettings({ enabled, keywords, location, companies: companies.filter((c) => c.name.trim()), sources });
+      const n = (f) => r.companies.filter((c) => c.enabled && f(c)).length;
+      const bad = r.companies.filter((c) => c.portal_url && !c.kind).map((c) => c.name);
+      toast.success(`Réglages enregistrés : ${n((c) => c.kind === "workday")} portail(s) Workday, ${n((c) => c.kind && c.kind !== "workday")} site(s) carrières, ${n((c) => !c.kind)} entreprise(s) via Jooble.`);
+      if (bad.length) toast.warning(`URL non reconnue pour : ${bad.join(", ")}. Ces entreprises sont suivies via Jooble.`, { duration: 9000 });
+      onClose();
     } catch (e) { toast.error(e.message); } finally { setBusy(false); }
   };
   const toggleSrc = (k) => setS({ ...s, sources: s.sources.includes(k) ? s.sources.filter((x) => x !== k) : [...s.sources, k] });
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={close}>
       <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-[#121520] text-slate-100 sm:max-w-2xl" data-testid="radar-settings-dialog">
         <DialogHeader><DialogTitle className="font-display">Réglages du Radar</DialogTitle>
           <DialogDescription className="text-xs text-slate-400">Sources officielles uniquement. Recherche quotidienne + à la demande.</DialogDescription></DialogHeader>
@@ -43,7 +52,9 @@ export const RadarSettingsDialog = ({ onClose }) => {
               })}
             </div>
             <CompanyManager companies={s.companies} setCompanies={(companies) => setS({ ...s, companies })} />
-            <button onClick={save} disabled={busy} data-testid="radar-settings-save-btn" className="w-full rounded-xl bg-indigo-500 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">Enregistrer</button>
+            <div className="sticky bottom-0 -mx-1 bg-[#121520] px-1 pb-1 pt-2">
+              <button onClick={save} disabled={busy} data-testid="radar-settings-save-btn" className="w-full rounded-xl bg-indigo-500 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">{busy ? "Enregistrement…" : "Enregistrer"}</button>
+            </div>
           </div>)}
       </DialogContent>
     </Dialog>

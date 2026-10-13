@@ -30,6 +30,12 @@ LABELS = {
 }
 NETWORK_SCORES = {"aucun": (2, "Aucun contact dans l'entreprise"), "contact": (6, "Un contact dans l'entreprise"), "recommandation": (10, "Recommandation interne")}
 KNOCKOUT_CAP = 40
+RADAR_EXCLUDED = ("qualite_lettre", "force_reseau")  # unknown before the member applies: evaluated in the pack
+FORMULA_PACK = ("IPS = Σ (poids × note/10) ; plafonné à 40 si exigence éliminatoire. "
+                "Priorité A : IPS ≥ 70 et objectifs ≥ 6/10 ; B : IPS ≥ 50 ; C : sinon.")
+FORMULA_RADAR = ("IPS Radar = Σ (poids × note/10) sur les 8 critères évaluables avant candidature (90 points), ramené sur 100 ; "
+                 "lettre et réseau sont évalués dans le pack. Plafonné à 40 si exigence éliminatoire. "
+                 "Priorité A : IPS ≥ 70 et objectifs ≥ 6/10 ; B : IPS ≥ 50 ; C : sinon.")
 
 
 def _clamp(v):
@@ -51,10 +57,12 @@ def freshness(posted_date: str):
     return score, f"Publiée il y a {max(days, 0)} jour(s)"
 
 
-def compute_ips(ai_criteria: dict, knockout: dict, goal_fit: dict, posted_date: str, network: str, letter_ready: bool):
+def compute_ips(ai_criteria: dict, knockout: dict, goal_fit: dict, posted_date: str, network: str, letter_ready: bool, stage: str = "pack"):
     ai_criteria = ai_criteria or {}
     rows = []
     for key, weight in WEIGHTS.items():
+        if stage == "radar" and key in RADAR_EXCLUDED:
+            continue
         source, just = "ia", ""
         if key == "fraicheur_offre":
             score, just = freshness(posted_date)
@@ -73,7 +81,7 @@ def compute_ips(ai_criteria: dict, knockout: dict, goal_fit: dict, posted_date: 
                 score, just, source = 5, "Non évalué (valeur neutre)", "neutre"
         rows.append({"key": key, "label": LABELS[key], "weight": weight, "score": round(score, 1),
                      "points": round(weight * score / 10, 1), "justification": just, "source": source})
-    ips = round(sum(r["points"] for r in rows))
+    ips = round(sum(r["points"] for r in rows) * 100 / sum(r["weight"] for r in rows))
     ko = bool((knockout or {}).get("present"))
     if ko:
         ips = min(ips, KNOCKOUT_CAP)
@@ -88,7 +96,6 @@ def compute_ips(ai_criteria: dict, knockout: dict, goal_fit: dict, posted_date: 
     return {
         "score": ips, "priority": priority, "criteria": rows,
         "knockout": ko, "knockout_detail": (knockout or {}).get("detail", ""),
-        "goal_fit": gf,
-        "formula": "IPS = Σ (poids × note/10) ; plafonné à 40 si exigence éliminatoire. "
-                   "Priorité A : IPS ≥ 70 et objectifs ≥ 6/10 ; B : IPS ≥ 50 ; C : sinon.",
+        "goal_fit": gf, "stage": stage,
+        "formula": FORMULA_RADAR if stage == "radar" else FORMULA_PACK,
     }

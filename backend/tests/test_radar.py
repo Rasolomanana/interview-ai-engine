@@ -190,7 +190,7 @@ class TestIpsShape:
         assert isinstance(ips["score"], int) or float(ips["score"]).is_integer()
         rep = o.get("decision_report") or {}
         summary = rep.get("summary") or ""
-        assert summary.startswith("IPS officiel CareerOS :"), summary[:120]
+        assert summary.startswith("IPS Radar CareerOS :"), summary[:120]
         assert f"{ips['score']}/100" in summary
         assert f"priorité {ips['priority']}" in summary
 

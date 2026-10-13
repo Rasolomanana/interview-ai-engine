@@ -92,7 +92,27 @@ Tu es le moteur IPS RADAR de CareerOS (tri rapide). Renvoie UNIQUEMENT un JSON v
  "knockout": {{"present": true/false, "detail": ""}}, "goal_fit": {{"score": 0-10, "justification": "5 si objectifs non précisés"}},
  "decision_summary": "1-2 phrases : postuler / optimiser / éviter et pourquoi", "reasons_apply": ["max 3"], "reasons_avoid": ["max 3"],
  "ats": {{"keywords_missing": ["max 5"]}}}}
-Ne donne AUCUN score global ni estimation chiffrée d'IPS : CareerOS calcule l'IPS officiel."""
+Ne donne AUCUN score global ni estimation chiffrée d'IPS : CareerOS calcule l'IPS officiel.{EXCERPT_NOTE if is_excerpt(offer) else ""}"""
+
+
+EXCERPT_NOTE = ("\nATTENTION : seul un EXTRAIT de l'offre est disponible (agrégateur). Ne pénalise pas une information absente de l'extrait : "
+                "note 5 (neutre) un critère non vérifiable, et ne déclare une exigence éliminatoire que si elle est explicitement écrite.")
+
+
+def is_excerpt(offer: dict) -> bool:
+    return offer.get("source") == "jooble" or len(offer.get("description") or "") < 600
+
+
+def rescore_radar(o: dict) -> tuple:
+    """Recompute a stored V2.0 Radar IPS with the radar calibration, from the AI grades already stored (no AI call)."""
+    old, rep = o["ips"], o.get("decision_report") or {}
+    crit = {r["key"]: {"score": r["score"], "justification": r["justification"]} for r in old["criteria"] if r["source"] in ("ia",)}
+    ips = compute_ips(crit, {"present": old.get("knockout"), "detail": old.get("knockout_detail", "")}, {"score": old.get("goal_fit")},
+                      o.get("posted_at"), "aucun", False, stage="radar")
+    rest = re.sub(r"^IPS officiel CareerOS : \d+/100 — priorité [ABC]\.\s*", "", rep.get("summary", ""))
+    new = build_decision_report(ips, {"decision_summary": rest, "ats": {"keywords_missing": rep.get("keywords_to_add") or []}})
+    new["actions"] = rep.get("actions") or new["actions"]
+    return ips, new
 
 
 def create_radar_router(db, current_user, generate_text, parse_json, careeros_router):
@@ -158,10 +178,10 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         d = parse_json((await generate_text(sysm, txt)).strip()) or {}
         if not d.get("ips_criteria"):
             raise ValueError("Réponse IA illisible")
-        ips = compute_ips(d.get("ips_criteria"), d.get("knockout"), d.get("goal_fit"), doc.get("posted_at"), "aucun", False)
+        ips = compute_ips(d.get("ips_criteria"), d.get("knockout"), d.get("goal_fit"), doc.get("posted_at"), "aucun", False, stage="radar")
         report = build_decision_report(ips, d)
         await db.radar_offers.update_one({"id": doc["id"]}, {"$set": {
-            "analyzed_at": _now().isoformat(), "ips": ips, "decision_report": report,
+            "analyzed_at": _now().isoformat(), "ips": ips, "decision_report": report, "excerpt": is_excerpt(doc),
             "reasons_apply": (d.get("reasons_apply") or [])[:3], "reasons_avoid": (d.get("reasons_avoid") or [])[:3]}})
 
     async def run_for_user(user_id: str, trigger: str) -> dict:
@@ -347,3 +367,6 @@ async def ensure_radar_indexes(db):
     await db.radar_runs.create_index([("user_id", 1), ("at", -1)])
     await db.radar_settings.create_index("user_id", unique=True)
     await db.radar_runs.update_many({"status": "running"}, {"$set": {"status": "interrompue"}})
+    async for o in db.radar_offers.find({"ips": {"$ne": None}, "ips.stage": {"$ne": "radar"}}, {"_id": 0}):
+        ips, report = rescore_radar(o)
+        await db.radar_offers.update_one({"id": o["id"]}, {"$set": {"ips": ips, "decision_report": report, "excerpt": is_excerpt(o)}})

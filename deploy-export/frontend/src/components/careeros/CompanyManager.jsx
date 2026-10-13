@@ -37,7 +37,7 @@ const CompanyRow = ({ c, i, onChange, onRemove }) => {
       <input value={c.name} onChange={(e) => onChange({ name: e.target.value })} className={inputCls} data-testid={`radar-company-name-${i}`} />
       <input value={c.portal_url} onChange={(e) => onChange({ portal_url: e.target.value, kind: "", slug: "" })} placeholder="URL portail carrières (optionnel)" className={inputCls} data-testid={`radar-company-url-${i}`} />
       {c.kind ? <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-emerald-300" data-testid={`radar-company-kind-${i}`}><CheckCircle2 className="h-3.5 w-3.5" />{KIND[c.kind]}</span>
-        : c.portal_url ? <button type="button" onClick={check} disabled={checking} className="whitespace-nowrap text-[11px] text-indigo-300" data-testid={`radar-company-check-${i}`}>{checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Vérifier"}</button>
+        : c.portal_url ? <button type="button" onClick={check} disabled={checking} className="whitespace-nowrap text-[11px] text-indigo-300" data-testid={`radar-company-check-${i}`}>{checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-amber-300" title="Portail pas encore reconnu : cliquez pour vérifier">À vérifier</span>}</button>
           : <span className="whitespace-nowrap text-[11px] text-slate-500" data-testid={`radar-company-kind-${i}`}>Jooble</span>}
       <button type="button" onClick={onRemove} className="p-1.5 text-slate-500 hover:text-rose-300" data-testid={`radar-company-remove-${i}`}><Trash2 className="h-4 w-4" /></button>
     </div>

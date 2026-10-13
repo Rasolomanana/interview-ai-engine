@@ -25,8 +25,9 @@ const OfferCard = ({ o, onPack, onIgnore, busy }) => (
         <p className="truncate text-sm font-semibold text-white">{o.title}</p>
         <p className="truncate text-xs text-slate-500">{o.company} · {o.location} · {o.source}{o.posted_at ? ` · ${o.posted_at}` : ""}</p>
       </div>
-      <span className="font-mono text-xs text-slate-300" data-testid={`radar-ips-${o.id}`}>IPS {o.ips?.score ?? "—"}</span>
+      <span className="whitespace-nowrap font-mono text-xs text-slate-300" title="IPS Radar provisoire : 8 critères évaluables avant candidature. L'IPS officiel est recalculé dans le pack." data-testid={`radar-ips-${o.id}`}>IPS Radar {o.ips?.score ?? "—"}</span>
     </div>
+    {o.excerpt && <p className="mt-2 inline-flex rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200" title="Jooble ne fournit qu'un extrait de l'offre : les critères non vérifiables sont notés de façon neutre." data-testid={`radar-excerpt-${o.id}`}>Analyse sur extrait{o.source === "jooble" ? " Jooble" : ""}</p>}
     <p className="mt-3 text-xs leading-relaxed text-slate-300" data-testid={`radar-why-${o.id}`}>{o.decision_report?.summary}</p>
     {(o.reasons_apply?.length > 0 || o.reasons_avoid?.length > 0) && (
       <div className="mt-2 grid min-w-0 gap-2 text-[11px] sm:grid-cols-2">
@@ -77,7 +78,7 @@ export default function Radar() {
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300">CareerOS Radar</p>
           <h1 className="mt-2 font-display text-4xl font-bold tracking-tight sm:text-5xl">Vos meilleures opportunités</h1>
           <TodayMarker runs={runs} running={running} />
-          <p className="mt-2 max-w-xl text-sm text-slate-400">CareerOS cherche chaque jour pour vous et classe les offres par IPS officiel. Le pack complet n'est généré que si vous le demandez.</p>
+          <p className="mt-2 max-w-xl text-sm text-slate-400">CareerOS cherche chaque jour pour vous et classe les offres par IPS Radar (provisoire, sur les critères évaluables avant candidature). L'IPS officiel est recalculé dans le pack complet, qui n'est généré que si vous le demandez.</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setSettings(true)} data-testid="radar-settings-btn" className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-slate-300 hover:text-white"><Settings2 className="h-4 w-4" />Réglages</button>
