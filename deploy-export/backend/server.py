@@ -51,7 +51,7 @@ def _build_server_chain():
     Gemini Flash (free tier) -> OpenRouter free -> OpenRouter DeepSeek. No Anthropic. Entries need their key."""
     chain = []
     if os.environ.get("GEMINI_API_KEY"):
-        chain.append(("gemini", "gemini", os.environ.get("GEMINI_SERVER_MODEL", "gemini-2.5-flash")))
+        chain.append(("gemini", "gemini", os.environ.get("GEMINI_SERVER_MODEL") or "gemini-flash-latest"))
     if OPENROUTER_API_KEY:
         free = os.environ.get("OPENROUTER_FREE_MODEL", "openrouter/free").strip()
         if free:
@@ -65,7 +65,7 @@ def _build_premium_chain():
     models, Anthropic strictly as the last resort."""
     chain = []
     if OPENROUTER_API_KEY:
-        chain.append(("openrouter_premium", "openrouter", os.environ.get("OPENROUTER_PREMIUM_MODEL", "google/gemini-2.5-pro")))
+        chain.append(("openrouter_premium", "openrouter", os.environ.get("OPENROUTER_PREMIUM_MODEL") or "~google/gemini-pro-latest"))
     chain += [c for c in SERVER_CHAIN if c[0] != "openrouter_free"]
     if ANTHROPIC_API_KEY:
         chain.append(("anthropic", "anthropic", os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")))

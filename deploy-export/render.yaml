@@ -54,12 +54,12 @@ services:
         value: "20"
       # Model routing: economical model for analyses, premium only for letters + interview simulations
       - key: OPENROUTER_PREMIUM_MODEL
-        value: google/gemini-2.5-pro
+        value: "~google/gemini-pro-latest"
       # Gemini (Google AI Studio, free tier) = first provider for analyses
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_SERVER_MODEL
-        value: gemini-2.5-flash
+        value: gemini-flash-latest
       # Low-credit alert e-mail (Emergent managed e-mail)
       - key: EMERGENT_EMAIL_KEY
         sync: false

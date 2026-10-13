@@ -102,7 +102,7 @@ class LlmChat:
                     model = OPENROUTER_VISION_MODEL
             elif self.provider == "gemini":  # Google AI Studio, OpenAI-compatible endpoint
                 client = AsyncOpenAI(api_key=os.environ["GEMINI_API_KEY"], base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
-                model = self.model or "gemini-2.5-flash"
+                model = self.model or "gemini-flash-latest"
             else:
                 client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
                 model = OPENAI_MODEL
