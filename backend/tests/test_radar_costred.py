@@ -5,11 +5,15 @@ mismatched profession family), cron with X-Cron-Secret filtering by active membe
 admin credits/alert-settings/alert-test with password gating + validation.
 """
 import os
+import sys
 import time
 import uuid
 
 import pytest
 import requests
+
+# Ensure /app/backend is on sys.path so `careeros` package is importable regardless of CWD
+sys.path.insert(0, "/app/backend")
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
