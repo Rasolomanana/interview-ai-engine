@@ -18,7 +18,7 @@ export const SourceStatus = ({ status, run }) => (
             <span className={`h-2.5 w-2.5 rounded-full ${s.dot}`} />
             <span className="font-medium text-slate-200">{l}</span>
             <span className="text-xs text-slate-400" data-testid={`radar-source-count-${k}`}>
-              {s.label === "Actif" ? `${n?.fetched ?? 0} offres` : s.label}</span>
+              {s.label !== "Actif" ? s.label : status?.portals && k in status.portals && !status.portals[k] ? "Aucun portail configuré" : `${n?.fetched ?? 0} offres`}</span>
           </div>
         );
       })}

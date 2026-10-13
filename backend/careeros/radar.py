@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List
 
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
 from . import radar_sources as S
@@ -116,7 +116,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
     async def _fetch(st: dict) -> tuple:
         offers, errors = [], {}
         kw = st.get("keywords") or []
-        what = " ".join(kw[:2]) or "analyste"
+        terms = kw[:3] or ["analyste"]  # one Jooble query per keyword (joined keywords = AND search)
         srcs, comps = _active_sources(st), [c for c in st["companies"] if c.get("enabled", True)]
         sem = asyncio.Semaphore(6)
 
@@ -125,24 +125,32 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 return await coro
         async with httpx.AsyncClient(timeout=S.TIMEOUT, follow_redirects=True) as c:
             tasks = []  # (label, company filter or None, coroutine)
-            for src, fn in (("adzuna", S.adzuna), ("jooble", S.jooble)):
-                if src in srcs:
-                    tasks += [(src, None, fn(c, what, st["location"]))]
-                    tasks += [(f"{src}:{co['name']}", co["name"], fn(c, what, st["location"], co["name"])) for co in comps[:JOOBLE_COMPANY_LIMIT]]
+            if "adzuna" in srcs:
+                tasks += [("adzuna", None, S.adzuna(c, " ".join(terms[:2]), st["location"]))]
+                tasks += [(f"adzuna:{co['name']}", co["name"], S.adzuna(c, " ".join(terms[:2]), st["location"], co["name"])) for co in comps[:JOOBLE_COMPANY_LIMIT]]
+            if "jooble" in srcs:
+                tasks += [(f"jooble:{t}", None, S.jooble(c, t, st["location"])) for t in terms]
+                tasks += [(f"jooble:{co['name']}", co["name"], S.jooble(c, "", st["location"], co["name"])) for co in comps[:JOOBLE_COMPANY_LIMIT]]
             for co in comps:
                 if co.get("kind") and co.get("slug") and ("workday" if co["kind"] == "workday" else "boards") in srcs:
                     tasks += [(f"{co['kind']}:{co['name']}", None, S.board(c, co["kind"], co["slug"], co["name"], kw))]
             res = await asyncio.gather(*(limited(t) for _, _, t in tasks), return_exceptions=True)
+        jooble_raw, jooble_ok = 0, 0
         for (name, company, _), r in zip(tasks, res):
             if isinstance(r, Exception):
                 errors[name] = (str(r) or type(r).__name__)[:160]
                 continue
+            if name.startswith("jooble"):
+                jooble_raw, jooble_ok = jooble_raw + len(r), jooble_ok + 1
             for o in r:
                 if company and not S.company_match(o, company):
                     continue
-                if o["source"] in ("greenhouse", "lever", "ashby") and not S.matches(o, kw):
+                if (company or o["source"] in ("greenhouse", "lever", "ashby")) and not S.matches(o, kw):
                     continue
                 offers.append(o)
+        if jooble_ok and not jooble_raw:
+            errors["jooble"] = (f"Jooble ({S.JOOBLE_HOST}) n'a renvoyé aucune offre pour « {st['location']} ». "
+                                f"Vérifiez que la clé a été obtenue sur {S.JOOBLE_HOST}/api/about (les clés Jooble sont propres à chaque pays).")
         return offers, errors
 
     async def _analyze(doc: dict, cv: str, profile: dict):
@@ -261,6 +269,12 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         asyncio.create_task(run_for_user(user["id"], "manuel"))
         return {"started": True}
 
+    @router.get("/runs")
+    async def runs(days: int = Query(30, ge=1, le=90), user: dict = Depends(current_user)):
+        since = (_now() - timedelta(days=days)).isoformat()
+        proj = {"_id": 0, "user_id": 0, "sources": 0, "selected_sources": 0}
+        return [r async for r in db.radar_runs.find({"user_id": user["id"], "at": {"$gte": since}}, proj).sort("at", -1).limit(300)]
+
     @router.get("/dashboard")
     async def dashboard(user: dict = Depends(current_user)):
         q = {"user_id": user["id"]}
@@ -271,7 +285,9 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         top = lambda p: sorted([o for o in active if o["ips"]["priority"] == p], key=lambda o: -o["ips"]["score"])[:20]  # noqa: E731
         st = await _settings(user["id"], {})
         return {
-            "sources_status": {"configured": S.configured(), "selected": st["sources"]},
+            "sources_status": {"configured": S.configured(), "selected": st["sources"], "portals": {
+                "workday": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") == "workday"),
+                "boards": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") in ("greenhouse", "lever", "ashby", "amazon"))}},
             "last_run": last, "analyzed_today": await _analyzed_today(user["id"]), "daily_limit": DAILY_LIMIT,
             "new_today": [o for o in offers if last and o.get("run_id") == last.get("id")][:50],
             "top_a": top("A"), "top_b": top("B"),

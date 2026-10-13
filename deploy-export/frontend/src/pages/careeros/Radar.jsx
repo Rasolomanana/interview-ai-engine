@@ -6,6 +6,7 @@ import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { RadarSettingsDialog } from "@/components/careeros/RadarSettings";
 import { SourceStatus } from "@/components/careeros/SourceStatus";
+import { RadarHistory, TodayMarker } from "@/components/careeros/RadarHistory";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
 import { radar } from "@/lib/careeros";
 
@@ -17,7 +18,7 @@ const Stat = ({ label, value, testid }) => (
 );
 
 const OfferCard = ({ o, onPack, onIgnore, busy }) => (
-  <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4" data-testid={`radar-offer-${o.id}`}>
+  <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4 min-w-0 break-words" data-testid={`radar-offer-${o.id}`}>
     <div className="flex items-start gap-3">
       <PriorityBadge priority={o.ips?.priority} testid={`radar-priority-${o.id}`} />
       <div className="min-w-0 flex-1">
@@ -28,7 +29,7 @@ const OfferCard = ({ o, onPack, onIgnore, busy }) => (
     </div>
     <p className="mt-3 text-xs leading-relaxed text-slate-300" data-testid={`radar-why-${o.id}`}>{o.decision_report?.summary}</p>
     {(o.reasons_apply?.length > 0 || o.reasons_avoid?.length > 0) && (
-      <div className="mt-2 grid gap-2 text-[11px] sm:grid-cols-2">
+      <div className="mt-2 grid min-w-0 gap-2 text-[11px] sm:grid-cols-2">
         <ul className="space-y-0.5 text-emerald-300">{(o.reasons_apply || []).map((r, i) => <li key={i}>+ {r}</li>)}</ul>
         <ul className="space-y-0.5 text-rose-300">{(o.reasons_avoid || []).map((r, i) => <li key={i}>– {r}</li>)}</ul>
       </div>
@@ -46,7 +47,7 @@ const OfferCard = ({ o, onPack, onIgnore, busy }) => (
 const Section = ({ title, items, testid, ...p }) => (
   <section className="space-y-3" data-testid={testid}>
     <h2 className="text-sm font-semibold text-slate-200">{title} <span className="text-slate-500">({items.length})</span></h2>
-    {items.length === 0 ? <p className="text-xs text-slate-500">Aucune opportunité.</p> : <div className="grid gap-3 lg:grid-cols-2">{items.map((o) => <OfferCard key={o.id} o={o} {...p} />)}</div>}
+    {items.length === 0 ? <p className="text-xs text-slate-500">Aucune opportunité.</p> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{items.map((o) => <OfferCard key={o.id} o={o} {...p} />)}</div>}
   </section>
 );
 
@@ -58,7 +59,9 @@ export default function Radar() {
   const [settings, setSettings] = useState(false);
   const load = useCallback(() => radar.dashboard().then(setD).catch((e) => toast.error(e.message)), []);
   const running = d?.last_run?.status === "running";
+  const [runs, setRuns] = useState(null);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (!running) radar.runs(30).then(setRuns).catch(() => setRuns([])); }, [running, d?.last_run?.id]);
   useEffect(() => { if (!running) return undefined; const t = setTimeout(load, 4000); return () => clearTimeout(t); }, [running, d, load]);
 
   const runNow = async () => { try { await radar.run(); toast.success("Recherche lancée"); setTimeout(load, 1200); } catch (e) { toast.error(e.message); } };
@@ -73,6 +76,7 @@ export default function Radar() {
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300">CareerOS Radar</p>
           <h1 className="mt-2 font-display text-4xl font-bold tracking-tight sm:text-5xl">Vos meilleures opportunités</h1>
+          <TodayMarker runs={runs} running={running} />
           <p className="mt-2 max-w-xl text-sm text-slate-400">CareerOS cherche chaque jour pour vous et classe les offres par IPS officiel. Le pack complet n'est généré que si vous le demandez.</p>
         </div>
         <div className="flex gap-2">
@@ -95,6 +99,7 @@ export default function Radar() {
           <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" onPack={onPack} onIgnore={onIgnore} busy={busy} />
           <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" onPack={onPack} onIgnore={onIgnore} busy={busy} />
           <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" onPack={onPack} onIgnore={onIgnore} busy={busy} />
+          <RadarHistory runs={runs} />
         </div>
       )}
       {settings && <RadarSettingsDialog onClose={() => { setSettings(false); load(); }} />}

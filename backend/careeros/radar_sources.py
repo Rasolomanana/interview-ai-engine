@@ -67,11 +67,18 @@ async def adzuna(client, what: str, where: str, company: str = "", max_days: int
     return out
 
 
+JOOBLE_HOST = os.environ.get("JOOBLE_HOST") or "ca.jooble.org"  # keys are country-specific: ca.jooble.org = Canada
+
+
 async def jooble(client, what: str, where: str, company: str = ""):
     if not configured()["jooble"]:
         return []
-    r = await client.post(f"https://jooble.org/api/{os.environ['JOOBLE_API_KEY']}",
-                          json={"keywords": f"{what} {company}".strip(), "location": where, "page": 1})
+    body = {"keywords": company or what, "location": where, "page": 1, "ResultOnPage": 50}
+    if company:
+        body["companysearch"] = True
+    r = await client.post(f"https://{JOOBLE_HOST}/api/{os.environ['JOOBLE_API_KEY']}", json=body)
+    if r.status_code == 403:
+        raise RuntimeError(f"Clé Jooble refusée (403) : la clé doit être obtenue sur {JOOBLE_HOST}/api/about.")
     r.raise_for_status()
     return [{"source": "jooble", "external_id": str(j.get("id") or j.get("link")), "title": _clean(j.get("title")),
              "company": j.get("company", ""), "location": j.get("location", ""), "url": j.get("link", ""),
