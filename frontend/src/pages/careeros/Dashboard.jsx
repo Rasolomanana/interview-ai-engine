@@ -1,3 +1,5 @@
+import { ConceptRow } from "@/components/careeros/guide/InfoTip";
+import { useGuide } from "@/components/careeros/guide/GuideProvider";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Brain, ChevronRight } from "lucide-react";
@@ -34,6 +36,7 @@ const Row = ({ a }) => (
 export default function Dashboard() {
   usePageTitle("Tableau de bord");
   const { user } = useAuth();
+  const { beginner } = useGuide();
   const [apps, setApps] = useState(null);
   useEffect(() => { careeros.list().then(setApps).catch(() => setApps([])); }, []);
   const list = apps || [];
@@ -46,8 +49,9 @@ export default function Dashboard() {
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300">Directeur de carrière</p>
           <h1 className="mt-2 font-display text-4xl font-bold tracking-tight sm:text-5xl" data-testid="dashboard-title">Bonjour{user?.name ? `, ${user.name}` : ""}.</h1>
           <p className="mt-2 text-sm text-slate-400">Vos opportunités, classées par probabilité réelle d'obtenir une entrevue.</p>
+          <ConceptRow keys={["ips", "priorite", "career_score", "suivi"]} />
         </div>
-        <Link to="/careeros/nouveau" data-testid="dashboard-new-pack-btn" className="flex items-center gap-2 rounded-full bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-400">
+        <Link to="/careeros/nouveau" data-testid="dashboard-new-pack-btn" className={beginner ? "flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-slate-200 hover:bg-white/5" : "flex items-center gap-2 rounded-full bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-400"}>
           <Plus className="h-4 w-4" /> Nouveau pack candidature
         </Link>
       </div>

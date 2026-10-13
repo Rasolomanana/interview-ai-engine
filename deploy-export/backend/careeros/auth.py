@@ -9,7 +9,7 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 from fastapi import APIRouter, HTTPException, Request, Depends
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -73,7 +73,9 @@ class LoginBody(BaseModel):
 
 
 class PreferencesBody(BaseModel):
-    theme: Literal["light", "dark"]
+    theme: Optional[Literal["light", "dark"]] = None
+    guide_mode: Optional[Literal["debutant", "expert"]] = None
+    tour_done: Optional[bool] = None
 
 
 class RefreshBody(BaseModel):
@@ -142,8 +144,11 @@ def create_auth(db):
 
     @router.patch("/preferences")
     async def preferences(body: PreferencesBody, user: dict = Depends(current_user)):
-        await db.users.update_one({"id": user["id"]}, {"$set": {"preferences.theme": body.theme, "updated_at": _now().isoformat()}})
-        return {"preferences": {**(user.get("preferences") or {}), "theme": body.theme}}
+        upd = {k: v for k, v in body.model_dump().items() if v is not None}
+        if not upd:
+            raise HTTPException(status_code=422, detail="Aucune préférence fournie")
+        await db.users.update_one({"id": user["id"]}, {"$set": {**{f"preferences.{k}": v for k, v in upd.items()}, "updated_at": _now().isoformat()}})
+        return {"preferences": {**(user.get("preferences") or {}), **upd}}
 
     return router, current_user
 

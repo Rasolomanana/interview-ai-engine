@@ -1,3 +1,4 @@
+import { ConceptRow } from "@/components/careeros/guide/InfoTip";
 import { useEffect, useState } from "react";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -39,6 +40,7 @@ export default function Profile() {
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300">Profil carrière vivant</p>
           <h1 className="mt-2 font-display text-4xl font-bold tracking-tight sm:text-5xl">Career Memory</h1>
           <p className="mt-2 text-sm text-slate-400">CareerOS utilise ce profil pour chaque décision et chaque document.</p>
+          <ConceptRow keys={["memory", "career_score"]} />
         </div>
         <button onClick={save} disabled={busy} data-testid="save-profile-btn" className="flex items-center gap-2 rounded-full bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Enregistrer

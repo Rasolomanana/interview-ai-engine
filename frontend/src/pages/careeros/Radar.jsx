@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { RadarSettingsDialog } from "@/components/careeros/RadarSettings";
+import { MoreMenu } from "@/components/careeros/guide/MoreMenu";
+import { ConceptRow } from "@/components/careeros/guide/InfoTip";
 import { SourceStatus } from "@/components/careeros/SourceStatus";
 import { RadarHistory, TodayMarker } from "@/components/careeros/RadarHistory";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
@@ -45,8 +47,10 @@ const OfferCard = ({ o, onPack, onIgnore, onDeep, deepId, busy }) => (
           <Sparkles className="h-3.5 w-3.5" />Générer le pack</button>)}
       {o.method !== "ia" && o.status !== "pack" && <button onClick={() => onDeep(o)} disabled={deepId === o.id} data-testid={`radar-deep-btn-${o.id}`} className="flex items-center gap-1.5 rounded-full border border-indigo-400/40 px-3 py-1.5 text-xs text-indigo-200 hover:bg-indigo-500/10 disabled:opacity-60">
         {deepId === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Analyse approfondie</button>}
-      {o.url && <a href={o.url} target="_blank" rel="noreferrer" data-testid={`radar-open-${o.id}`} className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:text-white"><ExternalLink className="h-3.5 w-3.5" />Voir l'offre</a>}
-      {o.status !== "ignoree" && o.status !== "pack" && <button onClick={() => onIgnore(o)} data-testid={`radar-ignore-${o.id}`} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-slate-500 hover:text-slate-200"><EyeOff className="h-3.5 w-3.5" />Ignorer</button>}
+      <MoreMenu testid={`radar-more-${o.id}`} items={[
+        o.url && { label: "Voir l'offre", icon: ExternalLink, href: o.url, testid: `radar-open-${o.id}` },
+        o.status !== "ignoree" && o.status !== "pack" && { label: "Ignorer cette offre", icon: EyeOff, onClick: () => onIgnore(o), danger: true, testid: `radar-ignore-${o.id}` },
+      ]} />
     </div>
   </article>
 );
@@ -90,6 +94,7 @@ export default function Radar() {
           <h1 className="mt-2 font-display text-4xl font-bold tracking-tight sm:text-5xl">Vos meilleures opportunités</h1>
           <TodayMarker runs={runs} running={running} />
           <p className="mt-2 max-w-xl text-sm text-slate-400">CareerOS cherche chaque jour pour vous, pré-analyse chaque offre par règles (sans IA), fait confirmer par l'IA les 5 meilleures du jour, et classe les offres par IPS Radar (provisoire, sur les critères évaluables avant candidature). L'IPS officiel est recalculé dans le pack complet, qui n'est généré que si vous le demandez.</p>
+          <ConceptRow keys={["ips_radar", "priorite", "regles", "deep", "extrait"]} />
         </div>
         <div className="flex gap-2">
           <button onClick={() => setSettings(true)} data-testid="radar-settings-btn" className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-slate-300 hover:text-white"><Settings2 className="h-4 w-4" />Réglages</button>

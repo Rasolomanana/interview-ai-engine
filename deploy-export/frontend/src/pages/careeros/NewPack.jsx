@@ -1,3 +1,4 @@
+import { ConceptRow } from "@/components/careeros/guide/InfoTip";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Sparkles, Upload } from "lucide-react";
@@ -45,6 +46,7 @@ export default function NewPack() {
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300">Interview AI Engine</p>
             <h1 className="mt-2 font-display text-4xl font-bold tracking-tight sm:text-5xl">Pack candidature en un clic</h1>
             <p className="mt-3 max-w-xl text-sm text-slate-400">Collez l'offre (ou son lien) : CareerOS décide s'il faut postuler, et prépare tout le reste.</p>
+            <ConceptRow keys={["pack", "ips", "priorite"]} />
           </div>
           <div>
             <Label hint="texte complet recommandé">Offre d'emploi</Label>

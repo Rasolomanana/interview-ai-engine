@@ -21,6 +21,7 @@ from emergentintegrations.llm.openai import OpenAISpeechToText
 from careeros.auth import create_auth, ensure_auth_indexes
 from careeros.router import create_careeros_router, ensure_careeros_indexes
 from careeros.radar import create_radar_router, ensure_radar_indexes
+from careeros.journey import create_journey_router
 from careeros.followup import create_followup_router
 import state_machine as sm
 import prompt as P
@@ -788,6 +789,7 @@ app.include_router(auth_router)
 careeros_router = create_careeros_router(db, current_member, _generate_text, _fetch_page_text, _parse_json_object)
 app.include_router(careeros_router)
 app.include_router(create_radar_router(db, current_member, _generate_text, _parse_json_object, careeros_router))
+app.include_router(create_journey_router(db, current_member))
 app.include_router(create_followup_router(db, current_member, _generate_text, _parse_json_object, careeros_router))
 app.add_middleware(
     CORSMiddleware,
