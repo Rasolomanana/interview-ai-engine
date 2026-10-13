@@ -7,6 +7,7 @@ import {
 import { adminLogin, adminStats, adminExport } from "@/lib/api";
 import { SimulationsTable } from "@/components/admin/SimulationsTable";
 import { LlmHealth } from "@/components/admin/LlmHealth";
+import { CreditCard } from "@/components/admin/CreditCard";
 import { ThemeToggle, usePageTitle } from "@/components/careeros/ThemeToggle";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(4)}`;
@@ -180,6 +181,7 @@ export default function AdminDashboard() {
           <StatCard icon={Mail} label="Lettres" value={num(t.cover_letters)} accent="text-amber-400" />
         </div>
 
+        <CreditCard />
         <LlmHealth />
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/60 p-5">

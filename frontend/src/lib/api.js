@@ -35,6 +35,16 @@ export async function adminLogin(password) {
   return r.json();
 }
 
+async function adminCall(path, password, opts = {}) {
+  const r = await fetch(`${ADMIN_BASE()}${path}`, { ...opts, headers: { "X-Admin-Password": password, "Content-Type": "application/json", ...(opts.headers || {}) } });
+  let d = {}; try { d = await r.json(); } catch { /* ignore */ }
+  if (!r.ok) throw new Error(d?.detail || `Erreur ${r.status}`);
+  return d;
+}
+export const adminCredits = (pwd) => adminCall("/credits", pwd);
+export const adminSaveAlert = (pwd, body) => adminCall("/alert-settings", pwd, { method: "PUT", body: JSON.stringify(body) });
+export const adminTestAlert = (pwd) => adminCall("/alert-test", pwd, { method: "POST" });
+
 export async function adminLlmHealth(password) {
   const r = await fetch(`${ADMIN_BASE()}/llm-health`, { headers: { "X-Admin-Password": password } });
   if (!r.ok) throw new Error(`Erreur ${r.status}`);

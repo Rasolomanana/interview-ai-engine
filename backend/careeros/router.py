@@ -200,7 +200,7 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
 
     async def _text_part(app_id, version, name, prompt_fn, ctx):
         sysm, txt = prompt_fn(*ctx)
-        out = (await generate_text(sysm, txt)).strip()
+        out = (await generate_text(sysm, txt, tier="premium" if name == "letter" else "eco")).strip()
         if not out:
             raise PartError("Le service IA a renvoyé une réponse vide.")
         await _write(app_id, version, f"parts.{name}", out)

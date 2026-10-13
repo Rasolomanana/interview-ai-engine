@@ -15,6 +15,7 @@ import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
+from . import radar_rules as RR
 from . import radar_sources as S
 from .decision_report import build_decision_report
 from .ips import compute_ips
@@ -23,6 +24,9 @@ from .prompts import SYSTEM
 logger = logging.getLogger("careeros.radar")
 DAILY_LIMIT = int(os.environ.get("RADAR_DAILY_LIMIT", "50"))
 DEFAULT_SOURCES = ["jooble", "workday", "boards"]
+AI_TOP = int(os.environ.get("RADAR_AI_TOP") or 5)  # AI confirmation of the best rule-scored offers, per member per day
+DEEP_LIMIT = int(os.environ.get("RADAR_DEEP_LIMIT") or 20)  # extra on-demand AI analyses per member per day
+ACTIVE_DAYS = 7
 JOOBLE_COMPANY_LIMIT = 20
 
 
@@ -173,16 +177,32 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                                 f"Vérifiez que la clé a été obtenue sur {S.JOOBLE_HOST}/api/about (les clés Jooble sont propres à chaque pays).")
         return offers, errors
 
+    async def _store(doc: dict, d: dict, method: str):
+        ips = compute_ips(d.get("ips_criteria"), d.get("knockout"), d.get("goal_fit"), doc.get("posted_at"), "aucun", False, stage="radar")
+        ips["method"] = method
+        report = build_decision_report(ips, d)
+        now = _now().isoformat()
+        upd = {"ips": ips, "decision_report": report, "excerpt": is_excerpt(doc), "method": method,
+               "reasons_apply": (d.get("reasons_apply") or [])[:3], "reasons_avoid": (d.get("reasons_avoid") or [])[:3]}
+        upd["analyzed_at" if method == "regles" else "ai_analyzed_at"] = now
+        if not doc.get("analyzed_at"):
+            upd["analyzed_at"] = now
+        await db.radar_offers.update_one({"id": doc["id"]}, {"$set": upd})
+        return ips
+
+    async def _rules(doc: dict, cv: str, profile: dict, keywords: list):
+        return await _store(doc, RR.score_offer(doc, cv, profile, keywords), "regles")
+
     async def _analyze(doc: dict, cv: str, profile: dict):
         sysm, txt = radar_prompt(cv, doc, profile)
         d = parse_json((await generate_text(sysm, txt)).strip()) or {}
         if not d.get("ips_criteria"):
             raise ValueError("Réponse IA illisible")
-        ips = compute_ips(d.get("ips_criteria"), d.get("knockout"), d.get("goal_fit"), doc.get("posted_at"), "aucun", False, stage="radar")
-        report = build_decision_report(ips, d)
-        await db.radar_offers.update_one({"id": doc["id"]}, {"$set": {
-            "analyzed_at": _now().isoformat(), "ips": ips, "decision_report": report, "excerpt": is_excerpt(doc),
-            "reasons_apply": (d.get("reasons_apply") or [])[:3], "reasons_avoid": (d.get("reasons_avoid") or [])[:3]}})
+        return await _store(doc, d, "ia")
+
+    async def _ai_today(user_id: str) -> int:
+        start = _now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        return await db.radar_offers.count_documents({"user_id": user_id, "ai_analyzed_at": {"$gte": start}})
 
     async def run_for_user(user_id: str, trigger: str) -> dict:
         profile = await db.career_profiles.find_one({"user_id": user_id}, {"_id": 0}) or {}
@@ -221,27 +241,29 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                        if d["id"] not in fresh_ids]  # offers deferred by an earlier daily limit
             queue = fresh + backlog
             todo, run["skipped_limit"] = queue[:budget], max(0, len(queue) - budget)
-            sem = asyncio.Semaphore(4)
-
-            fails = {"n": 0}
-
-            async def one(doc):
-                async with sem:
-                    if fails["n"] >= 3:  # AI service down: keep the remaining offers pending for the next run
-                        return False
-                    try:
-                        await _analyze(doc, cv, profile)
-                        run["by_source"][S.group(doc["source"])]["analyzed"] += 1
-                        fails["n"] = 0
-                        return True
-                    except Exception as e:  # noqa: BLE001
-                        fails["n"] += 1
-                        logger.warning("radar analyze %s failed: %s", doc["id"], e)
-                        return False
-            run["analyzed"] = sum(await asyncio.gather(*(one(d) for d in todo)))
+            scored = []
+            for doc in todo:  # free deterministic pre-scoring
+                scored.append((await _rules(doc, cv, profile, st.get("keywords") or []), doc))
+                run["by_source"][S.group(doc["source"])]["analyzed"] += 1
+            run["analyzed"] = len(scored)
+            start = _now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+            pool = [d async for d in db.radar_offers.find({"user_id": user_id, "method": "regles", "analyzed_at": {"$gte": start},
+                                                           "ips.knockout": False, "status": "nouvelle"}, {"_id": 0}).sort("ips.score", -1)]
+            ai_todo = pool[:max(0, AI_TOP - await _ai_today(user_id))]
+            fails, run["ai_analyzed"] = {"n": 0}, 0
+            for doc in ai_todo:  # AI confirmation of the best offers of the day only
+                if fails["n"] >= 3:  # AI service down: offers stay rule-scored
+                    break
+                try:
+                    await _analyze(doc, cv, profile)
+                    run["ai_analyzed"] += 1
+                    fails["n"] = 0
+                except Exception as e:  # noqa: BLE001
+                    fails["n"] += 1
+                    logger.warning("radar AI analyze %s failed: %s", doc["id"], e)
             if fails["n"] >= 3:
-                run["errors"]["ia"] = ("Service IA du serveur indisponible : analyses suspendues, les offres restantes seront "
-                                       "analysées lors de la prochaine recherche.")
+                run["errors"]["ia"] = ("Service IA du serveur indisponible : les meilleures offres restent pré-analysées par règles ; "
+                                       "relancez l'analyse approfondie plus tard.")
         run["status"], run["finished_at"] = "done", _now().isoformat()
         await db.radar_runs.update_one({"id": run["id"]}, {"$set": run})
         return run
@@ -318,6 +340,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 "workday": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") == "workday"),
                 "boards": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") in ("greenhouse", "lever", "ashby", "amazon"))}},
             "last_run": last, "analyzed_today": await _analyzed_today(user["id"]), "daily_limit": DAILY_LIMIT,
+            "ai_today": await _ai_today(user["id"]), "ai_top": AI_TOP, "deep_limit": AI_TOP + DEEP_LIMIT,
             "new_today": [o for o in offers if last and o.get("run_id") == last.get("id")][:50],
             "top_a": top("A"), "top_b": top("B"),
             "ignored": [o for o in offers if o["status"] == "ignoree" or (o.get("ips") and o["ips"]["priority"] == "C")][:40],
@@ -332,6 +355,23 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             raise HTTPException(status_code=404, detail="Offre introuvable")
         return {"ok": True}
 
+    @router.post("/offers/{offer_id}/deep")
+    async def deep(offer_id: str, user: dict = Depends(current_user)):
+        o = await db.radar_offers.find_one({"id": offer_id, "user_id": user["id"]}, {"_id": 0})
+        if not o:
+            raise HTTPException(status_code=404, detail="Offre introuvable")
+        if o.get("method") == "ia":
+            return o
+        if await _ai_today(user["id"]) >= AI_TOP + DEEP_LIMIT:
+            raise HTTPException(status_code=429, detail=f"Limite de {AI_TOP + DEEP_LIMIT} analyses approfondies par jour atteinte")
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+        try:
+            await _analyze(o, profile.get("cv_text") or "", profile)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("radar deep %s failed: %s", offer_id, e)
+            raise HTTPException(status_code=503, detail="Service IA temporairement indisponible : réessayez plus tard.")
+        return await db.radar_offers.find_one({"id": offer_id}, {"_id": 0})
+
     @router.post("/offers/{offer_id}/pack")
     async def pack(offer_id: str, user: dict = Depends(current_user)):
         o = await db.radar_offers.find_one({"id": offer_id, "user_id": user["id"]}, {"_id": 0})
@@ -341,6 +381,10 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             return {"id": o["application_id"], "already": True}
         from .router import PackBody
         text = f"{o['title']} — {o['company']} — {o['location']}\nSource : {o['source']} · {o['url']}\n\n{o['description']}"
+        if o.get("method") == "ia" and o.get("ips"):  # reuse the Radar AI analysis for consistency
+            notes = "; ".join(f"{c['label']} {c['score']}/10" for c in o["ips"]["criteria"])
+            text += (f"\n\nANALYSE RADAR CAREEROS DÉJÀ RÉALISÉE (à réutiliser sauf contradiction avec l'offre) : {notes}. "
+                     f"Exigence éliminatoire : {o['ips'].get('knockout_detail') or 'aucune'}.")
         body = PackBody(offer_text=text[:30000], offer_url="", posted_date=o.get("posted_at") or "", network="aucun")
         res = await careeros_router.create_pack_internal(body, user, {"type": "radar", "radar_offer_id": offer_id, "source": o["source"], "url": o["url"]})
         await db.radar_offers.update_one({"id": offer_id}, {"$set": {"status": "pack", "application_id": res["id"]}})
@@ -352,8 +396,11 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         secret = os.environ.get("RADAR_CRON_SECRET")
         if not secret or x_cron_secret != secret:
             raise HTTPException(status_code=401, detail="Non autorisé")
+        since = (_now() - timedelta(days=ACTIVE_DAYS)).isoformat()
+        active = {u["id"] async for u in db.users.find({"last_seen_at": {"$gte": since}}, {"id": 1})}
         users = [s["user_id"] async for s in db.radar_settings.find({"enabled": True}, {"user_id": 1})]
         users += [p["user_id"] async for p in db.career_profiles.find({"cv_text": {"$nin": ["", None]}}, {"user_id": 1}) if p["user_id"] not in users]
+        users = [u for u in users if u in active]  # only members active in the last 7 days
         disabled = {s["user_id"] async for s in db.radar_settings.find({"enabled": False}, {"user_id": 1})}
 
         async def all_runs():
@@ -364,6 +411,11 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                     except Exception:  # noqa: BLE001
                         logger.exception("radar cron user %s", uid)
         asyncio.create_task(all_runs())
+        from . import ai_credits as AC
+        try:
+            await AC.check_alert(db)  # daily low-credit check
+        except Exception:  # noqa: BLE001
+            logger.exception("credit alert check failed")
         return {"started": True, "members": len([u for u in users if u not in disabled])}
 
     return router

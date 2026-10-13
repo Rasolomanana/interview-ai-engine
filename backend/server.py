@@ -349,7 +349,7 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
     yield _sse("done", {})
 
 
-async def _generate_text(system_message: str, user_text: str) -> str:
+async def _generate_text(system_message: str, user_text: str, tier: str = "eco") -> str:
     """Non-streaming aggregate generation with the same fallback chain."""
     if EMERGENT_LLM_KEY:
         for provider, model in SERVER_CHAIN:

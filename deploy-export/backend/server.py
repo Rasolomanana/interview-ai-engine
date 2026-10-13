@@ -56,11 +56,22 @@ def _build_server_chain():
             chain.append(("openrouter_free", "openrouter", free))
         chain.append(("openrouter", "openrouter", os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")))
     if ANTHROPIC_API_KEY:
-        chain.append(("anthropic", "anthropic", os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")))
+        chain.append(("anthropic", "anthropic", os.environ.get("ANTHROPIC_ECO_MODEL", "claude-haiku-4-5-20251001")))
     return chain
 
 
+def _build_premium_chain():
+    """Premium chain (letters + interview simulations): high-end model first, economical chain as fallback."""
+    chain = []
+    if OPENROUTER_API_KEY:
+        chain.append(("openrouter_premium", "openrouter", os.environ.get("OPENROUTER_PREMIUM_MODEL", "anthropic/claude-sonnet-4.5")))
+    if ANTHROPIC_API_KEY:
+        chain.append(("anthropic", "anthropic", os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")))
+    return chain + [c for c in SERVER_CHAIN if c[0] != "openrouter_free"]
+
+
 SERVER_CHAIN = _build_server_chain()
+PREMIUM_CHAIN = _build_premium_chain()
 LLM_MODEL = SERVER_CHAIN[0][1:] if SERVER_CHAIN else ("anthropic", "claude-sonnet-4-6")
 LLM_ENABLED = bool(SERVER_CHAIN)
 
@@ -318,8 +329,8 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
     imgs = [i for i in (images_base64 or []) if i]
     emitted = False
     errors = []
-    if SERVER_CHAIN:
-        for label, provider, model in SERVER_CHAIN:
+    if PREMIUM_CHAIN:
+        for label, provider, model in PREMIUM_CHAIN:
             try:
                 chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
                 fc = [ImageContent(image_base64=_strip_data_url(i)) for i in imgs] if imgs else None
@@ -345,11 +356,12 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
     yield _sse("done", {})
 
 
-async def _generate_text(system_message: str, user_text: str) -> str:
-    """Non-streaming aggregate generation with the same fallback chain."""
+async def _generate_text(system_message: str, user_text: str, tier: str = "eco") -> str:
+    """Non-streaming aggregate generation. tier='eco' (analyses) or 'premium' (letters)."""
     errors = []
-    if SERVER_CHAIN:
-        for label, provider, model in SERVER_CHAIN:
+    chain = PREMIUM_CHAIN if tier == "premium" else SERVER_CHAIN
+    if chain:
+        for label, provider, model in chain:
             try:
                 chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
                 out = []
@@ -371,7 +383,7 @@ async def _generate_text(system_message: str, user_text: str) -> str:
 async def _llm_health() -> list:
     """Admin diagnostic: one tiny call per provider of the server chain."""
     out = []
-    for entry in SERVER_CHAIN:
+    for entry in SERVER_CHAIN + [c for c in PREMIUM_CHAIN if c not in SERVER_CHAIN]:
         label, provider, model = entry
         try:
             chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message="Réponds uniquement OK.").with_model(provider, model)

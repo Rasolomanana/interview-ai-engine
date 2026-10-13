@@ -47,6 +47,21 @@ services:
       # CareerOS Radar — Jooble = main source; Adzuna optional (paid plan), ignored when empty
       - key: JOOBLE_API_KEY
         sync: false
+      # Cost control: rules pre-scoring for every offer, AI only for the best RADAR_AI_TOP per day (+ on-demand)
+      - key: RADAR_AI_TOP
+        value: "5"
+      - key: RADAR_DEEP_LIMIT
+        value: "20"
+      # Model routing: economical model for analyses, premium only for letters + interview simulations
+      - key: OPENROUTER_PREMIUM_MODEL
+        value: anthropic/claude-sonnet-4.5
+      - key: ANTHROPIC_ECO_MODEL
+        value: claude-haiku-4-5-20251001
+      # Low-credit alert e-mail (Emergent managed e-mail)
+      - key: EMERGENT_EMAIL_KEY
+        sync: false
+      - key: EMAIL_FROM_NAME
+        value: CareerOS
       - key: ADZUNA_APP_ID
         sync: false
       - key: ADZUNA_APP_KEY

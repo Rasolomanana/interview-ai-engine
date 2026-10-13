@@ -92,6 +92,9 @@ def create_auth(db):
         user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
         if not user:
             raise HTTPException(status_code=401, detail="Compte introuvable")
+        now = datetime.now(timezone.utc)
+        if (user.get("last_seen_at") or "") < (now - timedelta(hours=1)).isoformat():  # activity marker (Radar: active members)
+            await db.users.update_one({"id": user_id}, {"$set": {"last_seen_at": now.isoformat()}})
         return user
 
     @router.post("/register")

@@ -17,7 +17,7 @@ const Stat = ({ label, value, testid }) => (
   </div>
 );
 
-const OfferCard = ({ o, onPack, onIgnore, busy }) => (
+const OfferCard = ({ o, onPack, onIgnore, onDeep, deepId, busy }) => (
   <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4 min-w-0 break-words" data-testid={`radar-offer-${o.id}`}>
     <div className="flex items-start gap-3">
       <PriorityBadge priority={o.ips?.priority} testid={`radar-priority-${o.id}`} />
@@ -27,7 +27,11 @@ const OfferCard = ({ o, onPack, onIgnore, busy }) => (
       </div>
       <span className="whitespace-nowrap font-mono text-xs text-slate-300" title="IPS Radar provisoire : 8 critères évaluables avant candidature. L'IPS officiel est recalculé dans le pack." data-testid={`radar-ips-${o.id}`}>IPS Radar {o.ips?.score ?? "—"}</span>
     </div>
-    {o.excerpt && <p className="mt-2 inline-flex rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200" title="Jooble ne fournit qu'un extrait de l'offre : les critères non vérifiables sont notés de façon neutre." data-testid={`radar-excerpt-${o.id}`}>Analyse sur extrait{o.source === "jooble" ? " Jooble" : ""}</p>}
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] ${o.method === "ia" ? "border-indigo-400/30 bg-indigo-500/10 text-indigo-200" : "border-white/10 bg-white/5 text-slate-300"}`}
+        title={o.method === "ia" ? "Analyse IA approfondie" : "Pré-analyse par règles CareerOS, sans IA"} data-testid={`radar-method-${o.id}`}>{o.method === "ia" ? "Analyse IA" : "Pré-analyse règles"}</span>
+    {o.excerpt && <p className="inline-flex rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200" title="Jooble ne fournit qu'un extrait de l'offre : les critères non vérifiables sont notés de façon neutre." data-testid={`radar-excerpt-${o.id}`}>Analyse sur extrait{o.source === "jooble" ? " Jooble" : ""}</p>}
+    </div>
     <p className="mt-3 text-xs leading-relaxed text-slate-300" data-testid={`radar-why-${o.id}`}>{o.decision_report?.summary}</p>
     {(o.reasons_apply?.length > 0 || o.reasons_avoid?.length > 0) && (
       <div className="mt-2 grid min-w-0 gap-2 text-[11px] sm:grid-cols-2">
@@ -39,6 +43,8 @@ const OfferCard = ({ o, onPack, onIgnore, busy }) => (
       {o.status === "pack" ? <span className="text-xs text-indigo-300">Pack généré</span> : (
         <button onClick={() => onPack(o)} disabled={busy} data-testid={`radar-pack-btn-${o.id}`} className="flex items-center gap-1.5 rounded-full bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-400 disabled:opacity-50">
           <Sparkles className="h-3.5 w-3.5" />Générer le pack</button>)}
+      {o.method !== "ia" && o.status !== "pack" && <button onClick={() => onDeep(o)} disabled={deepId === o.id} data-testid={`radar-deep-btn-${o.id}`} className="flex items-center gap-1.5 rounded-full border border-indigo-400/40 px-3 py-1.5 text-xs text-indigo-200 hover:bg-indigo-500/10 disabled:opacity-60">
+        {deepId === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Analyse approfondie</button>}
       {o.url && <a href={o.url} target="_blank" rel="noreferrer" data-testid={`radar-open-${o.id}`} className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:text-white"><ExternalLink className="h-3.5 w-3.5" />Voir l'offre</a>}
       {o.status !== "ignoree" && o.status !== "pack" && <button onClick={() => onIgnore(o)} data-testid={`radar-ignore-${o.id}`} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-slate-500 hover:text-slate-200"><EyeOff className="h-3.5 w-3.5" />Ignorer</button>}
     </div>
@@ -68,6 +74,11 @@ export default function Radar() {
   const runNow = async () => { try { await radar.run(); toast.success("Recherche lancée"); setTimeout(load, 1200); } catch (e) { toast.error(e.message); } };
   const onPack = async (o) => { setBusy(true); try { const r = await radar.pack(o.id); nav(`/careeros/candidature/${r.id}`); } catch (e) { toast.error(e.message); setBusy(false); } };
   const onIgnore = async (o) => { await radar.ignore(o.id); load(); };
+  const [deepId, setDeepId] = useState(null);
+  const onDeep = async (o) => {
+    setDeepId(o.id);
+    try { const r = await radar.deep(o.id); toast.success(`Analyse IA : IPS Radar ${r.ips?.score}/100 — priorité ${r.ips?.priority}`); load(); } catch (e) { toast.error(e.message); } finally { setDeepId(null); }
+  };
   const lr = d?.last_run;
   const errs = Object.entries(lr?.errors || {});
 
@@ -78,7 +89,7 @@ export default function Radar() {
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300">CareerOS Radar</p>
           <h1 className="mt-2 font-display text-4xl font-bold tracking-tight sm:text-5xl">Vos meilleures opportunités</h1>
           <TodayMarker runs={runs} running={running} />
-          <p className="mt-2 max-w-xl text-sm text-slate-400">CareerOS cherche chaque jour pour vous et classe les offres par IPS Radar (provisoire, sur les critères évaluables avant candidature). L'IPS officiel est recalculé dans le pack complet, qui n'est généré que si vous le demandez.</p>
+          <p className="mt-2 max-w-xl text-sm text-slate-400">CareerOS cherche chaque jour pour vous, pré-analyse chaque offre par règles (sans IA), fait confirmer par l'IA les 5 meilleures du jour, et classe les offres par IPS Radar (provisoire, sur les critères évaluables avant candidature). L'IPS officiel est recalculé dans le pack complet, qui n'est généré que si vous le demandez.</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setSettings(true)} data-testid="radar-settings-btn" className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-slate-300 hover:text-white"><Settings2 className="h-4 w-4" />Réglages</button>
@@ -89,7 +100,7 @@ export default function Radar() {
       {!d ? <Loader2 className="h-5 w-5 animate-spin text-indigo-400" /> : (
         <div className="space-y-8">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat label="Analysées aujourd'hui" value={`${d.analyzed_today}/${d.daily_limit}`} testid="radar-stat-analyzed" />
+            <Stat label="Analysées aujourd'hui (règles · IA)" value={`${d.analyzed_today} · ${d.ai_today ?? 0}/${d.deep_limit ?? 0}`} testid="radar-stat-analyzed" />
             <Stat label="Nouvelles (dernier passage)" value={lr?.new ?? 0} testid="radar-stat-new" />
             <Stat label="Déjà connues" value={lr?.known ?? 0} testid="radar-stat-known" />
             <Stat label="Priorité A" value={d.top_a.length} testid="radar-stat-a" />
@@ -97,9 +108,9 @@ export default function Radar() {
           <SourceStatus status={d.sources_status} run={lr} />
           {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
           {errs.length > 0 && <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-200" data-testid="radar-errors">{errs.map(([k, v]) => <p key={k}>{k} : {v}</p>)}</div>}
-          <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" onPack={onPack} onIgnore={onIgnore} busy={busy} />
-          <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" onPack={onPack} onIgnore={onIgnore} busy={busy} />
-          <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" onPack={onPack} onIgnore={onIgnore} busy={busy} />
+          <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
+          <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
+          <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
           <RadarHistory runs={runs} />
         </div>
       )}

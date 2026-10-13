@@ -8,6 +8,7 @@ import os
 import io
 import csv
 import hmac
+import re
 import logging
 from collections import Counter
 
@@ -155,6 +156,46 @@ async def _simulations_detail(db, limit=100):
 
 def create_admin_router(db, llm_health=None):
     router = APIRouter(prefix="/api/admin")
+
+    @router.get("/credits")
+    async def admin_credits(x_admin_password: str = Header(None)):
+        _check_admin(x_admin_password)
+        from careeros import ai_credits as AC
+        try:
+            orc = await AC.openrouter_credits()
+        except Exception as e:  # noqa: BLE001
+            orc = {"configured": True, "error": f"Solde illisible ({str(e)[:100]})"}
+        alert = await AC.alert_settings(db)
+        if orc.get("total"):
+            try:
+                await AC.check_alert(db)
+            except Exception:  # noqa: BLE001
+                logger.exception("credit alert check failed")
+        return {"openrouter": orc, "anthropic": {"configured": bool(os.environ.get("ANTHROPIC_API_KEY")), "balance_api": False},
+                "links": AC.TOPUP_LINKS, "alert": alert, "email_ready": bool(os.environ.get("EMERGENT_EMAIL_KEY") and os.environ.get("EMAIL_FROM_NAME"))}
+
+    class AlertBody(BaseModel):
+        email: str = ""
+        threshold: int = 20
+
+    @router.put("/alert-settings")
+    async def admin_alert_settings(body: AlertBody, x_admin_password: str = Header(None)):
+        _check_admin(x_admin_password)
+        from careeros import ai_credits as AC
+        if body.email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", body.email.strip()):
+            raise HTTPException(status_code=422, detail="Adresse e-mail invalide")
+        if not 5 <= body.threshold <= 90:
+            raise HTTPException(status_code=422, detail="Seuil entre 5 et 90 %")
+        return await AC.save_alert_settings(db, body.email, body.threshold)
+
+    @router.post("/alert-test")
+    async def admin_alert_test(x_admin_password: str = Header(None)):
+        _check_admin(x_admin_password)
+        from careeros import ai_credits as AC
+        try:
+            return await AC.check_alert(db, force=True)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(status_code=502, detail=f"Envoi impossible : {str(e)[:160]}")
 
     @router.get("/llm-health")
     async def admin_llm_health(x_admin_password: str = Header(None)):
