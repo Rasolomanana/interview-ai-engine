@@ -1,0 +1,30 @@
+{
+  "summary": "Full retest of Rentabilité CareerOS v2 (lines/revenue_real + catalog admin). 14/14 backend pytest tests pass covering auth, catalog shape (5 families seeded + 17 providers with 'used' flag), category CRUD + 409-when-has-providers, provider CRUD + audit (create/update/archive) + 409-when-used, month save math (theory=price×paid, adjustments signed by kind, expected=theory+adj, used=real||expected, gap_cad=real-theory, unexplained=real-expected, infra line gap in CAD via fx), recurrent providers auto-proposed (est_source='recurrent') while suspended/out-of-range are excluded, ops_cad+dev_cad=total_cad, operating_margin/net_margin, invest_cad from dev ponctuel lines, archived provider with saved line still appears, members list + 404, AI logging regression via /api/generate. Frontend admin login + Rentabilité tab + all required data-testid: 10 KPI cards (kpi-revenue/infra/ai/marketing/dev/total/op-margin/margin/active/paid) each with a *-nature badge, nature-legend, finance-answers, finance-revenue (rev-theory/rev-real present), finance-costs with 5 cost-family-* groups and 9 cost-line-*, margin-op, margin-net, finance-per-member, finance-projections. Catalog sheet opens with catalog-categories + catalog-providers; provider add via prov-add-btn → provider-form → prov-save works (TEST_uiprov visible in prov-row-*); prov-history-{id} shows provider-history panel; prov-archive-{id} archives (toast 'Fournisseur archivé'). Editor sheet opens; fin-revenue-real correctly pre-fills 300 for preview month 2026-10. Mobile 390px: scrollWidth=innerWidth=390 (no horizontal overflow). Preview DB restored (2026-10 revenue_real=300, rabais=20, 2 lines preserved; all TEST_ catalog entities deleted via API after test).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "FinanceEditor Sheet (sticky bottom save bar)", "issues": ["fin-save button is positioned via sticky bottom-0 inside sm:max-w-xl Sheet; Playwright reports 'Element is outside of the viewport' when clicking at 1920×1080 without scrolling the sheet's internal scroll container. Visually fine for real users, but automated tests must JS-click or scroll the sheet. Minor — consider ensuring the sticky footer stays visible without needing internal scroll on short viewports."]},
+      {"screen": "ProviderForm <select> options", "issues": ["Non-blocking console hydration warning: '<span> cannot be a child of <option>'. This is caused by the preview-env runtime instrumentation wrapping dynamic text in <span>, NOT by the app code itself. Will not reproduce in production builds."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_finance.py", "/app/test_reports/pytest/finance_results.xml"],
+  "action_items": [
+    "(Optional, DX) In FinanceEditor, make the bottom action bar always visible (e.g., switch Sheet to flex column with footer outside overflow-y-auto) so e2e tooling doesn't need internal scroll."
+  ],
+  "critical_code_review_comments": [
+    "backend/careeros/finance.py (549 lines) is approaching the 700-line threshold — splitting catalog CRUD vs summary/compute into separate modules would improve maintainability but is not urgent.",
+    "seed_catalog() migrates legacy platform_costs/ai_invoices → lines idempotently on each app start by scanning finance_months without 'lines' key — correct and safe.",
+    "_used_providers() correctly excludes rows that have both estimated and real as None (recurrent-auto-proposed rows are not persisted and therefore don't block delete) — matches spec.",
+    "_lines() correctly skips archived providers that have no saved line (so archived recurrent providers don't pollute the dashboard) and keeps them visible when a saved line exists — matches spec and verified in test_finance_preview_month_2026_10.",
+    "classify() nicely routes OpenRouter :free into openrouter_free bucket; invest_cad is derived from recurrence=='ponctuel' lines in dev family — matches spec."
+  ],
+  "updated_files": ["/app/backend/tests/test_finance.py (rewritten for v2 schema: catalog shape, category/provider CRUD + 409 flows, provider audit, month save math incl. gap/unexplained, recurrent proposal rules, archived-with-line display, members, AI logging)"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% core flows (dashboard, catalog add/history/archive, editor opens with correct prefilled values, mobile no overflow)"},
+  "test_credentials": "Admin password: admin2026 (from /app/backend/.env ADMIN_PASSWORD). Member: membre.test@careeros.dev / CareerOS2026!",
+  "seed_data_creation": "No persistent seed changes. TEST_uicat_* / TEST_uiprov catalog entities created during UI tests were cleaned up via API (verified: 0 leftover TEST_ catalog rows). Preview month 2026-10 untouched (revenue_real=300.0, rabais=20, 2 lines).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Finance v2 is stable. Backend test file /app/backend/tests/test_finance.py matches the current schema (lines/revenue_real/catalog). Dedicated test month is 2027-03 and is wiped by each run. If testing editor save via Playwright, click fin-save via page.evaluate(\"document.querySelector('[data-testid=fin-save]').click()\") because the sticky footer may sit below the sheet's internal scroll on 1920×1080. The <span>-inside-<option> console warning is a preview-wrapper artifact, not an app bug."
+}

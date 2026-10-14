@@ -1,5 +1,12 @@
 # PRD — Copilote Entretien IA / CareerOS
 
+## Amélioration (juin 2026) — Rentabilité v2 : nature des données, catalogue, 2 marges
+- Nature sur chaque valeur : Réel (facture/encaissé), Estimé (saisi, récurrent par défaut, jetons×tarif), Calculé (dérivé, « % réel »). Composant `Nature.jsx` + légende.
+- Catalogue administrable : `finance_categories` (famille infrastructure/ia/developpement/marketing/autres) et `finance_providers` (récurrent/ponctuel/variable, montant habituel+devise, début/fin, suspension, lien journal IA google/openrouter/anthropic/autre, statut actif/archivé). Suppression seulement si non utilisé (409 sinon), archivage/réactivation, historique `finance_audit`. Seed + migration v1 au démarrage (`seed_catalog`).
+- Mois : `lines[{provider_id, estimated, real, currency, note}]`, `revenue_real`. Récurrents proposés automatiquement (Estimé) ; facture → Réel ; bouton « confirmer ». Revenu théorique / attendu / encaissé / écart / non expliqué.
+- Marge d'exploitation (hors dév.) + marge nette (tout inclus), investissements ponctuels du mois, 10 KPI, réponses clés, coût par membre actif / actif payant / payant, projections hors développement.
+- Testé : iteration_27 → backend 14/14, frontend 100 %, mobile OK.
+
 ## Fonctionnalité (juin 2026) — Admin « Rentabilité CareerOS »
 - Backend `careeros/finance.py` : journal `ai_usage` (chaque appel IA serveur : fournisseur, modèle, bucket, facturation, fonctionnalité copilote/analyse/premium/entreprise, jetons estimés ≈ 4 car./jeton) branché dans `_stream_with_fallback`, `_generate_text`, analyse entreprise (preview + deploy-export). `member_activity` (membre actif par mois, via current_user). `finance_months` (prix, payants forcés, ajustements, coûts plateforme CAD/USD, factures IA réelles). `admin_settings.finance` (taux USD→CAD, tarifs $/M jetons).
 - Endpoints admin : GET `/api/admin/finance?month=`, PUT `/api/admin/finance/{month}`, PUT `/api/admin/finance-settings`, GET `/api/admin/members`, PUT `/api/admin/members/{id}/paid`.
