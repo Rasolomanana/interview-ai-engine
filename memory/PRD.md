@@ -1,5 +1,12 @@
 # PRD — Copilote Entretien IA / CareerOS
 
+## Fonctionnalité (juin 2026) — Qualité des sources Radar : portails employeurs
+- Nouveaux lecteurs (`radar_sources.py`) : SuccessFactors RMK (flux RSS public `/services/rss/job/`), Oracle Recruiting (REST `recruitingCEJobRequisitions`), iCIMS (HTML, au mieux), SmartRecruiters (API publique). parse_portal reconnaît Oracle/iCIMS/SmartRecruiters/RSS SF.
+- `radar_discovery.py` : annuaire 26 employeurs QC/CA vérifiés en direct (cache 6 h) — Workday (Desjardins, Intact, iA, Beneva, Saputo, TD, CAE, Couche-Tard, Intelcom), SuccessFactors (Hydro-Québec, Rogers, Bombardier, TELUS, Hydro One, Scotia, CN, CPKC, Sobeys=403 illisible), Oracle (Ville de Montréal), SmartRecruiters (Ubisoft), Amazon ; sans flux public → Jooble (Banque Nationale, Bell/Phenom, Air Canada, Metro, CGI/Njoyn). Détection : annuaire + scan site (site web facultatif, sinon nom.com/.ca, careers./jobs.) + devinettes Greenhouse/Lever/Ashby/SmartRecruiters/Workday ; ATS non pris en charge signalés.
+- Endpoints : POST `/api/careeros/radar/portal/discover`, GET `/api/careeros/radar/directory`, `/portal/detect` sonde SuccessFactors.
+- Run : `portals` {entreprise: kind, ok, fetched, matched, error} ; Jooble interroge d'abord les entreprises sans portail (repli). UI : loupe « Trouver le portail » + « Associer » (validation explicite), « Tout détecter », « Annuaire » (ajout 1 clic), carte « Portails employeurs » (configurés, taux de lecture, offres lues/retenues, échecs).
+- Testé : iteration_28 → backend 29/29, frontend 100 %.
+
 ## Correctif (juin 2026) — Radar automatique : 0 analysée / tout reporté
 - Cause : la limite quotidienne (50 analyses, 5 IA) comptait depuis minuit UTC (= 20 h la veille à Toronto en heure d'été). Des analyses faites la veille au soir épuisaient le quota du passage de 6 h → budget 0 → tout « reporté ».
 - Fix : `_day_start()` = minuit America/Toronto pour `_analyzed_today`, `_ai_today`, pool IA et dashboard. Le run enregistre `budget` et un message `errors.limite` si le quota est déjà atteint.

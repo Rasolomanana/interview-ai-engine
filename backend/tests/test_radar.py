@@ -89,11 +89,62 @@ class TestRadarSettings:
         assert [c["name"] for c in d["companies"]] == ["Metro", "Desjardins"]
         assert d["companies"][1]["kind"] == "workday" and d["companies"][1]["slug"] == "desjardins.wd10/Desjardins"
 
-    def test_portal_detect(self, seed_h):
+    def test_portal_detect_successfactors_probe(self, seed_h):
+        # Hydro-Québec: no ATS regex match, but SF probe should succeed → ok=True kind=successfactors
         r = requests.post(f"{API}/careeros/radar/portal/detect", headers=seed_h,
-                          json={"url": "https://emploi.hydroquebec.com/", "name": "Hydro-Québec"}, timeout=30).json()
+                          json={"url": "https://emploi.hydroquebec.com/", "name": "Hydro-Québec"}, timeout=45).json()
+        assert r["kind"] == "successfactors", r
+        assert r["ok"] is True, r
+        assert r["count"] > 0, r
+
+    def test_portal_detect_unknown_host(self, seed_h):
+        r = requests.post(f"{API}/careeros/radar/portal/detect", headers=seed_h,
+                          json={"url": "https://example.com/", "name": "Example"}, timeout=30).json()
         assert r["ok"] is False and r["kind"] == ""
         assert "Jooble" in (r.get("message") or "")
+
+    def test_directory_endpoint(self, seed_h):
+        r = requests.get(f"{API}/careeros/radar/directory", headers=seed_h, timeout=120)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert isinstance(data, list) and len(data) >= 20, len(data)
+        for d in data:
+            assert set(["name", "sector", "portal_url", "kind", "ok", "count", "message"]).issubset(d.keys()), d
+        # At least a few verified portals
+        ok_count = sum(1 for d in data if d["ok"])
+        assert ok_count >= 5, f"Only {ok_count} verified portals in directory"
+        # Entries without a URL should be marked as Jooble fallback
+        no_feed = [d for d in data if not d["portal_url"]]
+        for d in no_feed:
+            assert d["ok"] is False and "Jooble" in d["message"], d
+
+    def test_portal_discover_desjardins(self, seed_h):
+        r = requests.post(f"{API}/careeros/radar/portal/discover", headers=seed_h,
+                          json={"name": "Desjardins", "website": "desjardins.com"}, timeout=60)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["name"] == "Desjardins"
+        cands = d.get("candidates") or []
+        assert any(c.get("ok") and c.get("kind") == "workday" for c in cands), cands
+        # Directory match should surface with origin='annuaire' and portal_url pre-filled
+        anm = [c for c in cands if c.get("origin") == "annuaire"]
+        assert anm, cands
+        assert anm[0]["portal_url"].startswith("https://desjardins.wd10")
+
+    def test_portal_discover_unknown(self, seed_h):
+        r = requests.post(f"{API}/careeros/radar/portal/discover", headers=seed_h,
+                          json={"name": "Zzz Random Company 404", "website": ""}, timeout=60)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        # Either no candidates or at least a helpful message about Jooble fallback
+        assert "candidates" in d and "message" in d
+        if not any(c.get("ok") for c in d.get("candidates") or []):
+            assert "Jooble" in d["message"] or d["message"] == "" or d["candidates"] == []
+
+    def test_portal_discover_requires_auth(self):
+        r = requests.post(f"{API}/careeros/radar/portal/discover",
+                          json={"name": "Desjardins"}, timeout=15)
+        assert r.status_code in (401, 403)
 
     def test_portal_detect_requires_auth(self):
         r = requests.post(f"{API}/careeros/radar/portal/detect", json={"url": "https://x.wd1.myworkdayjobs.com/foo"}, timeout=15)

@@ -125,8 +125,10 @@ async def discover(name: str, website: str = "") -> dict:
         for v in vs[:2]:
             guesses += [("greenhouse", v), ("lever", v), ("ashby", v), ("smartrecruiters", v)]
             guesses += [("workday", f"{v}.wd{n}/{site}") for n in (1, 3, 5, 10) for site in (v, "External", "Careers")]
-        checks = await asyncio.gather(*(verify(c, k, s, name) for k, s in guesses if (k, s) not in found))
-        for (k, s), v in zip([g for g in guesses if g not in found], checks):
+        known = {(k, s.lower()) for k, s in found}
+        guesses = [g for g in guesses if (g[0], g[1].lower()) not in known]
+        checks = await asyncio.gather(*(verify(c, k, s, name) for k, s in guesses))
+        for (k, s), v in zip(guesses, checks):
             if v["ok"] and v["count"]:
                 found[(k, s)], origin[(k, s)] = "", "devinette"
         results = await asyncio.gather(*(verify(c, k, s, name) for k, s in found))
