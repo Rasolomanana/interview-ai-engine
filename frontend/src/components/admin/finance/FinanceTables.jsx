@@ -15,6 +15,8 @@ const NRow = ({ label, value, kind, realPct, strong, testid, hint }) => <Row lab
 const ADJ = { rabais: "Rabais", fondateur: "Fondateurs", essai: "Essai gratuit", ponctuel: "Ponctuel", remboursement: "Remboursement", b2b: "B2B", autre: "Autre" };
 const SRC = { saisie: "saisi", jetons: "jetons × tarif", recurrent: "récurrent par défaut" };
 const REC = { recurrent: "Récurrent", ponctuel: "Ponctuel", variable: "Variable" };
+export const WARN = { date_missing: "Date manquante", real_unconfirmed: "Facture réelle non confirmée", estimate_only: "Montant estimé uniquement" };
+const Warn = ({ w, testid }) => <span className="mr-1 mt-0.5 inline-block rounded border border-amber-400/40 bg-amber-500/10 px-1.5 py-px text-[10px] text-amber-300" data-testid={testid}>⚠ {WARN[w]}</span>;
 
 export const RevenuePanel = ({ s }) => {
   const r = s.revenue;
@@ -36,7 +38,9 @@ export const RevenuePanel = ({ s }) => {
 
 const LineRow = ({ l }) => (
   <tr data-testid={`cost-line-${l.provider_id}`} className={l.provider_status === "archived" ? "opacity-60" : ""}>
-    <Td left>{l.name}<span className="block text-[10px] text-slate-500">{l.category} · {REC[l.recurrence]}{l.provider_status === "archived" ? " · archivé" : ""}{l.suspended ? " · suspendu" : ""}</span></Td>
+    <Td left>{l.name}<span className="block text-[10px] text-slate-500">{l.category} · {REC[l.recurrence]}{l.provider_status === "archived" ? " · archivé" : ""}{l.suspended ? " · suspendu" : ""}</span>
+      <span className="block text-[10px] text-slate-400" data-testid={`cost-line-date-${l.provider_id}`}>{l.billing_date ? `Facturé le ${l.billing_date}` : l.due_date ? `Prévu le ${l.due_date}` : ""}{l.note ? `${l.billing_date || l.due_date ? " · " : ""}${l.note}` : ""}</span>
+      {l.warnings.map((w) => <Warn key={w} w={w} testid={`cost-line-warn-${w}-${l.provider_id}`} />)}</Td>
     <Td>{l.est_cad === null ? "—" : cadFine(l.est_cad)}<span className="block text-[10px] text-slate-500">{SRC[l.est_source] || ""}</span></Td>
     <Td>{cad(l.real_cad)}</Td>
     <Td className={l.gap_cad > 0 ? "text-rose-300" : "text-emerald-300"}>{l.gap_cad === null ? "—" : `${cad(l.gap_cad)}${l.gap_pct !== null ? ` · ${pct(l.gap_pct)}` : ""}`}</Td>
@@ -127,6 +131,9 @@ export const Alerts = ({ s }) => {
         </div>
         <div data-testid="finance-pace-ai"><p className="flex items-center gap-1.5 text-[11px] uppercase text-slate-500">IA projetée fin de mois <Nature kind="estimated" /></p><p className="text-xl font-bold text-white">{cad(s.pace.ai_month_end_cad)}</p><p className="text-[11px] text-slate-400">Jour {s.pace.days_elapsed}/{s.pace.days_in_month}</p></div>
         <div data-testid="finance-pace-margin"><p className="flex items-center gap-1.5 text-[11px] uppercase text-slate-500">Marge d'exploitation projetée <Nature kind="estimated" /></p><p className={`text-xl font-bold ${tone(s.pace.operating_margin_month_end_cad)}`}>{cad(s.pace.operating_margin_month_end_cad)}</p></div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2" data-testid="finance-warnings">
+        {Object.entries(s.warnings).map(([w, n]) => <span key={w} className={`rounded-lg border px-2.5 py-1 text-xs ${n ? "border-amber-400/40 bg-amber-500/10 text-amber-300" : "border-white/10 text-slate-500"}`} data-testid={`finance-warning-${w}`}>⚠ {WARN[w]} : {n}</span>)}
       </div>
       <p className="mt-3 text-[11px] text-slate-500">Le seuil d'alerte et l'e-mail se règlent dans la carte « Crédit IA restant » de l'onglet Activité.</p>
     </Panel>

@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { adminFinanceCatalog, adminSaveFinanceMonth, adminSaveFinanceSettings } from "@/lib/api";
 import { cadFine, monthLabel } from "./fmt";
 import { Nature } from "./Nature";
+import { DateField } from "@/components/careeros/DateField";
 
 const pwd = () => sessionStorage.getItem("adminPwd");
 const inp = "w-full rounded-lg border border-white/10 bg-slate-950 px-2.5 py-1.5 text-sm text-white outline-none focus:border-emerald-400/60";
@@ -15,7 +16,7 @@ const H = ({ children }) => <h4 className="mb-2 mt-5 flex items-center gap-2 tex
 const toNum = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
 
 const toRow = (l) => ({ provider_id: l.provider_id, name: l.name, family: l.family, est_cad: l.est_cad, est_source: l.est_source,
-  default_amount: l.default_amount, default_currency: l.default_currency, estimated: l.saved_estimated ?? "", real: l.saved_real ?? "", currency: l.currency, note: l.note || "" });
+  default_amount: l.default_amount, default_currency: l.default_currency, estimated: l.saved_estimated ?? "", real: l.saved_real ?? "", currency: l.currency, note: l.note || "", billing_date: l.billing_date || "", due_date: l.due_date });
 
 const LineEdit = ({ r, onChange, onRemove, onConfirm }) => (
   <div className="mb-2 rounded-lg border border-white/[0.06] p-2" data-testid={`fin-line-${r.provider_id}`}>
@@ -28,6 +29,11 @@ const LineEdit = ({ r, onChange, onRemove, onConfirm }) => (
       <button onClick={onConfirm} title="Confirmer l'estimation comme montant réel" className="rounded-md p-1.5 text-slate-400 hover:text-emerald-300" data-testid={`fin-line-confirm-${r.provider_id}`}><CheckCheck className="h-4 w-4" /></button>
       <button onClick={onRemove} title="Retirer la saisie" className="rounded-md p-1.5 text-slate-500 hover:text-rose-400"><Trash2 className="h-4 w-4" /></button>
     </div>
+    <div className="mt-1.5 grid grid-cols-[150px_1fr] gap-1.5">
+      <DateField value={r.billing_date} onChange={(v) => onChange({ billing_date: v })} className={inp} testid={`fin-line-date-${r.provider_id}`} />
+      <input value={r.note} onChange={(e) => onChange({ note: e.target.value })} maxLength={200} placeholder={r.due_date ? `Note (facture prévue le ${r.due_date})` : "Note facultative"} className={inp} data-testid={`fin-line-note-${r.provider_id}`} />
+    </div>
+    {r.real !== "" && !r.billing_date && <p className="mt-1 text-[11px] text-amber-300" data-testid={`fin-line-warn-${r.provider_id}`}>⚠ Date de facturation manquante (facultative)</p>}
   </div>
 );
 
@@ -53,7 +59,7 @@ export const FinanceEditor = ({ open, onClose, s, onSaved }) => {
     const p = addable.find((x) => x.id === pick);
     if (!p) return;
     const c = cat.categories.find((x) => x.id === p.category_id);
-    setRows([...rows, { provider_id: p.id, name: p.name, family: c?.family || "autres", est_cad: null, est_source: null, default_amount: p.default_amount, default_currency: p.currency, estimated: "", real: "", currency: p.currency, note: "" }]);
+    setRows([...rows, { provider_id: p.id, name: p.name, family: c?.family || "autres", est_cad: null, est_source: null, default_amount: p.default_amount, default_currency: p.currency, estimated: "", real: "", currency: p.currency, note: "", billing_date: "", due_date: null }]);
     setPick("");
   };
   const save = async () => {
@@ -63,7 +69,7 @@ export const FinanceEditor = ({ open, onClose, s, onSaved }) => {
       await adminSaveFinanceMonth(pwd(), s.month, {
         price_cad: Number(f.price_cad) || 0, paid_override: toNum(f.paid_override), revenue_real: toNum(f.revenue_real),
         adjustments: f.adjustments.map((a) => ({ ...a, amount: Number(a.amount) || 0 })),
-        lines: rows.map((r) => ({ provider_id: r.provider_id, estimated: toNum(r.estimated), real: toNum(r.real), currency: r.currency, note: r.note })),
+        lines: rows.map((r) => ({ provider_id: r.provider_id, estimated: toNum(r.estimated), real: toNum(r.real), currency: r.currency, note: r.note, billing_date: r.billing_date || null })),
       });
       toast.success("Données financières enregistrées");
       onSaved();

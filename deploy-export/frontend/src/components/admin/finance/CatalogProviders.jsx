@@ -31,7 +31,12 @@ const ProvRow = ({ p, data, reload }) => {
     <div className={`border-t border-white/[0.06] py-2 first:border-t-0 ${archived ? "opacity-60" : ""}`} data-testid={`prov-row-${p.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="min-w-0 flex-1 text-sm text-slate-200">{p.name}
-          <span className="block text-[11px] text-slate-500">{cat?.name || "?"} · {REC[p.recurrence]} · {p.default_amount} {p.currency}/mois{p.start_month ? ` · dès ${p.start_month}` : ""}{p.end_month ? ` → ${p.end_month}` : ""}{p.ai_key ? " · lié au journal IA" : ""}</span>
+          <span className="block text-[11px] text-slate-500">{cat?.name || "?"} · {REC[p.recurrence]} · {p.default_amount} {p.currency}/{p.billing_cycle === "annuel" ? "an" : "mois"}{p.start_month ? ` · dès ${p.start_month}` : ""}{p.end_month ? ` → ${p.end_month}` : ""}{p.ai_key ? " · lié au journal IA" : ""}</span>
+          <span className="block text-[11px] text-slate-400" data-testid={`prov-billing-${p.id}`}>
+            Facturation : {p.billing_day ? `le ${p.billing_day}${p.billing_cycle === "annuel" ? " (annuel)" : " du mois"}` : "jour non défini"}
+            {" · "}Dernière facture : {p.last_invoice ? `${p.last_invoice.date || p.last_invoice.month} · ${p.last_invoice.amount} ${p.last_invoice.currency}` : "aucune"}
+            {" · "}Prochaine prévue : {p.next_invoice || "—"}
+          </span>
         </span>
         <StatusBadge archived={archived} suspended={p.suspended} />
         <IconBtn icon={Pencil} label="Modifier" onClick={() => setMode("edit")} testid={`prov-edit-${p.id}`} />

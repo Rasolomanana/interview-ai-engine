@@ -103,6 +103,7 @@ class Line(BaseModel):
     real: Optional[float] = Field(None, ge=0)
     currency: str = Field("CAD", pattern="^(CAD|USD)$")
     note: str = Field("", max_length=200)
+    billing_date: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
 class MonthBody(BaseModel):
@@ -137,6 +138,8 @@ class ProviderBody(BaseModel):
     end_month: Optional[str] = Field(None, pattern=M_PATTERN)
     suspended: bool = False
     ai_key: Optional[str] = Field(None, pattern="^(google|openrouter|anthropic|autre)$")
+    billing_day: Optional[int] = Field(None, ge=1, le=31)
+    billing_cycle: str = Field("mensuel", pattern="^(mensuel|annuel)$")
 
 
 class ArchiveBody(BaseModel):
@@ -180,6 +183,40 @@ async def seed_catalog(db):
                 lines.append({"provider_id": p["id"], "estimated": None, "real": i["amount"], "currency": i.get("currency", "USD"), "note": ""})
         await db.finance_months.update_one({"month": doc["month"]}, {"$set": {"lines": lines, "revenue_real": None},
                                                                       "$unset": {"platform_costs": "", "ai_invoices": ""}})
+
+
+def _due_date(month: str, day: Optional[int]) -> Optional[str]:
+    if not day:
+        return None
+    y, m = map(int, month.split("-"))
+    return f"{month}-{min(day, calendar.monthrange(y, m)[1]):02d}"
+
+
+def _bills_in(p: dict, month: str) -> bool:
+    """Annual providers are billed only in the anniversary month of start_month."""
+    return p.get("billing_cycle", "mensuel") != "annuel" or not p.get("start_month") or p["start_month"][5:] == month[5:]
+
+
+def _shift(month: str, n: int) -> str:
+    y, m = map(int, month.split("-"))
+    t = y * 12 + m - 1 + n
+    return f"{t // 12:04d}-{t % 12 + 1:02d}"
+
+
+def next_invoice(p: dict) -> Optional[str]:
+    if p.get("status") != "active" or p.get("suspended") or p.get("recurrence") != "recurrent":
+        return None
+    today = datetime.now(TZ).strftime("%Y-%m-%d")
+    m = max(month_key(), p.get("start_month") or month_key())
+    for i in range(13):
+        mm = _shift(m, i)
+        if p.get("end_month") and mm > p["end_month"]:
+            return None
+        if _bills_in(p, mm):
+            d = _due_date(mm, p.get("billing_day") or 1)
+            if d >= today or not p.get("billing_day"):
+                return d if p.get("billing_day") else mm
+    return None
 
 
 def _nature(lines):
@@ -247,14 +284,14 @@ def create_finance_router(db, check_admin, credits_fn=None):
             ln = saved.get(p["id"])
             in_range = (not p.get("start_month") or p["start_month"] <= month) and (not p.get("end_month") or month <= p["end_month"])
             live = p["status"] == "active" and cat["status"] == "active" and not p.get("suspended") and in_range
-            if not ln and not (live and (p["recurrence"] == "recurrent" or p.get("ai_key"))):
+            if not ln and not (live and ((p["recurrence"] == "recurrent" and _bills_in(p, month)) or p.get("ai_key"))):
                 continue
             cur = (ln or {}).get("currency") or p["currency"]
             if ln and ln.get("estimated") is not None:
                 est, src = cad(ln["estimated"], cur), "saisie"
             elif p.get("ai_key"):
                 est, src = ai_usd.get(p["ai_key"], 0.0) * cad(1, "USD"), "jetons"
-            elif live and p["recurrence"] == "recurrent":
+            elif live and p["recurrence"] == "recurrent" and _bills_in(p, month):
                 est, src = cad(p["default_amount"], p["currency"]), "recurrent"
             else:
                 est, src = None, None
@@ -262,7 +299,17 @@ def create_finance_router(db, check_admin, credits_fn=None):
             if est is None and real is None and not live:
                 continue
             used = real if real is not None else (est or 0.0)
-            out.append({"provider_id": p["id"], "name": p["name"], "category": cat["name"], "family": cat["family"],
+            bdate = (ln or {}).get("billing_date")
+            due = _due_date(month, p.get("billing_day"))
+            today = datetime.now(TZ).strftime("%Y-%m-%d")
+            overdue = month < month_key() or (due is not None and due < today)
+            warnings = []
+            if real is not None and not bdate:
+                warnings.append("date_missing")
+            if real is None and (est or 0) >= 0.01:
+                warnings.append("real_unconfirmed" if overdue else "estimate_only")
+            out.append({"billing_date": bdate, "due_date": due, "billing_day": p.get("billing_day"),
+                        "billing_cycle": p.get("billing_cycle", "mensuel"), "warnings": warnings,"provider_id": p["id"], "name": p["name"], "category": cat["name"], "family": cat["family"],
                         "recurrence": p["recurrence"], "provider_status": p["status"], "suspended": p.get("suspended", False),
                         "ai_key": p.get("ai_key"), "currency": cur, "default_amount": p["default_amount"], "default_currency": p["currency"],
                         "saved_estimated": (ln or {}).get("estimated"), "saved_real": (ln or {}).get("real"), "note": (ln or {}).get("note", ""),
@@ -313,6 +360,7 @@ def create_finance_router(db, check_admin, credits_fn=None):
                            "unexplained_cad": None if real_rev is None else round(real_rev - expected, 2)},
                "families": fam, "ops_cad": ops, "dev_cad": dev, "invest_cad": fam["developpement"]["invest_cad"], "total_cad": total,
                "ops_nature": ops_nat, "total_nature": all_nat,
+               "warnings": {w: sum(w in x["warnings"] for x in lines) for w in ("date_missing", "real_unconfirmed", "estimate_only")},
                "operating_margin_cad": op_margin, "operating_margin_pct": pctof(op_margin),
                "net_margin_cad": net_margin, "net_margin_pct": pctof(net_margin),
                "members": {"registered": registered, "active": n_active, "paid": paid, "active_paid": active_paid}}
@@ -417,10 +465,17 @@ def create_finance_router(db, check_admin, credits_fn=None):
         check_admin(x_admin_password)
         cats, provs = await _catalog()
         used = await _used_providers()
+        last = {}
+        async for d in db.finance_months.find({}, {"_id": 0, "month": 1, "lines": 1}).sort("month", 1):
+            for ln in d.get("lines") or []:
+                if ln.get("real") is not None:
+                    last[ln["provider_id"]] = {"month": d["month"], "date": ln.get("billing_date"), "amount": ln["real"], "currency": ln.get("currency")}
         count = {}
         for p in provs:
             count[p["category_id"]] = count.get(p["category_id"], 0) + 1
             p["used"] = p["id"] in used
+            p["last_invoice"] = last.get(p["id"])
+            p["next_invoice"] = next_invoice(p)
         return {"families": FAMILIES, "ai_keys": AI_KEYS, "providers": provs,
                 "categories": [{**c, "providers": count.get(c["id"], 0)} for c in sorted(cats.values(), key=lambda c: (list(FAMILIES).index(c["family"]), c["name"]))]}
 

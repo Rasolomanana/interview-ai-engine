@@ -1,5 +1,10 @@
 # PRD — Copilote Entretien IA / CareerOS
 
+## Amélioration (juin 2026) — Facturation fournisseurs
+- Fournisseur : `billing_day` (1-31), `billing_cycle` mensuel/annuel (annuel = mois anniversaire de start_month, récurrent proposé seulement ce mois-là). Catalogue : `last_invoice` (dernier montant réel saisi), `next_invoice` (prochaine date prévue).
+- Ligne du mois : `billing_date` (DateField FR) + `note`. Sortie : `due_date`, `warnings` (date_missing, real_unconfirmed si échéance passée, estimate_only ≥ 0,01 $) ; compteurs `warnings` dans Alertes. Avertissements non bloquants.
+- Testé : curl + parcours UI (date + note → avertissement disparaît, catalogue « Dernière / Prochaine facture »).
+
 ## Amélioration (juin 2026) — Rentabilité v2 : nature des données, catalogue, 2 marges
 - Nature sur chaque valeur : Réel (facture/encaissé), Estimé (saisi, récurrent par défaut, jetons×tarif), Calculé (dérivé, « % réel »). Composant `Nature.jsx` + légende.
 - Catalogue administrable : `finance_categories` (famille infrastructure/ia/developpement/marketing/autres) et `finance_providers` (récurrent/ponctuel/variable, montant habituel+devise, début/fin, suspension, lien journal IA google/openrouter/anthropic/autre, statut actif/archivé). Suppression seulement si non utilisé (409 sinon), archivage/réactivation, historique `finance_audit`. Seed + migration v1 au démarrage (`seed_catalog`).
