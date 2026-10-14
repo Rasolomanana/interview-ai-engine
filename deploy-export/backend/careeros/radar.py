@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from . import radar_rules as RR
 from . import radar_sources as S
+from . import radar_discovery as D
 from .decision_report import build_decision_report
 from .ips import compute_ips
 from .prompts import SYSTEM
@@ -27,12 +28,19 @@ DEFAULT_SOURCES = ["jooble", "workday", "boards"]
 AI_TOP = int(os.environ.get("RADAR_AI_TOP") or 5)  # AI confirmation of the best rule-scored offers, per member per day
 DEEP_LIMIT = int(os.environ.get("RADAR_DEEP_LIMIT") or 20)  # extra on-demand AI analyses per member per day
 ACTIVE_DAYS = 7
-SOURCE_RANK = {"workday": 0, "amazon": 1, "greenhouse": 2, "lever": 2, "ashby": 2, "jooble": 3, "adzuna": 4}
+SOURCE_RANK = {"workday": 0, "successfactors": 0, "oracle": 1, "amazon": 1, "smartrecruiters": 1, "icims": 2, "greenhouse": 2, "lever": 2, "ashby": 2,
+               "jooble": 3, "adzuna": 4}
 
 
 def _source_rank(o: dict) -> int:
     return SOURCE_RANK.get(o.get("source"), 3)
 JOOBLE_COMPANY_LIMIT = 20
+
+
+def _day_start() -> str:
+    """Midnight America/Toronto (the member's day), as a UTC ISO string."""
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("America/Toronto")).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).isoformat()
 
 
 def _now():
@@ -43,8 +51,9 @@ class Company(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     enabled: bool = True
     portal_url: str = Field(default="", max_length=400)
-    kind: str = Field(default="", pattern="^(|workday|greenhouse|lever|ashby|amazon)$")
+    kind: str = Field(default="", pattern="^(|workday|successfactors|oracle|icims|greenhouse|lever|ashby|smartrecruiters|amazon)$")
     slug: str = Field(default="", max_length=200)
+    website: str = Field(default="", max_length=200)
 
 
 class RadarSettings(BaseModel):
@@ -139,7 +148,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         return [x for x in st["sources"] if conf.get(x)]
 
     async def _analyzed_today(user_id: str) -> int:
-        start = _now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        start = _day_start()
         return await db.radar_offers.count_documents({"user_id": user_id, "analyzed_at": {"$gte": start}})
 
     async def _fetch(st: dict) -> tuple:
@@ -147,6 +156,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         kw = st.get("keywords") or []
         terms = kw[:3] or ["analyste"]  # one Jooble query per keyword (joined keywords = AND search)
         srcs, comps = _active_sources(st), [c for c in st["companies"] if c.get("enabled", True)]
+        comps.sort(key=lambda co: bool(co.get("kind") and co.get("slug")))  # Jooble fallback first for companies without a readable portal
         sem = asyncio.Semaphore(6)
 
         async def limited(coro):
@@ -165,7 +175,12 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                     tasks += [(f"{co['kind']}:{co['name']}", None, S.board(c, co["kind"], co["slug"], co["name"], kw))]
             res = await asyncio.gather(*(limited(t) for _, _, t in tasks), return_exceptions=True)
         jooble_raw, jooble_ok = 0, 0
+        portals = {}
         for (name, company, _), r in zip(tasks, res):
+            kind = name.split(":", 1)[0]
+            if kind in S.PORTAL_KINDS:
+                portals[name.split(":", 1)[1]] = {"kind": kind, "ok": not isinstance(r, Exception), "fetched": 0 if isinstance(r, Exception) else len(r),
+                                                  "error": (str(r) or type(r).__name__)[:160] if isinstance(r, Exception) else ""}
             if isinstance(r, Exception):
                 errors[name] = (str(r) or type(r).__name__)[:160]
                 continue
@@ -174,12 +189,13 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             for o in r:
                 if company and not S.company_match(o, company):
                     continue
-                if (company or o["source"] in ("greenhouse", "lever", "ashby")) and not S.matches(o, kw):
+                if (company or o["source"] in ("greenhouse", "lever", "ashby", "icims")) and not S.matches(o, kw):
                     continue
                 offers.append(o)
         if jooble_ok and not jooble_raw:
             errors["jooble"] = (f"Jooble ({S.JOOBLE_HOST}) n'a renvoyé aucune offre pour « {st['location']} ». "
                                 f"Vérifiez que la clé a été obtenue sur {S.JOOBLE_HOST}/api/about (les clés Jooble sont propres à chaque pays).")
+        errors["_portals"] = portals
         return offers, errors
 
     async def _store(doc: dict, d: dict, method: str):
@@ -206,7 +222,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         return await _store(doc, d, "ia")
 
     async def _ai_today(user_id: str) -> int:
-        start = _now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        start = _day_start()
         return await db.radar_offers.count_documents({"user_id": user_id, "ai_analyzed_at": {"$gte": start}})
 
     async def run_for_user(user_id: str, trigger: str) -> dict:
@@ -222,6 +238,9 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             run["errors"]["cv"] = "Ajoutez votre CV dans la Career Memory pour activer le Radar."
         else:
             offers, run["errors"] = await _fetch(st)
+            run["portals"] = run["errors"].pop("_portals", {})
+            for pname, pv in run["portals"].items():
+                pv["matched"] = sum(1 for o in offers if o["source"] == pv["kind"] and o.get("company") == pname)
             seen, fresh = set(), []
             for o in offers:
                 k = _key(o)
@@ -246,12 +265,16 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                        if d["id"] not in fresh_ids]  # offers deferred by an earlier daily limit
             queue = sorted(fresh, key=_source_rank) + sorted(backlog, key=_source_rank)  # full descriptions first
             todo, run["skipped_limit"] = queue[:budget], max(0, len(queue) - budget)
+            run["budget"] = budget
+            if queue and not budget:
+                run["errors"]["limite"] = (f"Limite de {DAILY_LIMIT} analyses par jour déjà atteinte depuis minuit (heure de Toronto) : "
+                                           "les offres sont reportées au prochain passage.")
             scored = []
             for doc in todo:  # free deterministic pre-scoring
                 scored.append((await _rules(doc, cv, profile, st.get("keywords") or []), doc))
                 run["by_source"][S.group(doc["source"])]["analyzed"] += 1
             run["analyzed"] = len(scored)
-            start = _now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+            start = _day_start()
             pool = [d async for d in db.radar_offers.find({"user_id": user_id, "method": "regles", "analyzed_at": {"$gte": start},
                                                            "ips.knockout": False, "status": "nouvelle"}, {"_id": 0}).sort("ips.score", -1)]
             pool.sort(key=lambda d: (-d["ips"]["score"], _source_rank(d)))
@@ -301,9 +324,29 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         url: str = Field(min_length=8, max_length=400)
         name: str = Field(default="", max_length=80)
 
+    class DiscoverBody(BaseModel):
+        name: str = Field(min_length=1, max_length=80)
+        website: str = Field(default="", max_length=200)
+
+    @router.post("/portal/discover")
+    async def discover_portal(body: DiscoverBody, user: dict = Depends(current_user)):
+        try:
+            return await asyncio.wait_for(D.discover(body.name.strip(), body.website.strip()), timeout=45)
+        except asyncio.TimeoutError:
+            return {"name": body.name, "candidates": [], "unsupported": [], "message": "Détection trop longue : réessayez ou collez l'URL du portail. Jooble reste utilisé en repli."}
+
+    @router.get("/directory")
+    async def employer_directory(user: dict = Depends(current_user)):
+        return await D.directory()
+
     @router.post("/portal/detect")
     async def detect_portal(body: PortalBody, user: dict = Depends(current_user)):
         kind, slug = S.parse_portal(body.url)
+        if not kind and S.host_of(body.url):
+            async with httpx.AsyncClient(timeout=S.TIMEOUT, follow_redirects=True) as c:
+                probe = await D.verify(c, "successfactors", S.host_of(body.url), body.name or "")
+            if probe["ok"]:
+                kind, slug = "successfactors", S.host_of(body.url)
         if not kind:
             return {"kind": "", "slug": "", "ok": False, "count": 0,
                     "message": "Portail sans flux public pris en charge : cette entreprise sera suivie via Jooble."}
@@ -313,7 +356,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                     offers = await S.workday(c, slug, body.name or slug, [], max_details=0)
                 else:
                     offers = await S.board(c, kind, slug, body.name or slug, [])
-            return {"kind": kind, "slug": slug, "ok": True, "count": len(offers), "message": f"Portail {kind} vérifié."}
+            return {"kind": kind, "slug": slug, "ok": True, "count": len(offers), "message": f"Portail {D.KIND_LABEL.get(kind, kind)} vérifié."}
         except Exception as e:  # noqa: BLE001
             return {"kind": kind, "slug": slug, "ok": False, "count": 0, "message": f"Portail {kind} injoignable ({(str(e) or type(e).__name__)[:80]})."}
 
@@ -351,14 +394,14 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         active = [o for o in offers if o["status"] not in ("ignoree", "pack") and o.get("ips")]
         top = lambda p: sorted([o for o in active if o["ips"]["priority"] == p], key=lambda o: -o["ips"]["score"])[:20]  # noqa: E731
         st = await _settings(user["id"], {})
-        day = _now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        day = _day_start()
         known = [o async for o in db.radar_offers.find({**q, "run_id": {"$ne": last["id"]}, "last_seen": {"$gte": last["at"]}}, proj).sort("last_seen", -1).limit(200)] if last else []
         analyzed = [o async for o in db.radar_offers.find({**q, "analyzed_at": {"$gte": day}}, proj).sort("analyzed_at", -1).limit(100)]
         return {
             "known_last_run": known, "analyzed_today_list": analyzed,
             "sources_status": {"configured": S.configured(), "selected": st["sources"], "portals": {
                 "workday": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") == "workday"),
-                "boards": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") in ("greenhouse", "lever", "ashby", "amazon"))}},
+                "boards": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") and c.get("kind") != "workday")}},
             "last_run": last, "analyzed_today": await _analyzed_today(user["id"]), "daily_limit": DAILY_LIMIT,
             "ai_today": await _ai_today(user["id"]), "ai_top": AI_TOP, "deep_limit": AI_TOP + DEEP_LIMIT,
             "new_today": [o for o in offers if last and o.get("run_id") == last.get("id")][:50],

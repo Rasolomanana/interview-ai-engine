@@ -26,7 +26,7 @@ export const RadarSettingsDialog = ({ onClose }) => {
       const r = await radar.saveSettings({ enabled, keywords, location, companies: companies.filter((c) => c.name.trim()), sources });
       const n = (f) => r.companies.filter((c) => c.enabled && f(c)).length;
       const bad = r.companies.filter((c) => c.portal_url && !c.kind).map((c) => c.name);
-      toast.success(`Réglages enregistrés : ${n((c) => c.kind === "workday")} portail(s) Workday, ${n((c) => c.kind && c.kind !== "workday")} site(s) carrières, ${n((c) => !c.kind)} entreprise(s) via Jooble.`);
+      toast.success(`Réglages enregistrés : ${n((c) => c.kind === "workday")} portail(s) Workday, ${n((c) => c.kind && c.kind !== "workday")} autre(s) portail(s) employeur, ${n((c) => !c.kind)} entreprise(s) via Jooble.`);
       if (bad.length) toast.warning(`URL non reconnue pour : ${bad.join(", ")}. Ces entreprises sont suivies via Jooble.`, { duration: 9000 });
       onClose();
     } catch (e) { toast.error(e.message); } finally { setBusy(false); }

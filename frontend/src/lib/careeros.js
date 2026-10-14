@@ -87,6 +87,8 @@ export const radar = {
   pack: (id) => call(`/careeros/radar/offers/${id}/pack`, { method: "POST" }),
   deep: (id) => call(`/careeros/radar/offers/${id}/deep`, { method: "POST" }),
   detectPortal: (b) => call("/careeros/radar/portal/detect", { method: "POST", body: b }),
+  discoverPortal: (b) => call("/careeros/radar/portal/discover", { method: "POST", body: b }),
+  directory: () => call("/careeros/radar/directory"),
 };
 
 export const followup = {

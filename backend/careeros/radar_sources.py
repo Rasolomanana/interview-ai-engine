@@ -1,5 +1,5 @@
 """CareerOS Radar sources — official/legal only: Jooble API, optional Adzuna API, public career portals
-(Workday, Greenhouse, Lever, Ashby, amazon.jobs). Each fetcher returns normalized offers:
+(Workday, SuccessFactors, Oracle Recruiting, iCIMS, Greenhouse, Lever, Ashby, SmartRecruiters, amazon.jobs). Each fetcher returns normalized offers:
 {source, external_id, title, company, location, url, description, posted_at, salary}."""
 import asyncio
 import html
@@ -19,7 +19,8 @@ def _clean(text: str) -> str:
 
 
 WORKDAY_CANADA = "a30a87ed25634629aa6c3958aa2b91ea"  # Workday's global country id for Canada
-PORTAL_KINDS = ("workday", "greenhouse", "lever", "ashby", "amazon")
+PORTAL_KINDS = ("workday", "successfactors", "oracle", "icims", "greenhouse", "lever", "ashby", "smartrecruiters", "amazon")
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"}
 SOURCE_GROUP = {"jooble": "jooble", "adzuna": "adzuna", "workday": "workday"}  # anything else → "boards"
 
 
@@ -39,14 +40,111 @@ def parse_portal(url: str) -> tuple:
     m = re.search(r"https?://([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[a-z]{2}/)?([^/?#]+)", u, re.I)
     if m:
         return "workday", f"{m.group(1).lower()}.{m.group(2).lower()}/{m.group(3)}"
+    m = re.search(r"https?://([a-z0-9.-]+\.oraclecloud\.com)/hcmUI/CandidateExperience/[a-z]{2}(?:-[a-z]{2})?/sites/([A-Za-z0-9_]+)", u, re.I)
+    if m:
+        return "oracle", f"{m.group(1).lower()}/{m.group(2)}"
+    m = re.search(r"https?://([a-z0-9-]+\.icims\.com)", u, re.I)
+    if m:
+        return "icims", m.group(1).lower()
     for kind, pat in (("greenhouse", r"greenhouse\.io/(?:embed/job_board\?for=)?([a-z0-9_-]+)"), ("lever", r"jobs\.lever\.co/([a-z0-9_-]+)"),
-                      ("ashby", r"jobs\.ashbyhq\.com/([a-z0-9_.-]+)")):
+                      ("ashby", r"jobs\.ashbyhq\.com/([a-z0-9_.-]+)"), ("smartrecruiters", r"(?:jobs|careers)\.smartrecruiters\.com/([A-Za-z0-9_-]+)")):
         m = re.search(pat, u, re.I)
         if m:
             return kind, m.group(1)
     if re.search(r"amazon\.jobs", u, re.I):
         return "amazon", "amazon"
+    m = re.search(r"https?://([a-z0-9.-]+)/services/rss/job", u, re.I)
+    if m:
+        return "successfactors", m.group(1).lower()
     return "", ""
+
+
+def host_of(url: str) -> str:
+    m = re.match(r"https?://([a-z0-9.-]+)", (url or "").strip(), re.I)
+    return m.group(1).lower() if m else ""
+
+
+def _rss_date(v: str) -> str:
+    try:
+        return datetime.strptime(v.strip()[5:16], "%d %b %Y").strftime("%Y-%m-%d")
+    except ValueError:
+        return ""
+
+
+async def successfactors(client, host: str, company: str, keywords: list):
+    """SAP SuccessFactors Recruiting Marketing (RMK) career sites expose a public RSS feed."""
+    out = {}
+    for text in (keywords[:3] or [""]):
+        r = await client.get(f"https://{host}/services/rss/job/", params={"locale": "fr_FR", **({"keywords": f"({text})"} if text else {})}, headers=UA)
+        r.raise_for_status()
+        if "<rss" not in r.text[:500]:
+            raise RuntimeError("Flux SuccessFactors illisible (page non RSS)")
+        for it in re.findall(r"<item>(.*?)</item>", r.text, re.S):
+            g = lambda tag: (re.search(rf"<{tag}>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</{tag}>", it, re.S) or [None, ""])[1]  # noqa: E731
+            link = html.unescape(g("link")).split("?")[0]
+            title = _clean(g("title"))
+            loc = re.search(r"\(([^()]*)\)\s*$", title)
+            out[link] = {"source": "successfactors", "external_id": (re.search(r"/(\d+)/?$", link) or [None, link])[1],
+                         "title": title[:loc.start()].strip() if loc else title, "company": company, "location": loc.group(1) if loc else "",
+                         "url": link, "description": _clean(g("description")), "posted_at": _rss_date(g("pubDate")), "salary": ""}
+    return list(out.values())
+
+
+async def oracle(client, slug: str, company: str, keywords: list):
+    """Oracle Recruiting Cloud (Candidate Experience) public REST search."""
+    host, site = slug.split("/", 1)
+    out = {}
+    for text in (keywords[:3] or [""]):
+        kw = f',keyword="{text}"' if text else ""
+        r = await client.get(f"https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions", headers={**UA, "Accept": "application/json"},
+                             params={"onlyData": "true", "expand": "requisitionList.secondaryLocations",
+                                     "finder": f"findReqs;siteNumber={site},limit=25{kw},sortBy=POSTING_DATES_DESC"})
+        r.raise_for_status()
+        for it in r.json().get("items") or []:
+            for j in it.get("requisitionList") or []:
+                out[j["Id"]] = {"source": "oracle", "external_id": str(j["Id"]), "title": j.get("Title", ""), "company": company,
+                                "location": j.get("PrimaryLocation") or "", "url": f"https://{host}/hcmUI/CandidateExperience/fr-CA/sites/{site}/job/{j['Id']}",
+                                "description": _clean(j.get("ShortDescriptionStr") or ""), "posted_at": (j.get("PostedDate") or "")[:10], "salary": ""}
+    return list(out.values())
+
+
+async def icims(client, host: str, company: str, keywords: list):
+    """iCIMS career portals: best-effort read of the public search page (HTML)."""
+    out = {}
+    for text in (keywords[:3] or [""]):
+        r = await client.get(f"https://{host}/jobs/search", params={"ss": "1", "searchKeyword": text, "in_iframe": "1"}, headers=UA)
+        r.raise_for_status()
+        cards = re.findall(r'<li class="iCIMS_JobCardItem">(.*?)</li>', r.text, re.S)
+        if not cards and "iCIMS" not in r.text:
+            raise RuntimeError("Page iCIMS illisible")
+        for cd in cards:
+            m = re.search(r'href="([^"]+/jobs/(\d+)/[^"]*?/job)', cd)
+            if not m:
+                continue
+            title = _clean((re.search(r"<h3[^>]*>(.*?)</h3>", cd, re.S) or [None, ""])[1])
+            loc = _clean((re.search(r"map-marker.*?</dt>\s*<dd[^>]*>\s*<span[^>]*>(.*?)</span>", cd, re.S) or [None, ""])[1])
+            out[m.group(2)] = {"source": "icims", "external_id": m.group(2), "title": title, "company": company, "location": loc,
+                               "url": html.unescape(m.group(1)), "description": _clean(cd)[:1500], "posted_at": "", "salary": ""}
+    return list(out.values())
+
+
+async def smartrecruiters(client, slug: str, company: str, keywords: list, max_details: int = 10):
+    out = {}
+    for text in (keywords[:3] or [""]):
+        r = await client.get(f"https://api.smartrecruiters.com/v1/companies/{slug}/postings", params={"q": text, "country": "ca", "limit": 50}, headers=UA)
+        r.raise_for_status()
+        for j in r.json().get("content") or []:
+            loc = j.get("location") or {}
+            out[j["id"]] = {"source": "smartrecruiters", "external_id": j["id"], "title": j.get("name", ""), "company": company,
+                            "location": ", ".join(x for x in (loc.get("city"), loc.get("region")) if x), "url": f"https://jobs.smartrecruiters.com/{slug}/{j['id']}",
+                            "description": "", "posted_at": (j.get("releasedDate") or "")[:10], "salary": ""}
+    for o in list(out.values())[:max_details]:
+        try:
+            d = (await client.get(f"https://api.smartrecruiters.com/v1/companies/{slug}/postings/{o['external_id']}", headers=UA)).json()
+            o["description"] = _clean(" ".join((v or {}).get("text", "") for v in ((d.get("jobAd") or {}).get("sections") or {}).values()))
+        except Exception:  # noqa: BLE001
+            pass
+    return list(out.values())
 
 
 async def adzuna(client, what: str, where: str, company: str = "", max_days: int = 7):
@@ -141,6 +239,14 @@ async def board(client, kind: str, slug: str, company: str, keywords: list = Non
         return await workday(client, slug, company, keywords or [])
     if kind == "amazon":
         return await amazon(client, company, keywords or [])
+    if kind == "successfactors":
+        return await successfactors(client, slug, company, keywords or [])
+    if kind == "oracle":
+        return await oracle(client, slug, company, keywords or [])
+    if kind == "icims":
+        return await icims(client, slug, company, keywords or [])
+    if kind == "smartrecruiters":
+        return await smartrecruiters(client, slug, company, keywords or [])
     if kind == "greenhouse":
         r = await client.get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs", params={"content": "true"})
         r.raise_for_status()

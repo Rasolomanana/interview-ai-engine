@@ -1,5 +1,10 @@
 # PRD — Copilote Entretien IA / CareerOS
 
+## Correctif (juin 2026) — Radar automatique : 0 analysée / tout reporté
+- Cause : la limite quotidienne (50 analyses, 5 IA) comptait depuis minuit UTC (= 20 h la veille à Toronto en heure d'été). Des analyses faites la veille au soir épuisaient le quota du passage de 6 h → budget 0 → tout « reporté ».
+- Fix : `_day_start()` = minuit America/Toronto pour `_analyzed_today`, `_ai_today`, pool IA et dashboard. Le run enregistre `budget` et un message `errors.limite` si le quota est déjà atteint.
+- Workday / sites carrières « Aucun portail configuré » : le compte du membre n'a aucune entreprise avec URL de portail ; la validation production utilisait un compte test avec Desjardins / Intelcom (Workday) + Amazon (amazon.jobs).
+
 ## Amélioration (juin 2026) — Facturation fournisseurs
 - Fournisseur : `billing_day` (1-31), `billing_cycle` mensuel/annuel (annuel = mois anniversaire de start_month, récurrent proposé seulement ce mois-là). Catalogue : `last_invoice` (dernier montant réel saisi), `next_invoice` (prochaine date prévue).
 - Ligne du mois : `billing_date` (DateField FR) + `note`. Sortie : `due_date`, `warnings` (date_missing, real_unconfirmed si échéance passée, estimate_only ≥ 0,01 $) ; compteurs `warnings` dans Alertes. Avertissements non bloquants.

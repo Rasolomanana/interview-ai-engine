@@ -8,6 +8,7 @@ import { RadarSettingsDialog } from "@/components/careeros/RadarSettings";
 import { MoreMenu } from "@/components/careeros/guide/MoreMenu";
 import { ConceptRow } from "@/components/careeros/guide/InfoTip";
 import { SourceStatus } from "@/components/careeros/SourceStatus";
+import { PortalHealth } from "@/components/careeros/PortalHealth";
 import { RadarHistory, TodayMarker } from "@/components/careeros/RadarHistory";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
 import { radar } from "@/lib/careeros";
@@ -113,6 +114,7 @@ export default function Radar() {
             <StatFilter label="Priorité A" value={d.top_a.length} testid="radar-stat-a" active={f === "a"} onClick={() => pick("a")} />
           </div>
           <SourceStatus status={d.sources_status} run={lr} />
+          <PortalHealth status={d.sources_status} run={lr} />
           {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
           {errs.length > 0 && <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-200" data-testid="radar-errors">{errs.map(([k, v]) => <p key={k}>{k} : {v}</p>)}</div>}
           {f ? <>
