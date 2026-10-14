@@ -34,11 +34,11 @@ export const RadarSettingsDialog = ({ onClose }) => {
   const toggleSrc = (k) => setS({ ...s, sources: s.sources.includes(k) ? s.sources.filter((x) => x !== k) : [...s.sources, k] });
   return (
     <Dialog open onOpenChange={close}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-[#121520] text-slate-100 sm:max-w-2xl" data-testid="radar-settings-dialog">
-        <DialogHeader><DialogTitle className="font-display">Réglages du Radar</DialogTitle>
+      <DialogContent className="flex max-h-[94vh] flex-col gap-0 overflow-hidden border-white/10 bg-[#121520] p-0 text-slate-100 sm:max-w-3xl" data-testid="radar-settings-dialog">
+        <DialogHeader className="shrink-0 border-b border-white/[0.06] px-5 pb-3 pt-5 sm:px-6"><DialogTitle className="font-display">Réglages du Radar</DialogTitle>
           <DialogDescription className="text-xs text-slate-400">Sources officielles uniquement. Recherche quotidienne + à la demande.</DialogDescription></DialogHeader>
-        {!s ? <Loader2 className="h-5 w-5 animate-spin text-indigo-400" /> : (
-          <div className="space-y-4 text-xs">
+        {!s ? <Loader2 className="m-6 h-5 w-5 animate-spin text-indigo-400" /> : (<>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 text-xs sm:px-6" data-testid="radar-settings-body">
             <label className="flex items-center gap-2 text-slate-300"><input type="checkbox" className="accent-indigo-500" checked={s.enabled} onChange={(e) => setS({ ...s, enabled: e.target.checked })} data-testid="radar-enabled-checkbox" />Recherche quotidienne automatique</label>
             <label className="block text-slate-400">Mots-clés / postes visés (virgules)<input defaultValue={csv(s.keywords)} onBlur={(e) => setS({ ...s, keywords: list(e.target.value) })} className={`${inputCls} mt-1`} data-testid="radar-keywords-input" /></label>
             <label className="block text-slate-400">Localisation<input value={s.location} onChange={(e) => setS({ ...s, location: e.target.value })} className={`${inputCls} mt-1`} data-testid="radar-location-input" /></label>
@@ -52,10 +52,11 @@ export const RadarSettingsDialog = ({ onClose }) => {
               })}
             </div>
             <CompanyManager companies={s.companies} setCompanies={(companies) => setS({ ...s, companies })} />
-            <div className="sticky bottom-0 -mx-1 bg-[#121520] px-1 pb-1 pt-2">
-              <button onClick={save} disabled={busy} data-testid="radar-settings-save-btn" className="w-full rounded-xl bg-indigo-500 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">{busy ? "Enregistrement…" : "Enregistrer"}</button>
-            </div>
-          </div>)}
+          </div>
+          <div className="shrink-0 border-t border-white/[0.06] bg-[#121520] px-5 py-3 sm:px-6" data-testid="radar-settings-footer">
+            <button onClick={save} disabled={busy} data-testid="radar-settings-save-btn" className="w-full rounded-xl bg-indigo-500 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">{busy ? "Enregistrement…" : "Enregistrer"}</button>
+          </div>
+        </>)}
       </DialogContent>
     </Dialog>
   );

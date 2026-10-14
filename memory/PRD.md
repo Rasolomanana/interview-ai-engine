@@ -1,5 +1,10 @@
 # PRD — Copilote Entretien IA / CareerOS
 
+## Amélioration (juin 2026) — Ergonomie Réglages du Radar
+- Dialog en colonne : hauteur max 94vh, largeur 3xl, en-tête et bouton « Enregistrer » fixes, corps défilant (`radar-settings-body`, `radar-settings-footer`). Liste d'entreprises sans défilement imbriqué.
+- Loupe : lance la détection immédiatement + défilement automatique vers le résultat ; résultats dans une zone défilante dédiée (`portal-results-{i}`, max-h-64), compteur « N proposition(s) · M lisible(s) », URL sur ligne propre, bouton Associer toujours visible.
+- Mobile (<640px) : suggestions dans un panneau bas dédié (Sheet `portal-sheet-{i}`).
+
 ## Amélioration (juin 2026) — Résumé des entreprises suivies
 - `CompanySummary.jsx` (Réglages Radar) : Via portail employeur / Suivies via Jooble / Détectées mais non prises en charge (dépliables). Champ entreprise `detected` (persisté) rempli par la loupe, « Tout détecter » et l'annuaire (« Non pris en charge : Phenom », « Illisible : SuccessFactors », « Aucun portail détecté »).
 - Annuaire : ATS nommé pour les employeurs sans flux (BNC Avature, Bell/Air Canada Phenom, CGI Njoyn, Metro propriétaire).

@@ -48,7 +48,7 @@ const CompanyRow = ({ c, i, onChange, onRemove, result, setResult }) => {
       <button type="button" onClick={() => setOpen(!show)} title="Trouver le portail" className="p-1.5 text-indigo-300 hover:text-white" data-testid={`radar-company-find-${i}`}><Search className="h-4 w-4" /></button>
       <button type="button" onClick={onRemove} className="p-1.5 text-slate-500 hover:text-rose-300" data-testid={`radar-company-remove-${i}`}><Trash2 className="h-4 w-4" /></button>
     </div>
-    {show && <PortalSuggest c={c} i={i} result={result} onResult={setResult} onClose={() => { setOpen(false); setResult(null); }}
+    {show && <PortalSuggest c={c} i={i} auto={open && !result} result={result} onResult={setResult} onClose={() => { setOpen(false); setResult(null); }}
       onPick={(p) => { onChange({ ...p, detected: "" }); setOpen(false); setResult(null); toast.success(`${c.name} associée à son portail ${KIND[p.kind]}.`); }} />}
     </div>
   );
@@ -108,7 +108,7 @@ export const CompanyManager = ({ companies, setCompanies }) => {
           <textarea value={bulk} onChange={(e) => setBulk(e.target.value)} rows={5} placeholder={"Une entreprise par ligne, URL optionnelle après |\nExemple : Desjardins | https://desjardins.wd10.myworkdayjobs.com/Desjardins"} className={inputCls} data-testid="radar-import-textarea" />
           <button type="button" onClick={doImport} disabled={!bulk.trim()} className="rounded-full bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50" data-testid="radar-import-btn">Importer</button>
         </div>)}
-      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+      <div className="space-y-2">
         {companies.map((c, i) => <CompanyRow key={i} c={c} i={i} result={results[i]} setResult={(r) => { setResults((x) => ({ ...x, [i]: r })); if (r) update(i, { detected: detectedLabel(r) }); }} onChange={(p) => update(i, p)} onRemove={() => { setResults({}); setCompanies(companies.filter((_, j) => j !== i)); }} />)}
         {companies.length === 0 && <p className="text-[11px] text-slate-500" data-testid="radar-company-empty">Aucune entreprise suivie. Ajoutez-en une ou importez une liste.</p>}
       </div>
