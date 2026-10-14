@@ -214,7 +214,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         cv = (profile.get("cv_text") or "").strip()
         st = await _settings(user_id, profile)
         run = {"id": str(uuid.uuid4()), "user_id": user_id, "at": _now().isoformat(), "trigger": trigger,
-               "fetched": 0, "new": 0, "known": 0, "analyzed": 0, "skipped_limit": 0, "errors": {}, "sources": S.configured(),
+               "fetched": 0, "new": 0, "known": 0, "analyzed": 0, "skipped_limit": 0, "tracked": True, "errors": {}, "sources": S.configured(),
                "selected_sources": st["sources"], "by_source": {g: {"fetched": 0, "analyzed": 0} for g in ("jooble", "workday", "boards", "adzuna")},
                "status": "running"}
         await db.radar_runs.insert_one(dict(run))
@@ -232,10 +232,10 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 existing = await db.radar_offers.find_one({"user_id": user_id, "dedupe_key": k}, {"_id": 0, "id": 1})
                 if existing:
                     run["known"] += 1
-                    await db.radar_offers.update_one({"id": existing["id"]}, {"$set": {"last_seen": _now().isoformat()}})
+                    await db.radar_offers.update_one({"id": existing["id"]}, {"$set": {"last_seen": _now().isoformat()}, "$addToSet": {"seen_runs": run["id"]}})
                     continue
                 doc = {"id": str(uuid.uuid4()), "user_id": user_id, "dedupe_key": k, **o, "first_seen": _now().isoformat(),
-                       "last_seen": _now().isoformat(), "run_id": run["id"], "status": "nouvelle", "ips": None, "decision_report": None,
+                       "last_seen": _now().isoformat(), "run_id": run["id"], "seen_runs": [run["id"]], "status": "nouvelle", "ips": None, "decision_report": None,
                        "analyzed_at": None, "application_id": None}
                 await db.radar_offers.insert_one(dict(doc))
                 fresh.append(doc)
@@ -331,6 +331,16 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         since = (_now() - timedelta(days=days)).isoformat()
         proj = {"_id": 0, "user_id": 0, "sources": 0, "selected_sources": 0}
         return [r async for r in db.radar_runs.find({"user_id": user["id"], "at": {"$gte": since}}, proj).sort("at", -1).limit(300)]
+
+    @router.get("/runs/{run_id}/offers")
+    async def run_offers(run_id: str, kind: str = Query("found", pattern="^(found|new)$"), user: dict = Depends(current_user)):
+        run = await db.radar_runs.find_one({"id": run_id, "user_id": user["id"]}, {"_id": 0, "tracked": 1})
+        if run is None:
+            raise HTTPException(status_code=404, detail="Recherche introuvable")
+        q = {"user_id": user["id"], "run_id": run_id} if kind == "new" else {"user_id": user["id"], "$or": [{"run_id": run_id}, {"seen_runs": run_id}]}
+        proj = {"_id": 0, "description": 0, "dedupe_key": 0, "user_id": 0, "seen_runs": 0}
+        offers = [o async for o in db.radar_offers.find(q, proj).sort("first_seen", -1).limit(300)]
+        return {"offers": offers, "complete": kind == "new" or bool(run.get("tracked"))}
 
     @router.get("/dashboard")
     async def dashboard(user: dict = Depends(current_user)):

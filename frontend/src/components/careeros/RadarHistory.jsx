@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CalendarClock, CheckCircle2, ChevronDown, CircleAlert, Clock } from "lucide-react";
+import { RunOffersDialog } from "./RunOffersDialog";
 
 const TZ = "America/Toronto";
 const day = (iso) => new Date(iso).toLocaleDateString("fr-CA", { timeZone: TZ, weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -24,7 +25,12 @@ export const TodayMarker = ({ runs, running }) => {
   );
 };
 
-const RunRow = ({ r }) => {
+const Num = ({ n, onClick, testid }) => (n ? (
+  <button type="button" onClick={onClick} data-testid={testid} title="Afficher ces offres"
+    className="rounded-md px-1.5 py-0.5 font-semibold text-indigo-300 underline decoration-indigo-400/40 underline-offset-2 transition-colors hover:bg-indigo-500/10 hover:text-indigo-200">{n}</button>
+) : <span className="px-1.5">0</span>);
+
+const RunRow = ({ r, onShow }) => {
   const bs = r.by_source || {};
   const errs = Object.keys(r.errors || {}).length;
   return (
@@ -32,8 +38,8 @@ const RunRow = ({ r }) => {
       <td className="py-2 pr-3 font-mono">{hour(r.at)}</td>
       <td className="pr-3"><span className={`rounded-full px-2 py-0.5 text-[11px] ${isAuto(r) ? "bg-indigo-500/15 text-indigo-200" : "bg-white/5 text-slate-300"}`}>{isAuto(r) ? "Automatique" : "Manuelle"}</span></td>
       <td className="pr-3">{STATUS[r.status] || r.status}</td>
-      <td className="pr-3">{r.fetched ?? 0}</td>
-      <td className="pr-3">{r.new ?? 0}</td>
+      <td className="pr-3"><Num n={r.fetched} onClick={() => onShow(r, "found")} testid={`radar-run-found-${r.id}`} /></td>
+      <td className="pr-3"><Num n={r.new} onClick={() => onShow(r, "new")} testid={`radar-run-new-${r.id}`} /></td>
       <td className="pr-3">{r.analyzed ?? 0}{r.skipped_limit ? <span className="text-slate-500"> (+{r.skipped_limit} reportées)</span> : ""}</td>
       <td className="pr-3 text-slate-400">J {bs.jooble?.fetched ?? 0} · W {bs.workday?.fetched ?? 0} · S {bs.boards?.fetched ?? 0}</td>
       <td className={errs ? "text-amber-300" : "text-slate-500"} title={Object.values(r.errors || {}).join("\n")}>{errs ? `${errs} alerte(s)` : "—"}</td>
@@ -43,6 +49,8 @@ const RunRow = ({ r }) => {
 
 export const RadarHistory = ({ runs }) => {
   const [open, setOpen] = useState(0);
+  const [sel, setSel] = useState(null);
+  const onShow = (run, kind) => setSel({ run, kind, when: `${day(run.at)} à ${hour(run.at)}` });
   if (!runs) return null;
   const groups = Object.values(runs.reduce((g, r) => { (g[dayKey(r.at)] ||= { key: dayKey(r.at), label: day(r.at), runs: [] }).runs.push(r); return g; }, {}));
   return (
@@ -62,12 +70,13 @@ export const RadarHistory = ({ runs }) => {
               <div className="overflow-x-auto px-4 pb-3">
                 <table className="w-full min-w-[640px] text-left text-xs">
                   <thead className="text-slate-500"><tr><th className="py-1">Heure</th><th>Type</th><th>Statut</th><th>Trouvées</th><th>Nouvelles</th><th>Analysées</th><th>Par source</th><th>Alertes</th></tr></thead>
-                  <tbody>{g.runs.map((r) => <RunRow key={r.id} r={r} />)}</tbody>
+                  <tbody>{g.runs.map((r) => <RunRow key={r.id} r={r} onShow={onShow} />)}</tbody>
                 </table>
               </div>)}
           </div>
         ))}
       </div>
+      <RunOffersDialog sel={sel} onClose={() => setSel(null)} />
     </section>
   );
 };

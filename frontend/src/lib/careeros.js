@@ -81,6 +81,7 @@ export const radar = {
   saveSettings: (b) => call("/careeros/radar/settings", { method: "PUT", body: b }),
   run: () => call("/careeros/radar/run", { method: "POST" }),
   runs: (days = 30) => call(`/careeros/radar/runs?days=${days}`),
+  runOffers: (id, kind) => call(`/careeros/radar/runs/${id}/offers?kind=${kind}`),
   dashboard: () => call("/careeros/radar/dashboard"),
   ignore: (id) => call(`/careeros/radar/offers/${id}/ignore`, { method: "POST" }),
   pack: (id) => call(`/careeros/radar/offers/${id}/pack`, { method: "POST" }),

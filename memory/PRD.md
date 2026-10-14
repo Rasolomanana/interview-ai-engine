@@ -1,5 +1,10 @@
 # PRD — Copilote Entretien IA / CareerOS
 
+## Amélioration (juin 2026) — Historique Radar : Trouvées / Nouvelles cliquables
+- Backend : chaque offre garde `seen_runs` ($addToSet à chaque passage) ; runs marqués `tracked: True`. Endpoint `GET /api/careeros/radar/runs/{run_id}/offers?kind=found|new` (isolé par membre, 404 si autre membre, `complete` false pour anciennes recherches non suivies → seules les nouvelles sont listables).
+- Frontend : `RunOffersDialog` (liste priorité, titre, entreprise, lieu, source, IPS, lien offre). Chiffres Trouvées/Nouvelles cliquables dans `RadarHistory` (testids `radar-run-found-*`, `radar-run-new-*`).
+- Testé preview : nouvelle recherche suivie → found 94 / new 9 ; ancienne → message partiel. Bug corrigé : projection Mongo vide `{}` interprétée comme introuvable (`if run is None`).
+
 ## Amélioration (juin 2026) — Compteurs cliquables = filtres
 - `StatFilter` + `FilterBanner` (components/careeros/StatFilter.jsx). Clic sur un compteur = filtre la liste, re-clic ou « Tout afficher » = retire.
 - Radar : Analysées aujourd'hui / Nouvelles / Déjà connues / Priorité A. Backend dashboard renvoie aussi `known_last_run` (vues au dernier passage, déjà connues, max 200) et `analyzed_today_list` (max 100).
