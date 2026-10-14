@@ -8,13 +8,13 @@ import { PriorityBadge } from "@/components/careeros/Ips";
 import { useAuth } from "@/components/careeros/AuthProvider";
 import { careeros, PIPELINE_LABELS } from "@/lib/careeros";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
+import { FilterBanner, StatFilter } from "@/components/careeros/StatFilter";
 
-const Stat = ({ label, value, testid }) => (
-  <div className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4" data-testid={testid}>
-    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">{label}</p>
-    <p className="mt-2 font-display text-3xl font-bold text-white">{value}</p>
-  </div>
-);
+const FILTERS = {
+  a: ["Priorité A", (a) => a.priority === "A"],
+  entrevue: ["Entrevues", (a) => a.pipeline_status === "entrevue"],
+  offre: ["Offres", (a) => a.pipeline_status === "offre"],
+};
 
 const Row = ({ a }) => (
   <Link to={`/careeros/candidature/${a.id}`} data-testid={`application-row-${a.id}`}
@@ -41,6 +41,9 @@ export default function Dashboard() {
   useEffect(() => { careeros.list().then(setApps).catch(() => setApps([])); }, []);
   const list = apps || [];
   const count = (fn) => list.filter(fn).length;
+  const [f, setF] = useState(null);
+  const pick = (k) => setF((cur) => (cur === k ? null : k));
+  const shown = f ? list.filter(FILTERS[f][1]) : list;
 
   return (
     <Shell>
@@ -56,19 +59,20 @@ export default function Dashboard() {
         </Link>
       </div>
       <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Opportunités" value={list.length} testid="stat-total" />
-        <Stat label="Priorité A" value={count((a) => a.priority === "A")} testid="stat-priority-a" />
-        <Stat label="Entrevues" value={count((a) => a.pipeline_status === "entrevue")} testid="stat-interviews" />
-        <Stat label="Offres" value={count((a) => a.pipeline_status === "offre")} testid="stat-offers" />
+        <StatFilter label="Opportunités" value={list.length} testid="stat-total" active={!f} onClick={() => setF(null)} />
+        <StatFilter label="Priorité A" value={count(FILTERS.a[1])} testid="stat-priority-a" active={f === "a"} onClick={() => pick("a")} />
+        <StatFilter label="Entrevues" value={count(FILTERS.entrevue[1])} testid="stat-interviews" active={f === "entrevue"} onClick={() => pick("entrevue")} />
+        <StatFilter label="Offres" value={count(FILTERS.offre[1])} testid="stat-offers" active={f === "offre"} onClick={() => pick("offre")} />
       </div>
       <section className="rounded-2xl border border-white/[0.07] bg-[#121520]/60 p-3 sm:p-5">
         <h2 className="mb-2 px-2 text-sm font-semibold text-slate-200">Historique des candidatures</h2>
+        {f && <div className="mb-3"><FilterBanner label={FILTERS[f][0]} count={shown.length} onClear={() => setF(null)} testid="dashboard-filter-banner" /></div>}
         {apps === null ? <p className="px-2 py-6 text-sm text-slate-500">Chargement…</p> : list.length === 0 ? (
           <div className="flex flex-col items-start gap-3 px-2 py-10" data-testid="empty-history">
             <Brain className="h-6 w-6 text-indigo-300" />
             <p className="text-sm text-slate-400">Aucune candidature pour l'instant. Commencez par une offre qui vous intéresse.</p>
           </div>
-        ) : <div data-testid="applications-list">{[...list].sort((x, y) => (x.priority || "Z").localeCompare(y.priority || "Z") || (y.ips || 0) - (x.ips || 0)).map((a) => <Row key={a.id} a={a} />)}</div>}
+        ) : shown.length === 0 ? <p className="px-2 py-6 text-sm text-slate-500" data-testid="filter-empty">Aucune candidature pour ce filtre.</p> : <div data-testid="applications-list">{[...shown].sort((x, y) => (x.priority || "Z").localeCompare(y.priority || "Z") || (y.ips || 0) - (x.ips || 0)).map((a) => <Row key={a.id} a={a} />)}</div>}
       </section>
     </Shell>
   );

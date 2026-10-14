@@ -1,5 +1,11 @@
 # PRD — Copilote Entretien IA / CareerOS
 
+## Amélioration (juin 2026) — Compteurs cliquables = filtres
+- `StatFilter` + `FilterBanner` (components/careeros/StatFilter.jsx). Clic sur un compteur = filtre la liste, re-clic ou « Tout afficher » = retire.
+- Radar : Analysées aujourd'hui / Nouvelles / Déjà connues / Priorité A. Backend dashboard renvoie aussi `known_last_run` (vues au dernier passage, déjà connues, max 200) et `analyzed_today_list` (max 100).
+- Tableau de bord : Opportunités (= tout), Priorité A, Entrevues, Offres ; message « Aucune candidature pour ce filtre ».
+- Testé preview (95 déjà connues ↔ 95 cartes ; filtre A dashboard ; mobile sans débordement). Export synchronisé. À PUBLIER avec les lots précédents.
+
 ## Amélioration (juin 2026) — Objectifs compacts, Copilote numéroté, mention de responsabilité
 - Career Memory : « Objectifs de carrière » = une seule ligne (`GoalsSelect`, popover multi-cases à cocher, résumé 2 puces + « +N », compteur x/12, « Tout désélectionner »). testids `goals-select-trigger`, `goal-*`, `goals-count`.
 - Copilote : boutons numérotés selon le parcours (1 Contexte, 2 Réglages, 3 Écoute, 4 Live, 5 Flottant, 6 Capture, 7 Envoyer, 8 Récap) + visite guidée 8 étapes (`CopilotTour`, carte flottante non modale, surbrillance du bouton ciblé, Passer/Précédent/Suivant/Terminer). Affichée une fois (localStorage `copilotTourDone`), relançable via bouton « Visite » (`copilot-tour-btn`). Masquée pendant l'ouverture de Réglages/Contexte/Récap.

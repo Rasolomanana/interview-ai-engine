@@ -11,13 +11,7 @@ import { SourceStatus } from "@/components/careeros/SourceStatus";
 import { RadarHistory, TodayMarker } from "@/components/careeros/RadarHistory";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
 import { radar } from "@/lib/careeros";
-
-const Stat = ({ label, value, testid }) => (
-  <div className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4" data-testid={testid}>
-    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">{label}</p>
-    <p className="mt-1 font-display text-2xl font-bold text-white">{value}</p>
-  </div>
-);
+import { FilterBanner, StatFilter } from "@/components/careeros/StatFilter";
 
 const OfferCard = ({ o, onPack, onIgnore, onDeep, deepId, busy }) => (
   <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4 min-w-0 break-words" data-testid={`radar-offer-${o.id}`}>
@@ -83,7 +77,15 @@ export default function Radar() {
     setDeepId(o.id);
     try { const r = await radar.deep(o.id); toast.success(`Analyse IA : IPS Radar ${r.ips?.score}/100 — priorité ${r.ips?.priority}`); load(); } catch (e) { toast.error(e.message); } finally { setDeepId(null); }
   };
+  const [f, setF] = useState(null);
   const lr = d?.last_run;
+  const FILTERS = d ? {
+    analyzed: ["Analysées aujourd'hui", d.analyzed_today_list || []],
+    new: ["Nouvelles (dernier passage)", d.new_today || []],
+    known: ["Déjà connues (dernier passage)", d.known_last_run || []],
+    a: ["Priorité A", d.top_a],
+  } : {};
+  const pick = (k) => setF((cur) => (cur === k ? null : k));
   const errs = Object.entries(lr?.errors || {});
 
   return (
@@ -105,17 +107,22 @@ export default function Radar() {
       {!d ? <Loader2 className="h-5 w-5 animate-spin text-indigo-400" /> : (
         <div className="space-y-8">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat label="Analysées aujourd'hui (règles · IA)" value={`${d.analyzed_today} · ${d.ai_today ?? 0}/${d.deep_limit ?? 0}`} testid="radar-stat-analyzed" />
-            <Stat label="Nouvelles (dernier passage)" value={lr?.new ?? 0} testid="radar-stat-new" />
-            <Stat label="Déjà connues" value={lr?.known ?? 0} testid="radar-stat-known" />
-            <Stat label="Priorité A" value={d.top_a.length} testid="radar-stat-a" />
+            <StatFilter label="Analysées aujourd'hui (règles · IA)" value={`${d.analyzed_today} · ${d.ai_today ?? 0}/${d.deep_limit ?? 0}`} testid="radar-stat-analyzed" active={f === "analyzed"} onClick={() => pick("analyzed")} />
+            <StatFilter label="Nouvelles (dernier passage)" value={lr?.new ?? 0} testid="radar-stat-new" active={f === "new"} onClick={() => pick("new")} />
+            <StatFilter label="Déjà connues" value={lr?.known ?? 0} testid="radar-stat-known" active={f === "known"} onClick={() => pick("known")} />
+            <StatFilter label="Priorité A" value={d.top_a.length} testid="radar-stat-a" active={f === "a"} onClick={() => pick("a")} />
           </div>
           <SourceStatus status={d.sources_status} run={lr} />
           {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
           {errs.length > 0 && <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-200" data-testid="radar-errors">{errs.map(([k, v]) => <p key={k}>{k} : {v}</p>)}</div>}
-          <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
-          <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
-          <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
+          {f ? <>
+            <FilterBanner label={FILTERS[f][0]} count={FILTERS[f][1].length} onClear={() => setF(null)} testid="radar-filter-banner" />
+            <Section title={FILTERS[f][0]} items={FILTERS[f][1]} testid="radar-filtered" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
+          </> : <>
+            <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
+            <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
+            <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
+          </>}
           <RadarHistory runs={runs} />
         </div>
       )}

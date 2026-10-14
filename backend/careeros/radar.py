@@ -341,7 +341,11 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         active = [o for o in offers if o["status"] not in ("ignoree", "pack") and o.get("ips")]
         top = lambda p: sorted([o for o in active if o["ips"]["priority"] == p], key=lambda o: -o["ips"]["score"])[:20]  # noqa: E731
         st = await _settings(user["id"], {})
+        day = _now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        known = [o async for o in db.radar_offers.find({**q, "run_id": {"$ne": last["id"]}, "last_seen": {"$gte": last["at"]}}, proj).sort("last_seen", -1).limit(200)] if last else []
+        analyzed = [o async for o in db.radar_offers.find({**q, "analyzed_at": {"$gte": day}}, proj).sort("analyzed_at", -1).limit(100)]
         return {
+            "known_last_run": known, "analyzed_today_list": analyzed,
             "sources_status": {"configured": S.configured(), "selected": st["sources"], "portals": {
                 "workday": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") == "workday"),
                 "boards": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") in ("greenhouse", "lever", "ashby", "amazon"))}},
