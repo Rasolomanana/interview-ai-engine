@@ -1,29 +1,56 @@
-import { Cpu, PiggyBank, Server, TrendingUp, Users } from "lucide-react";
+import { Code2, Cpu, Megaphone, PiggyBank, Server, Sigma, TrendingUp, UserCheck, Users, Wallet } from "lucide-react";
 import { cad, num, pct, tone } from "./fmt";
+import { Nature } from "./Nature";
 
-const Kpi = ({ icon: Icon, label, value, sub, valueClass = "text-white", testid }) => (
-  <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:p-5" data-testid={testid}>
-    <p className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-slate-400"><Icon className="h-4 w-4 text-emerald-400" />{label}</p>
-    <p className={`mt-2 text-2xl font-bold tabular-nums sm:text-3xl ${valueClass}`}>{value}</p>
+const Kpi = ({ icon: Icon, label, value, sub, valueClass = "text-white", testid, nature, realPct }) => (
+  <div className="min-w-0 rounded-2xl border border-white/10 bg-slate-900/60 p-4" data-testid={testid}>
+    <div className="flex flex-wrap items-start justify-between gap-1.5">
+      <p className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-slate-400"><Icon className="h-3.5 w-3.5 shrink-0 text-emerald-400" />{label}</p>
+      {nature && <Nature kind={nature} realPct={realPct} testid={`${testid}-nature`} />}
+    </div>
+    <p className={`mt-2 truncate text-xl font-bold tabular-nums sm:text-2xl ${valueClass}`}>{value}</p>
     {sub && <p className="mt-1 text-[11px] text-slate-500">{sub}</p>}
   </div>
 );
 
-export const FinanceKpis = ({ s }) => (
-  <div className="grid grid-cols-2 gap-3 lg:grid-cols-5" data-testid="finance-kpis">
-    <Kpi icon={PiggyBank} label="Revenus nets" value={cad(s.revenue.net)} sub={`Brut ${cad(s.revenue.gross)} · ajust. ${cad(s.revenue.adjustments)}`} testid="kpi-revenue" />
-    <Kpi icon={Server} label="Coûts plateforme" value={cad(s.platform_cad)} sub="Hébergement, outils, marketing" testid="kpi-platform" />
-    <Kpi icon={Cpu} label="Coûts IA" value={cad(s.ai_cad)} sub={`Estimé ${cad(s.ai_est_cad)} · ${num(s.calls)} appels`} testid="kpi-ai" />
-    <Kpi icon={TrendingUp} label="Marge nette" value={cad(s.margin_cad)} valueClass={tone(s.margin_cad)} sub={`Marge ${pct(s.margin_pct)}`} testid="kpi-margin" />
-    <Kpi icon={Users} label="Membres actifs" value={num(s.members.active)} sub={`${num(s.members.paid)} payants · ${num(s.members.active_paid)} actifs payants · ${num(s.members.registered)} inscrits`} testid="kpi-active" />
-  </div>
-);
+export const FinanceKpis = ({ s }) => {
+  const f = s.families;
+  const fam = (k) => (f[k].nature === "real" ? "real" : f[k].nature === "mixed" ? "mixed" : "estimated");
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="finance-kpis">
+      <Kpi icon={PiggyBank} label="Revenus" value={cad(s.revenue.used)} nature={s.revenue.nature} testid="kpi-revenue"
+        sub={s.revenue.real !== null ? `Théorique ${cad(s.revenue.theory)} · écart ${cad(s.revenue.gap_cad)}` : "Encaissé non saisi : théorique + ajustements"} />
+      <Kpi icon={Server} label="Infrastructure" value={cad(f.infrastructure.used_cad)} nature={fam("infrastructure")} realPct={f.infrastructure.real_pct} testid="kpi-infra" />
+      <Kpi icon={Cpu} label="IA" value={cad(f.ia.used_cad)} nature={fam("ia")} realPct={f.ia.real_pct} sub={`${num(s.calls)} appels journalisés`} testid="kpi-ai" />
+      <Kpi icon={Megaphone} label="Marketing" value={cad(f.marketing.used_cad)} nature={fam("marketing")} realPct={f.marketing.real_pct} testid="kpi-marketing" />
+      <Kpi icon={Code2} label="Développement" value={cad(f.developpement.used_cad)} nature={fam("developpement")} realPct={f.developpement.real_pct} sub={`dont investissements ponctuels ${cad(s.invest_cad)}`} testid="kpi-dev" />
+      <Kpi icon={Wallet} label="Dépenses totales" value={cad(s.total_cad)} nature="calculated" realPct={s.total_nature.real_pct} sub={`Exploitation ${cad(s.ops_cad)} · dév. ${cad(s.dev_cad)}`} testid="kpi-total" />
+      <Kpi icon={TrendingUp} label="Marge d'exploitation" value={cad(s.operating_margin_cad)} valueClass={tone(s.operating_margin_cad)} nature="calculated" sub={`${pct(s.operating_margin_pct)} · hors développement`} testid="kpi-op-margin" />
+      <Kpi icon={Sigma} label="Marge nette" value={cad(s.net_margin_cad)} valueClass={tone(s.net_margin_cad)} nature="calculated" sub={`${pct(s.net_margin_pct)} · tout inclus`} testid="kpi-margin" />
+      <Kpi icon={Users} label="Membres actifs" value={num(s.members.active)} nature="calculated" sub={`${num(s.members.registered)} inscrits`} testid="kpi-active" />
+      <Kpi icon={UserCheck} label="Membres payants" value={num(s.members.paid)} nature={s.doc.paid_override !== null && s.doc.paid_override !== undefined ? "estimated" : "calculated"} sub={`${num(s.members.active_paid)} actifs payants`} testid="kpi-paid" />
+    </div>
+  );
+};
 
-export const Answers = ({ s }) => (
-  <div className="grid gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4" data-testid="finance-answers">
-    <p><span className="text-slate-400">Combien je gagne ?</span> <b className="text-white">{cad(s.revenue.net)}</b></p>
-    <p><span className="text-slate-400">Combien je dépense ?</span> <b className="text-white">{cad(s.costs_cad)}</b></p>
-    <p><span className="text-slate-400">Combien me coûte un membre actif ?</span> <b className="text-white">{cad(s.per_member.cost_per_active)}</b></p>
-    <p><span className="text-slate-400">Quelle est ma marge ?</span> <b className={tone(s.margin_cad)}>{cad(s.margin_cad)} ({pct(s.margin_pct)})</b></p>
-  </div>
-);
+const share = (x, t) => (t ? `${Math.round((x * 1000) / t) / 10} %` : "—");
+const per = (x, n) => (n ? x / n : null);
+
+export const Answers = ({ s }) => {
+  const t = s.total_cad;
+  const ops = s.families.infrastructure.used_cad + s.families.autres.used_cad;
+  const Q = ({ q, a, testid }) => <p data-testid={testid}><span className="text-slate-400">{q}</span> <b className="text-white">{a}</b></p>;
+  return (
+    <div className="grid gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-4 text-sm sm:grid-cols-2 lg:grid-cols-3" data-testid="finance-answers">
+      <Q q="Combien CareerOS rapporte réellement ?" a={s.revenue.real !== null ? cad(s.revenue.real) : `${cad(s.revenue.used)} (estimé)`} testid="answer-revenue" />
+      <Q q="Combien CareerOS coûte réellement ?" a={`${cad(t)} (${s.total_nature.real_pct ?? 0} % réel)`} testid="answer-costs" />
+      <Q q="Part exploitation (infra + autres) ?" a={`${cad(ops)} · ${share(ops, t)}`} testid="answer-ops" />
+      <Q q="Part IA ?" a={`${cad(s.families.ia.used_cad)} · ${share(s.families.ia.used_cad, t)}`} testid="answer-ai" />
+      <Q q="Part développement ?" a={`${cad(s.dev_cad)} · ${share(s.dev_cad, t)}`} testid="answer-dev" />
+      <Q q="Part marketing ?" a={`${cad(s.families.marketing.used_cad)} · ${share(s.families.marketing.used_cad, t)}`} testid="answer-marketing" />
+      <Q q="Coût réel par membre actif ?" a={cad(per(t, s.members.active))} testid="answer-cost-active" />
+      <Q q="Coût réel par membre payant ?" a={cad(per(t, s.members.paid))} testid="answer-cost-paid" />
+      <Q q="Rentabilité réelle ?" a={<span className={tone(s.net_margin_cad)}>{cad(s.net_margin_cad)} ({pct(s.net_margin_pct)})</span>} testid="answer-margin" />
+    </div>
+  );
+};

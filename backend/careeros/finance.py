@@ -1,6 +1,7 @@
-"""Rentabilité CareerOS: AI usage log, monthly finance inputs, profitability summary (CAD)."""
+"""Rentabilité CareerOS: AI usage log, cost catalogue (families/categories/providers), monthly lines, profitability (CAD)."""
 import calendar
 import logging
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from zoneinfo import ZoneInfo
@@ -11,25 +12,35 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger("finance")
 TZ = ZoneInfo("America/Toronto")
 
+FAMILIES = {"infrastructure": "Infrastructure", "ia": "IA", "developpement": "Développement / Investissement",
+            "marketing": "Marketing / Acquisition", "autres": "Autres"}
+OPS_FAMILIES = ("infrastructure", "ia", "marketing", "autres")
 BUCKETS = {
     "gemini_flash": "Gemini Flash", "gemini_pro": "Gemini Pro", "openrouter": "OpenRouter (DeepSeek…)",
     "openrouter_free": "OpenRouter gratuit", "anthropic": "Anthropic", "autre": "Autres",
 }
-BILLING = {"google": "Gemini (Google)", "openrouter": "OpenRouter", "anthropic": "Anthropic", "autre": "Autres"}
-# USD per 1M tokens (official public prices, editable in the admin).
+AI_KEYS = {"google": "Gemini (Google)", "openrouter": "OpenRouter", "anthropic": "Anthropic", "autre": "Autres (journal IA)"}
 DEFAULT_PRICING = {
     "gemini_flash": {"in": 0.0, "out": 0.0}, "gemini_pro": {"in": 1.25, "out": 10.0},
     "openrouter": {"in": 0.27, "out": 1.10}, "openrouter_free": {"in": 0.0, "out": 0.0},
     "anthropic": {"in": 3.0, "out": 15.0}, "autre": {"in": 1.25, "out": 10.0},
 }
-DEFAULT_PLATFORM = [
-    {"name": "Render", "amount": 7.0, "currency": "USD"}, {"name": "MongoDB Atlas", "amount": 0.0, "currency": "USD"},
-    {"name": "Cloudflare", "amount": 0.0, "currency": "USD"}, {"name": "Domaine", "amount": 2.0, "currency": "CAD"},
-    {"name": "E-mail", "amount": 0.0, "currency": "USD"}, {"name": "Marketing", "amount": 0.0, "currency": "CAD"},
-    {"name": "Autres", "amount": 0.0, "currency": "CAD"},
-]
-NEGATIVE_KINDS = {"rabais", "remboursement"}
+SEED = {
+    ("Infrastructure", "infrastructure"): [("Render", 7, "USD", "recurrent", None), ("MongoDB Atlas", 0, "USD", "recurrent", None),
+                                           ("Cloudflare", 0, "USD", "recurrent", None), ("Domaine", 2, "CAD", "recurrent", None),
+                                           ("E-mail", 0, "USD", "recurrent", None)],
+    ("IA", "ia"): [("Gemini", 0, "USD", "variable", "google"), ("OpenRouter", 0, "USD", "variable", "openrouter"),
+                   ("Anthropic", 0, "USD", "variable", "anthropic")],
+    ("Développement", "developpement"): [("Emergent", 0, "USD", "ponctuel", None), ("Freelance", 0, "CAD", "ponctuel", None),
+                                         ("UX/UI", 0, "CAD", "ponctuel", None), ("Maintenance", 0, "CAD", "ponctuel", None),
+                                         ("Sous-traitance", 0, "CAD", "ponctuel", None)],
+    ("Marketing", "marketing"): [("Google Ads", 0, "CAD", "variable", None), ("LinkedIn Ads", 0, "CAD", "variable", None),
+                                 ("Campagnes diverses", 0, "CAD", "variable", None)],
+    ("Autres", "autres"): [("Outils et services divers", 0, "CAD", "variable", None)],
+}
+NEGATIVE_KINDS = {"rabais", "remboursement", "essai"}
 SCENARIOS = (100, 500, 1000)
+_now = lambda: datetime.now(timezone.utc).isoformat()  # noqa: E731
 
 
 def month_key(dt: Optional[datetime] = None) -> str:
@@ -74,33 +85,32 @@ async def log_ai_call(db, label: str, provider: str, model: str, in_chars: int, 
 
 
 async def mark_active(db, user_id: str):
-    await db.member_activity.update_one({"user_id": user_id, "month": month_key()}, {"$setOnInsert": {"at": datetime.now(timezone.utc).isoformat()}}, upsert=True)
+    await db.member_activity.update_one({"user_id": user_id, "month": month_key()}, {"$setOnInsert": {"at": _now()}}, upsert=True)
+
+
+M_PATTERN = r"^\d{4}-(0[1-9]|1[0-2])$"
 
 
 class Adjustment(BaseModel):
     label: str = Field("", max_length=120)
-    kind: str = Field("ponctuel", pattern="^(rabais|fondateur|ponctuel|remboursement|b2b|autre)$")
+    kind: str = Field("ponctuel", pattern="^(rabais|fondateur|essai|ponctuel|remboursement|b2b|autre)$")
     amount: float = 0.0
 
 
-class CostLine(BaseModel):
-    name: str = Field(..., min_length=1, max_length=80)
-    amount: float = Field(0.0, ge=0)
+class Line(BaseModel):
+    provider_id: str
+    estimated: Optional[float] = Field(None, ge=0)
+    real: Optional[float] = Field(None, ge=0)
     currency: str = Field("CAD", pattern="^(CAD|USD)$")
-
-
-class Invoice(BaseModel):
-    provider: str = Field(..., min_length=1, max_length=60)
-    amount: Optional[float] = Field(None, ge=0)
-    currency: str = Field("USD", pattern="^(CAD|USD)$")
+    note: str = Field("", max_length=200)
 
 
 class MonthBody(BaseModel):
     price_cad: float = Field(19.99, ge=0)
     paid_override: Optional[int] = Field(None, ge=0)
+    revenue_real: Optional[float] = Field(None, ge=0)
     adjustments: List[Adjustment] = []
-    platform_costs: List[CostLine] = []
-    ai_invoices: List[Invoice] = []
+    lines: List[Line] = []
 
 
 class SettingsBody(BaseModel):
@@ -112,6 +122,75 @@ class PaidBody(BaseModel):
     paid: bool
 
 
+class CategoryBody(BaseModel):
+    name: str = Field(..., min_length=1, max_length=60)
+    family: str = Field(..., pattern="^(infrastructure|ia|developpement|marketing|autres)$")
+
+
+class ProviderBody(BaseModel):
+    name: str = Field(..., min_length=1, max_length=60)
+    category_id: str
+    recurrence: str = Field("recurrent", pattern="^(recurrent|ponctuel|variable)$")
+    default_amount: float = Field(0.0, ge=0)
+    currency: str = Field("CAD", pattern="^(CAD|USD)$")
+    start_month: Optional[str] = Field(None, pattern=M_PATTERN)
+    end_month: Optional[str] = Field(None, pattern=M_PATTERN)
+    suspended: bool = False
+    ai_key: Optional[str] = Field(None, pattern="^(google|openrouter|anthropic|autre)$")
+
+
+class ArchiveBody(BaseModel):
+    archived: bool
+
+
+async def _audit(db, entity: str, entity_id: str, action: str, detail: dict):
+    await db.finance_audit.insert_one({"id": str(uuid.uuid4()), "at": _now(), "entity": entity, "entity_id": entity_id,
+                                       "action": action, "detail": detail})
+
+
+async def seed_catalog(db):
+    """Default catalogue + migration of the first version (platform_costs / ai_invoices)."""
+    if not await db.finance_categories.count_documents({}):
+        m = month_key()
+        for (cname, fam), provs in SEED.items():
+            cid = str(uuid.uuid4())
+            await db.finance_categories.insert_one({"id": cid, "name": cname, "family": fam, "status": "active", "created_at": _now()})
+            for name, amt, cur, rec, ai in provs:
+                await db.finance_providers.insert_one({"id": str(uuid.uuid4()), "name": name, "category_id": cid, "recurrence": rec,
+                                                       "default_amount": float(amt), "currency": cur, "start_month": m, "end_month": None,
+                                                       "suspended": False, "ai_key": ai, "status": "active", "created_at": _now()})
+    async for doc in db.finance_months.find({"lines": {"$exists": False}}):
+        provs = {p["name"].lower(): p async for p in db.finance_providers.find({}, {"_id": 0})}
+        by_ai = {p["ai_key"]: p for p in provs.values() if p.get("ai_key")}
+        other = await db.finance_categories.find_one({"family": "autres"}, {"_id": 0})
+        lines = []
+        for c in doc.get("platform_costs") or []:
+            p = provs.get(c["name"].lower())
+            if not p and other:
+                p = {"id": str(uuid.uuid4()), "name": c["name"], "category_id": other["id"], "recurrence": "variable", "default_amount": 0.0,
+                     "currency": c.get("currency", "CAD"), "start_month": doc["month"], "end_month": None, "suspended": False,
+                     "ai_key": None, "status": "active", "created_at": _now()}
+                await db.finance_providers.insert_one(dict(p))
+                provs[c["name"].lower()] = p
+            if p:
+                lines.append({"provider_id": p["id"], "estimated": c.get("amount", 0.0), "real": None, "currency": c.get("currency", "CAD"), "note": ""})
+        for i in doc.get("ai_invoices") or []:
+            p = by_ai.get(i["provider"]) or provs.get(i["provider"].lower())
+            if p and i.get("amount") is not None:
+                lines.append({"provider_id": p["id"], "estimated": None, "real": i["amount"], "currency": i.get("currency", "USD"), "note": ""})
+        await db.finance_months.update_one({"month": doc["month"]}, {"$set": {"lines": lines, "revenue_real": None},
+                                                                      "$unset": {"platform_costs": "", "ai_invoices": ""}})
+
+
+def _nature(lines):
+    """real / estimated / mixed for a set of lines, plus share of real amounts."""
+    tot = sum(x["used_cad"] for x in lines)
+    real = sum(x["used_cad"] for x in lines if x["nature"] == "real")
+    n = {x["nature"] for x in lines if x["used_cad"]}
+    nat = "real" if n == {"real"} else "estimated" if n <= {"estimated"} else "mixed"
+    return {"nature": nat, "real_pct": round(real * 100 / tot, 1) if tot else None}
+
+
 def create_finance_router(db, check_admin, credits_fn=None):
     router = APIRouter(prefix="/api/admin")
 
@@ -120,18 +199,19 @@ def create_finance_router(db, check_admin, credits_fn=None):
         pricing = {k: {**v, **(s.get("pricing") or {}).get(k, {})} for k, v in DEFAULT_PRICING.items()}
         return {"fx_usd_cad": s.get("fx_usd_cad", 1.37), "pricing": pricing}
 
+    async def _catalog():
+        cats = {c["id"]: c async for c in db.finance_categories.find({}, {"_id": 0})}
+        provs = [p async for p in db.finance_providers.find({}, {"_id": 0}).sort("name", 1)]
+        return cats, provs
+
     async def _month_doc(month: str):
         doc = await db.finance_months.find_one({"month": month}, {"_id": 0})
         if doc:
-            return doc, False
+            return {"revenue_real": None, "lines": [], **doc}, False
         prev = await db.finance_months.find_one({"month": {"$lt": month}}, {"_id": 0}, sort=[("month", -1)])
-        base = {"month": month, "price_cad": 19.99, "paid_override": None, "adjustments": [], "ai_invoices": [],
-                "platform_costs": DEFAULT_PLATFORM}
-        if prev:
-            base.update(price_cad=prev.get("price_cad", 19.99), platform_costs=prev.get("platform_costs") or DEFAULT_PLATFORM)
-        if month < month_key():
-            base.update(platform_costs=[], paid_override=0)
-        return base, True
+        past = month < month_key()
+        return {"month": month, "price_cad": (prev or {}).get("price_cad", 19.99), "paid_override": 0 if past else None,
+                "revenue_real": None, "adjustments": [], "lines": []}, True
 
     async def _members(month: str):
         start, end, _ = _bounds(month)
@@ -148,7 +228,7 @@ def create_finance_router(db, check_admin, credits_fn=None):
             {"$group": {"_id": {"b": "$bucket", "bill": "$billing", "f": "$feature"}, "calls": {"$sum": 1},
                         "tin": {"$sum": "$tokens_in"}, "tout": {"$sum": "$tokens_out"}}}])]
         buckets = {k: {"key": k, "label": v, "calls": 0, "tokens_in": 0, "tokens_out": 0, "est_usd": 0.0} for k, v in BUCKETS.items()}
-        billing, features = {k: 0.0 for k in BILLING}, {}
+        billing, features = {k: 0.0 for k in AI_KEYS}, {}
         for r in rows:
             p = pricing.get(r["_id"]["b"], DEFAULT_PRICING["autre"])
             usd = (r["tin"] * p["in"] + r["tout"] * p["out"]) / 1e6
@@ -159,6 +239,39 @@ def create_finance_router(db, check_admin, credits_fn=None):
             f["calls"] += r["calls"]; f["est_usd"] += usd
         return list(buckets.values()), billing, list(features.values())
 
+    def _lines(month, doc, cats, provs, ai_usd, cad):
+        saved = {ln["provider_id"]: ln for ln in doc.get("lines") or []}
+        out = []
+        for p in provs:
+            cat = cats.get(p["category_id"]) or {"name": "?", "family": "autres", "status": "active"}
+            ln = saved.get(p["id"])
+            in_range = (not p.get("start_month") or p["start_month"] <= month) and (not p.get("end_month") or month <= p["end_month"])
+            live = p["status"] == "active" and cat["status"] == "active" and not p.get("suspended") and in_range
+            if not ln and not (live and (p["recurrence"] == "recurrent" or p.get("ai_key"))):
+                continue
+            cur = (ln or {}).get("currency") or p["currency"]
+            if ln and ln.get("estimated") is not None:
+                est, src = cad(ln["estimated"], cur), "saisie"
+            elif p.get("ai_key"):
+                est, src = ai_usd.get(p["ai_key"], 0.0) * cad(1, "USD"), "jetons"
+            elif live and p["recurrence"] == "recurrent":
+                est, src = cad(p["default_amount"], p["currency"]), "recurrent"
+            else:
+                est, src = None, None
+            real = cad(ln["real"], cur) if ln and ln.get("real") is not None else None
+            if est is None and real is None and not live:
+                continue
+            used = real if real is not None else (est or 0.0)
+            out.append({"provider_id": p["id"], "name": p["name"], "category": cat["name"], "family": cat["family"],
+                        "recurrence": p["recurrence"], "provider_status": p["status"], "suspended": p.get("suspended", False),
+                        "ai_key": p.get("ai_key"), "currency": cur, "default_amount": p["default_amount"], "default_currency": p["currency"],
+                        "saved_estimated": (ln or {}).get("estimated"), "saved_real": (ln or {}).get("real"), "note": (ln or {}).get("note", ""),
+                        "est_cad": None if est is None else round(est, 4), "est_source": src, "real_cad": None if real is None else round(real, 2),
+                        "gap_cad": None if real is None or est is None else round(real - est, 2),
+                        "gap_pct": None if real is None or not est else round((real - est) * 100 / est, 1),
+                        "used_cad": round(used, 4), "nature": "real" if real is not None else "estimated"})
+        return out
+
     def _per(x, n):
         return round(x / n, 2) if n else None
 
@@ -167,69 +280,79 @@ def create_finance_router(db, check_admin, credits_fn=None):
         fx = st["fx_usd_cad"]
         cad = lambda a, c: (a or 0.0) * (fx if c == "USD" else 1.0)  # noqa: E731
         doc, draft = await _month_doc(month)
+        cats, provs = await _catalog()
         registered, active, flagged = await _members(month)
         n_active = len(active)
         paid = doc["paid_override"] if doc.get("paid_override") is not None else len(flagged)
         active_paid = len(active & flagged) if flagged else min(paid, n_active)
-        gross = round(doc["price_cad"] * paid, 2)
-        adj = sum(-abs(a["amount"]) if a["kind"] in NEGATIVE_KINDS else a["amount"] for a in doc["adjustments"])
-        net = round(gross + adj, 2)
-        platform = [{**c, "cad": round(cad(c["amount"], c["currency"]), 2)} for c in doc["platform_costs"]]
-        platform_cad = round(sum(c["cad"] for c in platform), 2)
-        buckets, billing_est, features = await _ai(month, st["pricing"])
-        inv = {i["provider"]: i for i in doc["ai_invoices"]}
-        providers = []
-        for key in list(BILLING) + [k for k in inv if k not in BILLING]:
-            est_usd = billing_est.get(key, 0.0)
-            i = inv.get(key)
-            real = cad(i["amount"], i["currency"]) if i and i.get("amount") is not None else None
-            est = est_usd * fx
-            if key == "autre" and not est and real is None:
-                continue
-            providers.append({"provider": key, "label": BILLING.get(key, key), "est_usd": round(est_usd, 4), "est_cad": round(est, 2),
-                              "real_cad": None if real is None else round(real, 2), "real_amount": i.get("amount") if i else None,
-                              "real_currency": i.get("currency", "USD") if i else "USD",
-                              "gap_cad": None if real is None else round(real - est, 2),
-                              "gap_pct": None if real is None or not est else round((real - est) * 100 / est, 1),
-                              "used_cad": round(est if real is None else real, 2)})
-        ai_est = round(sum(p["est_cad"] for p in providers), 2)
-        ai_used = round(sum(p["used_cad"] for p in providers), 2)
-        costs = round(platform_cad + ai_used, 2)
-        margin = round(net - costs, 2)
-        out = {"month": month, "draft": draft, "fx_usd_cad": fx, "revenue": {"price_cad": doc["price_cad"], "paid": paid, "gross": gross,
-               "adjustments": round(adj, 2), "net": net}, "platform_cad": platform_cad, "ai_est_cad": ai_est, "ai_cad": ai_used,
-               "costs_cad": costs, "margin_cad": margin, "margin_pct": round(margin * 100 / net, 1) if net else None,
+        theory = round(doc["price_cad"] * paid, 2)
+        adj = round(sum(-abs(a["amount"]) if a["kind"] in NEGATIVE_KINDS else a["amount"] for a in doc["adjustments"]), 2)
+        expected = round(theory + adj, 2)
+        real_rev = doc.get("revenue_real")
+        rev = real_rev if real_rev is not None else expected
+        buckets, ai_usd, features = await _ai(month, st["pricing"])
+        lines = _lines(month, doc, cats, provs, ai_usd, cad)
+        fam = {}
+        for k, label in FAMILIES.items():
+            ls = [x for x in lines if x["family"] == k]
+            fam[k] = {"key": k, "label": label, "used_cad": round(sum(x["used_cad"] for x in ls), 2),
+                      "est_cad": round(sum(x["est_cad"] or 0 for x in ls), 2), "real_cad": round(sum(x["real_cad"] or 0 for x in ls), 2),
+                      "invest_cad": round(sum(x["used_cad"] for x in ls if x["recurrence"] == "ponctuel"), 2), **_nature(ls)}
+        ops = round(sum(fam[k]["used_cad"] for k in OPS_FAMILIES), 2)
+        dev = fam["developpement"]["used_cad"]
+        total = round(ops + dev, 2)
+        op_margin, net_margin = round(rev - ops, 2), round(rev - total, 2)
+        pctof = lambda x: round(x * 100 / rev, 1) if rev else None  # noqa: E731
+        ops_nat = _nature([x for x in lines if x["family"] in OPS_FAMILIES])
+        all_nat = _nature(lines)
+        out = {"month": month, "draft": draft, "fx_usd_cad": fx,
+               "revenue": {"price_cad": doc["price_cad"], "paid": paid, "theory": theory, "adjustments": adj, "expected": expected,
+                           "real": real_rev, "used": round(rev, 2), "nature": "real" if real_rev is not None else "estimated",
+                           "gap_cad": None if real_rev is None else round(real_rev - theory, 2),
+                           "gap_pct": None if real_rev is None or not theory else round((real_rev - theory) * 100 / theory, 1),
+                           "unexplained_cad": None if real_rev is None else round(real_rev - expected, 2)},
+               "families": fam, "ops_cad": ops, "dev_cad": dev, "invest_cad": fam["developpement"]["invest_cad"], "total_cad": total,
+               "ops_nature": ops_nat, "total_nature": all_nat,
+               "operating_margin_cad": op_margin, "operating_margin_pct": pctof(op_margin),
+               "net_margin_cad": net_margin, "net_margin_pct": pctof(net_margin),
                "members": {"registered": registered, "active": n_active, "paid": paid, "active_paid": active_paid}}
         if light:
             return out
         _, _, days = _bounds(month)
-        now = datetime.now(TZ)
-        elapsed = now.day if month == month_key() else days
-        pace = ai_used / elapsed * days if elapsed else 0.0
+        elapsed = datetime.now(TZ).day if month == month_key() else days
+        ai_used = fam["ia"]["used_cad"]
+        ai_lines = [x for x in lines if x["family"] == "ia"]
+        pace_ai = sum((x["used_cad"] / elapsed * days) if x["est_source"] == "jetons" and x["real_cad"] is None else x["used_cad"] for x in ai_lines)
         out.update({
-            "doc": doc, "platform": platform, "providers": providers, "features": [{**f, "est_cad": round(f["est_usd"] * fx, 4)} for f in features],
+            "doc": doc, "lines": lines, "families_list": list(FAMILIES.items()),
+            "features": [{**f, "est_cad": round(f["est_usd"] * fx, 4)} for f in features],
             "buckets": [{**b, "est_usd": round(b["est_usd"], 4), "est_cad": round(b["est_usd"] * fx, 4)} for b in buckets],
-            "calls": sum(b["calls"] for b in buckets),
+            "calls": sum(b["calls"] for b in buckets), "ai_log_usd": {k: round(v, 4) for k, v in ai_usd.items()},
             "per_member": {
-                "revenue_per_paid": _per(net, paid), "revenue_per_active": _per(net, n_active),
-                "ai_per_active": _per(ai_used, n_active), "ai_per_active_paid": _per(ai_used, active_paid),
-                "platform_per_active": _per(platform_cad, n_active), "platform_per_active_paid": _per(platform_cad, active_paid),
-                "cost_per_active": _per(costs, n_active), "cost_per_active_paid": _per(costs, active_paid),
-                "profit_per_active": _per(margin, n_active), "profit_per_paid": _per(margin, paid)},
-            "pace": {"days_elapsed": elapsed, "days_in_month": days, "ai_month_end_cad": round(pace, 2),
-                     "margin_month_end_cad": round(net - platform_cad - pace, 2)},
+                "revenue_per_paid": _per(rev, paid), "revenue_per_active": _per(rev, n_active),
+                "infra_per_active": _per(fam["infrastructure"]["used_cad"], n_active), "ai_per_active": _per(ai_used, n_active),
+                "marketing_per_active": _per(fam["marketing"]["used_cad"], n_active), "dev_per_active": _per(dev, n_active),
+                "ops_per_active": _per(ops, n_active), "ops_per_active_paid": _per(ops, active_paid), "ops_per_paid": _per(ops, paid),
+                "total_per_active": _per(total, n_active), "total_per_active_paid": _per(total, active_paid), "total_per_paid": _per(total, paid),
+                "op_profit_per_active": _per(op_margin, n_active), "net_profit_per_active": _per(net_margin, n_active),
+                "op_profit_per_paid": _per(op_margin, paid), "net_profit_per_paid": _per(net_margin, paid)},
+            "pace": {"days_elapsed": elapsed, "days_in_month": days, "ai_month_end_cad": round(pace_ai, 2),
+                     "operating_margin_month_end_cad": round(rev - (ops - ai_used + pace_ai), 2)},
         })
         ratio = (active_paid / n_active) if n_active and active_paid else 1.0
         ai_pa = (ai_used / n_active) if n_active else 0.0
-        out["scenarios"] = [{"members": n, "paid": round(n * ratio), "revenue_cad": round(n * ratio * doc["price_cad"], 2),
-                             "ai_cad": round(n * ai_pa, 2), "platform_cad": platform_cad,
-                             "margin_cad": round(n * ratio * doc["price_cad"] - n * ai_pa - platform_cad, 2)} for n in SCENARIOS]
-        for s in out["scenarios"]:
-            s["margin_pct"] = round(s["margin_cad"] * 100 / s["revenue_cad"], 1) if s["revenue_cad"] else None
-        out["scenario_basis"] = {"paid_ratio_pct": round(ratio * 100, 1), "ai_per_active_cad": round(ai_pa, 4), "has_data": bool(n_active), "ratio_assumed": not (n_active and active_paid)}
+        fixed = round(ops - ai_used, 2)
+        out["scenarios"] = []
+        for n in SCENARIOS:
+            r = round(n * ratio * doc["price_cad"], 2)
+            m = round(r - n * ai_pa - fixed, 2)
+            out["scenarios"].append({"members": n, "paid": round(n * ratio), "revenue_cad": r, "ai_cad": round(n * ai_pa, 2), "fixed_cad": fixed,
+                                     "margin_cad": m, "margin_pct": round(m * 100 / r, 1) if r else None})
+        out["scenario_basis"] = {"paid_ratio_pct": round(ratio * 100, 1), "ai_per_active_cad": round(ai_pa, 4),
+                                 "ratio_assumed": not (n_active and active_paid)}
         return out
 
-    async def _credit(pace_or_usd: float):
+    async def _credit(daily_usd: float):
         if not credits_fn:
             return None
         try:
@@ -239,13 +362,12 @@ def create_finance_router(db, check_admin, credits_fn=None):
         if not c.get("configured"):
             return {"configured": False}
         alert = await db.admin_settings.find_one({"key": "credit_alert"}, {"_id": 0}) or {}
-        daily = pace_or_usd
-        return {**c, "threshold": alert.get("threshold", 20), "daily_usd": round(daily, 4),
-                "days_left": round(c["remaining"] / daily, 1) if daily > 0 else None,
-                "low": (c.get("remaining_pct") or 0) <= alert.get("threshold", 20)}
+        th = alert.get("threshold", 20)
+        return {**c, "threshold": th, "daily_usd": round(daily_usd, 4),
+                "days_left": round(c["remaining"] / daily_usd, 1) if daily_usd > 0 else None, "low": (c.get("remaining_pct") or 0) <= th}
 
     @router.get("/finance")
-    async def finance(month: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$"), x_admin_password: str = Header(None)):
+    async def finance(month: Optional[str] = Query(None, pattern=M_PATTERN), x_admin_password: str = Header(None)):
         check_admin(x_admin_password)
         month = month or month_key()
         s = await summary(month)
@@ -253,8 +375,7 @@ def create_finance_router(db, check_admin, credits_fn=None):
         for i in range(5, -1, -1):
             yy, mm = y + (m - 1 - i) // 12, (m - 1 - i) % 12 + 1
             hist.append(await summary(f"{yy:04d}-{mm:02d}", light=True))
-        or_est = next((p["est_usd"] for p in s["providers"] if p["provider"] == "openrouter"), 0.0)
-        s["credit"] = await _credit(or_est / max(1, s["pace"]["days_elapsed"]))
+        s["credit"] = await _credit(s["ai_log_usd"].get("openrouter", 0.0) / max(1, s["pace"]["days_elapsed"]))
         s["history"] = hist
         s["settings"] = await _settings()
         return s
@@ -266,8 +387,14 @@ def create_finance_router(db, check_admin, credits_fn=None):
             _bounds(month)
         except Exception:  # noqa: BLE001
             raise HTTPException(status_code=422, detail="Mois invalide (AAAA-MM)")
-        await db.finance_months.update_one({"month": month}, {"$set": {"month": month, **body.model_dump(),
-                                           "updated_at": datetime.now(timezone.utc).isoformat()}}, upsert=True)
+        ids = {p["id"] async for p in db.finance_providers.find({}, {"id": 1})}
+        lines = [ln.model_dump() for ln in body.lines if ln.provider_id in ids]
+        before = await db.finance_months.find_one({"month": month}, {"_id": 0}) or {}
+        await db.finance_months.update_one({"month": month}, {"$set": {"month": month, **body.model_dump(), "lines": lines,
+                                           "updated_at": _now()}}, upsert=True)
+        changed = [ln["provider_id"] for ln in lines if ln not in (before.get("lines") or [])]
+        await _audit(db, "month", month, "update", {"lines_changed": len(changed), "revenue_real": body.revenue_real,
+                                                    "price_cad": body.price_cad, "paid_override": body.paid_override})
         return {"ok": True}
 
     @router.put("/finance-settings")
@@ -278,6 +405,120 @@ def create_finance_router(db, check_admin, credits_fn=None):
         await db.admin_settings.update_one({"key": "finance"}, {"$set": {"fx_usd_cad": body.fx_usd_cad, "pricing": pricing}}, upsert=True)
         return await _settings()
 
+    # ---------- catalogue ----------
+    async def _used_providers():
+        used = set()
+        async for d in db.finance_months.find({}, {"lines": 1}):
+            used |= {ln["provider_id"] for ln in d.get("lines") or [] if ln.get("estimated") is not None or ln.get("real") is not None}
+        return used
+
+    @router.get("/finance-catalog")
+    async def catalog(x_admin_password: str = Header(None)):
+        check_admin(x_admin_password)
+        cats, provs = await _catalog()
+        used = await _used_providers()
+        count = {}
+        for p in provs:
+            count[p["category_id"]] = count.get(p["category_id"], 0) + 1
+            p["used"] = p["id"] in used
+        return {"families": FAMILIES, "ai_keys": AI_KEYS, "providers": provs,
+                "categories": [{**c, "providers": count.get(c["id"], 0)} for c in sorted(cats.values(), key=lambda c: (list(FAMILIES).index(c["family"]), c["name"]))]}
+
+    @router.post("/finance-categories")
+    async def add_category(body: CategoryBody, x_admin_password: str = Header(None)):
+        check_admin(x_admin_password)
+        c = {"id": str(uuid.uuid4()), **body.model_dump(), "status": "active", "created_at": _now()}
+        await db.finance_categories.insert_one(dict(c))
+        await _audit(db, "category", c["id"], "create", body.model_dump())
+        c.pop("_id", None)
+        return c
+
+    @router.put("/finance-categories/{cid}")
+    async def edit_category(cid: str, body: CategoryBody, x_admin_password: str = Header(None)):
+        check_admin(x_admin_password)
+        before = await db.finance_categories.find_one({"id": cid}, {"_id": 0})
+        if not before:
+            raise HTTPException(status_code=404, detail="Catégorie introuvable")
+        await db.finance_categories.update_one({"id": cid}, {"$set": body.model_dump()})
+        await _audit(db, "category", cid, "update", {"avant": {k: before.get(k) for k in ("name", "family")}, "après": body.model_dump()})
+        return {"ok": True}
+
+    @router.post("/finance-categories/{cid}/archive")
+    async def archive_category(cid: str, body: ArchiveBody, x_admin_password: str = Header(None)):
+        check_admin(x_admin_password)
+        r = await db.finance_categories.update_one({"id": cid}, {"$set": {"status": "archived" if body.archived else "active"}})
+        if not r.matched_count:
+            raise HTTPException(status_code=404, detail="Catégorie introuvable")
+        await _audit(db, "category", cid, "archive" if body.archived else "reactivate", {})
+        return {"ok": True}
+
+    @router.delete("/finance-categories/{cid}")
+    async def delete_category(cid: str, x_admin_password: str = Header(None)):
+        check_admin(x_admin_password)
+        if await db.finance_providers.count_documents({"category_id": cid}):
+            raise HTTPException(status_code=409, detail="Catégorie utilisée par des fournisseurs : archivez-la plutôt.")
+        r = await db.finance_categories.delete_one({"id": cid})
+        if not r.deleted_count:
+            raise HTTPException(status_code=404, detail="Catégorie introuvable")
+        await _audit(db, "category", cid, "delete", {})
+        return {"ok": True}
+
+    async def _check_cat(cid):
+        if not await db.finance_categories.find_one({"id": cid}, {"_id": 1}):
+            raise HTTPException(status_code=422, detail="Catégorie inconnue")
+
+    @router.post("/finance-providers")
+    async def add_provider(body: ProviderBody, x_admin_password: str = Header(None)):
+        check_admin(x_admin_password)
+        await _check_cat(body.category_id)
+        p = {"id": str(uuid.uuid4()), **body.model_dump(), "start_month": body.start_month or month_key(), "status": "active", "created_at": _now()}
+        await db.finance_providers.insert_one(dict(p))
+        await _audit(db, "provider", p["id"], "create", body.model_dump())
+        p.pop("_id", None)
+        return p
+
+    @router.put("/finance-providers/{pid}")
+    async def edit_provider(pid: str, body: ProviderBody, x_admin_password: str = Header(None)):
+        check_admin(x_admin_password)
+        before = await db.finance_providers.find_one({"id": pid}, {"_id": 0})
+        if not before:
+            raise HTTPException(status_code=404, detail="Fournisseur introuvable")
+        await _check_cat(body.category_id)
+        new = body.model_dump()
+        diff = {k: {"avant": before.get(k), "après": v} for k, v in new.items() if before.get(k) != v}
+        await db.finance_providers.update_one({"id": pid}, {"$set": new})
+        if diff:
+            await _audit(db, "provider", pid, "update", diff)
+        return {"ok": True}
+
+    @router.post("/finance-providers/{pid}/archive")
+    async def archive_provider(pid: str, body: ArchiveBody, x_admin_password: str = Header(None)):
+        check_admin(x_admin_password)
+        r = await db.finance_providers.update_one({"id": pid}, {"$set": {"status": "archived" if body.archived else "active"}})
+        if not r.matched_count:
+            raise HTTPException(status_code=404, detail="Fournisseur introuvable")
+        await _audit(db, "provider", pid, "archive" if body.archived else "reactivate", {})
+        return {"ok": True}
+
+    @router.delete("/finance-providers/{pid}")
+    async def delete_provider(pid: str, x_admin_password: str = Header(None)):
+        check_admin(x_admin_password)
+        if pid in await _used_providers():
+            raise HTTPException(status_code=409, detail="Fournisseur déjà utilisé dans un mois : archivez-le plutôt.")
+        r = await db.finance_providers.delete_one({"id": pid})
+        if not r.deleted_count:
+            raise HTTPException(status_code=404, detail="Fournisseur introuvable")
+        await db.finance_months.update_many({}, {"$pull": {"lines": {"provider_id": pid}}})
+        await _audit(db, "provider", pid, "delete", {})
+        return {"ok": True}
+
+    @router.get("/finance-audit")
+    async def audit(entity_id: Optional[str] = None, x_admin_password: str = Header(None)):
+        check_admin(x_admin_password)
+        q = {"entity_id": entity_id} if entity_id else {}
+        return [a async for a in db.finance_audit.find(q, {"_id": 0}).sort("at", -1).limit(50)]
+
+    # ---------- members ----------
     @router.get("/members")
     async def members(x_admin_password: str = Header(None)):
         check_admin(x_admin_password)
@@ -302,3 +543,7 @@ async def ensure_finance_indexes(db):
     await db.ai_usage.create_index([("month", 1), ("bucket", 1)])
     await db.member_activity.create_index([("user_id", 1), ("month", 1)], unique=True)
     await db.finance_months.create_index("month", unique=True)
+    await db.finance_providers.create_index("id", unique=True)
+    await db.finance_categories.create_index("id", unique=True)
+    await db.finance_audit.create_index([("entity_id", 1), ("at", -1)])
+    await seed_catalog(db)

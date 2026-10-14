@@ -48,6 +48,12 @@ export const adminFinance = (pwd, month) => adminCall(`/finance${month ? `?month
 export const adminSaveFinanceMonth = (pwd, month, body) => adminCall(`/finance/${month}`, pwd, { method: "PUT", body: JSON.stringify(body) });
 export const adminSaveFinanceSettings = (pwd, body) => adminCall("/finance-settings", pwd, { method: "PUT", body: JSON.stringify(body) });
 export const adminMembers = (pwd) => adminCall("/members", pwd);
+export const adminFinanceCatalog = (pwd) => adminCall("/finance-catalog", pwd);
+export const adminFinanceAudit = (pwd, id) => adminCall(`/finance-audit${id ? `?entity_id=${id}` : ""}`, pwd);
+const body = (method, data) => ({ method, body: data === undefined ? undefined : JSON.stringify(data) });
+export const adminCatalogSave = (pwd, kind, id, data) => adminCall(`/finance-${kind}${id ? `/${id}` : ""}`, pwd, body(id ? "PUT" : "POST", data));
+export const adminCatalogArchive = (pwd, kind, id, archived) => adminCall(`/finance-${kind}/${id}/archive`, pwd, body("POST", { archived }));
+export const adminCatalogDelete = (pwd, kind, id) => adminCall(`/finance-${kind}/${id}`, pwd, { method: "DELETE" });
 export const adminSetPaid = (pwd, id, paid) => adminCall(`/members/${id}/paid`, pwd, { method: "PUT", body: JSON.stringify({ paid }) });
 
 export async function adminLlmHealth(password) {
