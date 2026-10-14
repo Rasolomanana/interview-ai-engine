@@ -23,6 +23,7 @@ from careeros.router import create_careeros_router, ensure_careeros_indexes
 from careeros.radar import create_radar_router, ensure_radar_indexes
 from careeros.journey import create_journey_router
 from careeros.followup import create_followup_router
+from careeros.finance import create_finance_router, ensure_finance_indexes, log_ai_call
 import state_machine as sm
 import prompt as P
 from admin import (
@@ -307,13 +308,16 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
                 chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
                 fc = [ImageContent(image_base64=_strip_data_url(i)) for i in imgs] if imgs else None
                 um = UserMessage(text=turn_message, file_contents=fc) if fc else UserMessage(text=turn_message)
+                n_out = 0
                 async for ev in chat.stream_message(um):
                     if isinstance(ev, TextDelta):
                         emitted = True
+                        n_out += len(ev.content)
                         yield _sse("delta", {"content": ev.content})
                     elif isinstance(ev, StreamDone):
                         break
                 if emitted:
+                    await log_ai_call(db, provider, provider, model, len(system_message) + len(turn_message) + 1000 * len(imgs), n_out, "copilote")
                     yield _sse("done", {"provider": provider, "model": model})
                     return
             except Exception as e:  # noqa: BLE001
@@ -363,7 +367,9 @@ async def _generate_text(system_message: str, user_text: str, tier: str = "eco")
                     elif isinstance(ev, StreamDone):
                         break
                 if out:
-                    return "".join(out)
+                    txt = "".join(out)
+                    await log_ai_call(db, provider, provider, model, len(system_message) + len(user_text), len(txt), "premium" if tier == "premium" else "analyse")
+                    return txt
             except Exception as e:  # noqa: BLE001
                 logger.warning("analyze provider %s failed: %s", provider, e)
     if DEEPSEEK_API_KEY:
@@ -666,11 +672,14 @@ async def analyze_company(req: CompanyAnalyzeRequest):
     async def gen():
         try:
             chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(*LLM_MODEL)
+            n_out = 0
             async for ev in chat.stream_message(UserMessage(text=user_text)):
                 if isinstance(ev, TextDelta):
+                    n_out += len(ev.content)
                     yield _sse("delta", {"content": ev.content})
                 elif isinstance(ev, StreamDone):
                     break
+            await log_ai_call(db, LLM_MODEL[0], LLM_MODEL[0], LLM_MODEL[1], len(system_message) + len(user_text), n_out, "entreprise")
         except Exception as e:  # noqa: BLE001
             logger.exception("analyze-company failed")
             yield _sse("error", {"detail": str(e)})
@@ -781,6 +790,9 @@ def _sse(event: str, data: dict) -> str:
 
 app.include_router(api_router)
 app.include_router(create_admin_router(db, _llm_health))
+from admin import _check_admin as _admin_check  # noqa: E402
+from careeros.ai_credits import openrouter_credits as _or_credits  # noqa: E402
+app.include_router(create_finance_router(db, _admin_check, _or_credits))
 auth_router, current_member = create_auth(db)
 app.include_router(auth_router)
 careeros_router = create_careeros_router(db, current_member, _generate_text, _fetch_page_text, _parse_json_object)
@@ -807,6 +819,7 @@ async def _admin_startup():
         await ensure_auth_indexes(db)
         await ensure_careeros_indexes(db)
         await ensure_radar_indexes(db)
+        await ensure_finance_indexes(db)
     except Exception:
         logger.exception("careeros index setup failed")
 

@@ -97,6 +97,8 @@ def create_auth(db):
         now = datetime.now(timezone.utc)
         if (user.get("last_seen_at") or "") < (now - timedelta(hours=1)).isoformat():  # activity marker (Radar: active members)
             await db.users.update_one({"id": user_id}, {"$set": {"last_seen_at": now.isoformat()}})
+            from careeros.finance import mark_active
+            await mark_active(db, user_id)
         return user
 
     @router.post("/register")

@@ -9,6 +9,8 @@ import { SimulationsTable } from "@/components/admin/SimulationsTable";
 import { LlmHealth } from "@/components/admin/LlmHealth";
 import { CreditCard } from "@/components/admin/CreditCard";
 import { ThemeToggle, usePageTitle } from "@/components/careeros/ThemeToggle";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FinanceDashboard } from "@/components/admin/finance/FinanceDashboard";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(4)}`;
 const num = (n) => (Number(n) || 0).toLocaleString();
@@ -156,7 +158,7 @@ export default function AdminDashboard() {
             <h1 className="text-xl font-bold text-white">Tableau de bord administrateur</h1>
             <span className="rounded-md border border-white/10 bg-black/30 px-2 py-0.5 font-mono text-[10px] text-slate-400">rétention {stats?.retention_days ?? 90} j</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <ThemeToggle />
             <button onClick={() => load(sessionStorage.getItem("adminPwd"))} data-testid="admin-refresh-btn" className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs hover:border-white/20">
               <RefreshCw className="h-3.5 w-3.5" /> Rafraîchir
@@ -173,6 +175,13 @@ export default function AdminDashboard() {
           </div>
         </header>
 
+        <Tabs defaultValue="activite">
+        <TabsList className="mb-4 border border-white/10 bg-slate-900" data-testid="admin-tabs">
+          <TabsTrigger value="activite" data-testid="admin-tab-activity">Activité</TabsTrigger>
+          <TabsTrigger value="rentabilite" data-testid="admin-tab-finance">Rentabilité CareerOS</TabsTrigger>
+        </TabsList>
+        <TabsContent value="rentabilite"><FinanceDashboard /></TabsContent>
+        <TabsContent value="activite">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard icon={Users} label="Visiteurs" value={num(t.visitors)} accent="text-indigo-400" />
           <StatCard icon={PlayCircle} label="Simulations" value={num(t.simulations)} accent="text-emerald-400" />
@@ -261,6 +270,8 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        </TabsContent>
+        </Tabs>
         <a href="/careeros" className="mt-6 block text-center text-xs text-slate-500 hover:text-slate-300">← Retour à l'application</a>
       </div>
     </div>

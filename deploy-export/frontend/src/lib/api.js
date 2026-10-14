@@ -44,6 +44,11 @@ async function adminCall(path, password, opts = {}) {
 export const adminCredits = (pwd) => adminCall("/credits", pwd);
 export const adminSaveAlert = (pwd, body) => adminCall("/alert-settings", pwd, { method: "PUT", body: JSON.stringify(body) });
 export const adminTestAlert = (pwd) => adminCall("/alert-test", pwd, { method: "POST" });
+export const adminFinance = (pwd, month) => adminCall(`/finance${month ? `?month=${month}` : ""}`, pwd);
+export const adminSaveFinanceMonth = (pwd, month, body) => adminCall(`/finance/${month}`, pwd, { method: "PUT", body: JSON.stringify(body) });
+export const adminSaveFinanceSettings = (pwd, body) => adminCall("/finance-settings", pwd, { method: "PUT", body: JSON.stringify(body) });
+export const adminMembers = (pwd) => adminCall("/members", pwd);
+export const adminSetPaid = (pwd, id, paid) => adminCall(`/members/${id}/paid`, pwd, { method: "PUT", body: JSON.stringify({ paid }) });
 
 export async function adminLlmHealth(password) {
   const r = await fetch(`${ADMIN_BASE()}/llm-health`, { headers: { "X-Admin-Password": password } });
