@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { radar } from "@/lib/careeros";
 import { PortalSuggest, discoverFor } from "@/components/careeros/PortalSuggest";
 import { EmployerDirectory } from "@/components/careeros/EmployerDirectory";
+import { CompanySummary, detectedLabel } from "@/components/careeros/CompanySummary";
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400/60";
 const KIND = { workday: "Workday", successfactors: "SuccessFactors", oracle: "Oracle", icims: "iCIMS", greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", smartrecruiters: "SmartRecruiters", amazon: "amazon.jobs" };
@@ -48,7 +49,7 @@ const CompanyRow = ({ c, i, onChange, onRemove, result, setResult }) => {
       <button type="button" onClick={onRemove} className="p-1.5 text-slate-500 hover:text-rose-300" data-testid={`radar-company-remove-${i}`}><Trash2 className="h-4 w-4" /></button>
     </div>
     {show && <PortalSuggest c={c} i={i} result={result} onResult={setResult} onClose={() => { setOpen(false); setResult(null); }}
-      onPick={(p) => { onChange(p); setOpen(false); setResult(null); toast.success(`${c.name} associée à son portail ${KIND[p.kind]}.`); }} />}
+      onPick={(p) => { onChange({ ...p, detected: "" }); setOpen(false); setResult(null); toast.success(`${c.name} associée à son portail ${KIND[p.kind]}.`); }} />}
     </div>
   );
 };
@@ -65,20 +66,24 @@ export const CompanyManager = ({ companies, setCompanies }) => {
     const todo = companies.map((c, i) => [c, i]).filter(([c]) => c.enabled && !c.kind);
     if (!todo.length) { toast.message("Toutes les entreprises actives ont déjà un portail."); return; }
     let found = 0;
+    const det = {};
     for (let k = 0; k < todo.length; k++) {
       const [c, i] = todo[k];
       setScan(`${k + 1}/${todo.length} · ${c.name}`);
       try {
         const r = await discoverFor(c);
         setResults((x) => ({ ...x, [i]: r }));
+        det[i] = detectedLabel(r);
         if (r.candidates?.some((p) => p.ok)) found += 1;
       } catch { /* keep going */ }
     }
     setScan(null);
+    setCompanies(companies.map((c, i) => (i in det ? { ...c, detected: det[i] } : c)));
     toast.success(`Détection terminée : ${found} portail(s) proposé(s) sur ${todo.length} entreprise(s). Validez chaque suggestion avec « Associer ».`);
   };
   const addFromDirectory = (d) => {
-    setCompanies(mergeCompanies(companies, [{ name: d.name, enabled: true, portal_url: d.ok ? d.portal_url : "", kind: d.ok ? d.kind : "", slug: d.ok ? d.slug : "", website: "" }]));
+    setCompanies(mergeCompanies(companies, [{ name: d.name, enabled: true, portal_url: d.ok ? d.portal_url : "", kind: d.ok ? d.kind : "", slug: d.ok ? d.slug : "", website: "",
+      detected: d.ok ? "" : d.kind ? `Illisible : ${d.kind_label}` : `Non pris en charge : ${d.ats || "non identifié"}` }]));
     toast.success(d.ok ? `${d.name} ajoutée avec son portail ${d.kind_label}.` : `${d.name} ajoutée : suivie via Jooble.`);
   };
   const update = (i, patch) => setCompanies(companies.map((c, j) => (j === i ? { ...c, ...patch } : c)));
@@ -96,6 +101,7 @@ export const CompanyManager = ({ companies, setCompanies }) => {
         </div>
       </div>
       <p className="text-[11px] text-slate-500">Ajoutez simplement le nom : la loupe propose le portail compatible (Workday, SuccessFactors, Oracle Recruiting, iCIMS, Greenhouse, Lever, SmartRecruiters…). Sans portail lisible, l'entreprise reste suivie via Jooble.</p>
+      <CompanySummary companies={companies} />
       {dir && <EmployerDirectory companies={companies} onAdd={addFromDirectory} />}
       {importing && (
         <div className="space-y-2 rounded-xl border border-white/10 p-3" data-testid="radar-import-panel">
@@ -103,7 +109,7 @@ export const CompanyManager = ({ companies, setCompanies }) => {
           <button type="button" onClick={doImport} disabled={!bulk.trim()} className="rounded-full bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50" data-testid="radar-import-btn">Importer</button>
         </div>)}
       <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-        {companies.map((c, i) => <CompanyRow key={i} c={c} i={i} result={results[i]} setResult={(r) => setResults((x) => ({ ...x, [i]: r }))} onChange={(p) => update(i, p)} onRemove={() => { setResults({}); setCompanies(companies.filter((_, j) => j !== i)); }} />)}
+        {companies.map((c, i) => <CompanyRow key={i} c={c} i={i} result={results[i]} setResult={(r) => { setResults((x) => ({ ...x, [i]: r })); if (r) update(i, { detected: detectedLabel(r) }); }} onChange={(p) => update(i, p)} onRemove={() => { setResults({}); setCompanies(companies.filter((_, j) => j !== i)); }} />)}
         {companies.length === 0 && <p className="text-[11px] text-slate-500" data-testid="radar-company-empty">Aucune entreprise suivie. Ajoutez-en une ou importez une liste.</p>}
       </div>
       <div className="grid grid-cols-[1fr_1.4fr_auto] gap-2">

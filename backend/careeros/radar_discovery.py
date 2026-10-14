@@ -28,6 +28,7 @@ DIRECTORY = [
     ("Banque Nationale", "", "Finance"), ("Bell", "", "Télécommunications"), ("Air Canada", "", "Transport"),
     ("Metro", "", "Alimentation"), ("CGI", "", "Technologie"),
 ]
+NO_FEED_ATS = {"Banque Nationale": "Avature", "Bell": "Phenom", "Air Canada": "Phenom", "Metro": "portail propriétaire", "CGI": "Njoyn"}
 UNSUPPORTED = {"taleo.net": "Taleo", "phenompeople": "Phenom", "avature": "Avature", "njoyn": "Njoyn", "silkroad": "SilkRoad",
                "jobvite": "Jobvite", "ultipro": "UKG"}
 ATS = [
@@ -100,6 +101,8 @@ async def discover(name: str, website: str = "") -> dict:
     found, unsupported, origin = {}, set(), {}
     d = directory_match(name)
     async with httpx.AsyncClient(timeout=S.TIMEOUT, follow_redirects=True) as c:
+        if d and not d[1]:
+            unsupported.add(NO_FEED_ATS.get(d[0], "non identifié"))
         if d and d[1]:
             k, s = S.parse_portal(d[1])
             found[(k, s)], origin[(k, s)] = d[1], "annuaire"
@@ -155,8 +158,9 @@ async def directory(force: bool = False) -> list:
         async def one(d):
             name, url, sector = d
             if not url:
-                return {"name": name, "sector": sector, "portal_url": "", "kind": "", "slug": "", "ok": False, "count": 0,
-                        "message": "Portail sans flux public : suivi via Jooble."}
+                ats = NO_FEED_ATS.get(name, "non identifié")
+                return {"name": name, "sector": sector, "portal_url": "", "kind": "", "slug": "", "ok": False, "count": 0, "ats": ats,
+                        "message": f"Portail {ats} non pris en charge : suivi via Jooble."}
             k, s = S.parse_portal(url)
             return {"name": name, "sector": sector, "portal_url": url, "kind": k, "kind_label": KIND_LABEL.get(k, k), "slug": s, **await verify(c, k, s, name)}
         data = await asyncio.gather(*(one(d) for d in DIRECTORY))

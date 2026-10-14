@@ -54,6 +54,7 @@ class Company(BaseModel):
     kind: str = Field(default="", pattern="^(|workday|successfactors|oracle|icims|greenhouse|lever|ashby|smartrecruiters|amazon)$")
     slug: str = Field(default="", max_length=200)
     website: str = Field(default="", max_length=200)
+    detected: str = Field(default="", max_length=160)
 
 
 class RadarSettings(BaseModel):

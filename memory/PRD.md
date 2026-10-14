@@ -1,5 +1,11 @@
 # PRD — Copilote Entretien IA / CareerOS
 
+## Amélioration (juin 2026) — Résumé des entreprises suivies
+- `CompanySummary.jsx` (Réglages Radar) : Via portail employeur / Suivies via Jooble / Détectées mais non prises en charge (dépliables). Champ entreprise `detected` (persisté) rempli par la loupe, « Tout détecter » et l'annuaire (« Non pris en charge : Phenom », « Illisible : SuccessFactors », « Aucun portail détecté »).
+- Annuaire : ATS nommé pour les employeurs sans flux (BNC Avature, Bell/Air Canada Phenom, CGI Njoyn, Metro propriétaire).
+- Incident prod : « Not Found » sur la détection = Render pas sur le dernier commit (Cloudflare à jour) ; résolu par redéploiement utilisateur.
+- BACKLOG P1 : lecteur Phenom (demandé par l'utilisateur pour une prochaine itération : Air Canada, Bell).
+
 ## Fonctionnalité (juin 2026) — Qualité des sources Radar : portails employeurs
 - Nouveaux lecteurs (`radar_sources.py`) : SuccessFactors RMK (flux RSS public `/services/rss/job/`), Oracle Recruiting (REST `recruitingCEJobRequisitions`), iCIMS (HTML, au mieux), SmartRecruiters (API publique). parse_portal reconnaît Oracle/iCIMS/SmartRecruiters/RSS SF.
 - `radar_discovery.py` : annuaire 26 employeurs QC/CA vérifiés en direct (cache 6 h) — Workday (Desjardins, Intact, iA, Beneva, Saputo, TD, CAE, Couche-Tard, Intelcom), SuccessFactors (Hydro-Québec, Rogers, Bombardier, TELUS, Hydro One, Scotia, CN, CPKC, Sobeys=403 illisible), Oracle (Ville de Montréal), SmartRecruiters (Ubisoft), Amazon ; sans flux public → Jooble (Banque Nationale, Bell/Phenom, Air Canada, Metro, CGI/Njoyn). Détection : annuaire + scan site (site web facultatif, sinon nom.com/.ca, careers./jobs.) + devinettes Greenhouse/Lever/Ashby/SmartRecruiters/Workday ; ATS non pris en charge signalés.
