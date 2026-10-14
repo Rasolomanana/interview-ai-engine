@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Brain,
   Send, Mic, MicOff, ImagePlus, X, Zap, RotateCcw, SlidersHorizontal,
-  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound, FileText, Headphones, PictureInPicture2, MonitorUp, Coins,
+  Bug, Hand, UserCircle2, ClipboardList, ArrowRight, PlayCircle, KeyRound, FileText, Headphones, PictureInPicture2, MonitorUp, Coins, Compass,
 } from "lucide-react";
 import * as api from "@/lib/api";
 import { useVoice } from "@/lib/useVoice";
@@ -17,6 +17,7 @@ import MessageBubble from "@/components/console/MessageBubble";
 import AutoListenBar from "@/components/console/AutoListenBar";
 import RecapPanel from "@/components/console/RecapPanel";
 import FloatingAnswer from "@/components/console/FloatingAnswer";
+import { CopilotTour, StepNum, useCopilotTour } from "@/components/console/CopilotTour";
 import { ThemeToggle, usePageTitle } from "@/components/careeros/ThemeToggle";
 
 const BADGE = {
@@ -49,6 +50,7 @@ export default function InterviewConsole() {
   const [showListen, setShowListen] = useState(false);
   const [recap, setRecap] = useState({ open: false, text: "", loading: false });
   const [pipRoot, setPipRoot] = useState(null);
+  const tour = useCopilotTour();
   const pipWinRef = useRef(null);
   const autoQRef = useRef(null);
   const listen = useAutoListen({ onQuestion: (q) => autoQRef.current?.(q) });
@@ -473,19 +475,22 @@ export default function InterviewConsole() {
                     : cost.lastProvider === "gemini" ? "Gratuit" : "≈ $0"}
               </button>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5" data-testid="copilot-toolbar">
+              <HeaderBtn n={1} onClick={() => setCtxOpen(true)} testid="open-context-btn" icon={<SlidersHorizontal className="h-4 w-4" />} label="Contexte" />
+              <HeaderBtn n={2} onClick={() => setSettingsOpen(true)} testid="open-settings-btn" icon={<KeyRound className="h-4 w-4" />} label="Réglages" active={settings.provider !== "server" && !settings.geminiKey} />
+              <HeaderBtn n={3} onClick={() => setShowListen((s) => !s)} testid="toggle-listen-btn" icon={<Headphones className="h-4 w-4" />} label="Écoute" active={listen.active} />
               <button onClick={startLive} data-testid="live-btn"
-                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${liveActive ? "border-red-500/50 bg-red-500/20 text-red-300 pulse-ring" : "border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"}`}>
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${liveActive ? "border-red-500/50 bg-red-500/20 text-red-300 pulse-ring" : "border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"}`}>
+                <StepNum n={4} />
                 <span className={`h-2 w-2 rounded-full ${liveActive ? "bg-red-500 animate-pulse" : "bg-emerald-400"}`} />
                 {liveActive ? "Live actif" : "Live"}
               </button>
+              <HeaderBtn n={5} onClick={openFloating} testid="floating-btn" icon={<PictureInPicture2 className="h-4 w-4" />} label="Flottant" active={!!pipRoot} />
+              <HeaderBtn n={8} onClick={doRecap} testid="recap-btn" icon={<FileText className="h-4 w-4" />} label="Récap" />
+              <span className="mx-1 hidden h-5 w-px bg-white/10 sm:block" />
+              <HeaderBtn onClick={tour.open} testid="copilot-tour-btn" icon={<Compass className="h-4 w-4" />} label="Visite" />
               <ThemeToggle className="!rounded-lg !p-1.5" />
               <HeaderBtn onClick={() => { window.location.href = "/careeros"; }} testid="careeros-btn" icon={<Brain className="h-4 w-4" />} label="CareerOS" />
-              <HeaderBtn onClick={openFloating} testid="floating-btn" icon={<PictureInPicture2 className="h-4 w-4" />} label="Flottant" active={!!pipRoot} />
-              <HeaderBtn onClick={() => setShowListen((s) => !s)} testid="toggle-listen-btn" icon={<Headphones className="h-4 w-4" />} label="Écoute" active={listen.active} />
-              <HeaderBtn onClick={doRecap} testid="recap-btn" icon={<FileText className="h-4 w-4" />} label="Récap" />
-              <HeaderBtn onClick={() => setSettingsOpen(true)} testid="open-settings-btn" icon={<KeyRound className="h-4 w-4" />} label="Réglages" active={settings.provider !== "server" && !settings.geminiKey} />
-              <HeaderBtn onClick={() => setCtxOpen(true)} testid="open-context-btn" icon={<SlidersHorizontal className="h-4 w-4" />} label="Contexte" />
               <HeaderBtn onClick={toggleDebug} testid="debug-toggle-btn" icon={<Bug className="h-4 w-4" />} label="Debug" active={active?.debug} />
               <HeaderBtn onClick={doReset} testid="reset-btn" icon={<RotateCcw className="h-4 w-4" />} label="Reset" />
             </div>
@@ -567,8 +572,9 @@ export default function InterviewConsole() {
               <button onClick={() => fileRef.current?.click()} data-testid="image-upload-btn" className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-slate-400 transition-colors hover:text-white" title="Joindre une ou plusieurs images (ou coller avec Ctrl/Cmd+V)">
                 <ImagePlus className="h-5 w-5" />
               </button>
-              <button onClick={captureScreen} disabled={streaming.active} data-testid="capture-screen-btn" className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-sky-300 transition-colors hover:bg-sky-500/20 disabled:opacity-40" title="Capturer l'écran (LOCAL — invisible pour le recruteur, ce n'est pas le partage Teams/Zoom) — ordinateur uniquement">
+              <button onClick={captureScreen} disabled={streaming.active} data-testid="capture-screen-btn" className="relative rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-sky-300 transition-colors hover:bg-sky-500/20 disabled:opacity-40" title="Capturer l'écran (LOCAL — invisible pour le recruteur, ce n'est pas le partage Teams/Zoom) — ordinateur uniquement">
                 <MonitorUp className="h-5 w-5" />
+                <span className="absolute -left-1.5 -top-1.5"><StepNum n={6} /></span>
               </button>
               <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" onChange={(e) => {
                 const files = Array.from(e.target.files || []);
@@ -607,7 +613,7 @@ export default function InterviewConsole() {
                 </button>
               ) : (
                 <button onClick={submitInput} data-testid="send-btn" className="flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:from-indigo-400 hover:to-indigo-500">
-                  <Send className="h-4 w-4" /> Envoyer
+                  <StepNum n={7} /><Send className="h-4 w-4" /> Envoyer
                 </button>
               )}
             </div>
@@ -623,15 +629,16 @@ export default function InterviewConsole() {
       <ContextPanel open={ctxOpen} session={active} onClose={() => setCtxOpen(false)} onSave={saveContext} />
       <SettingsPanel open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)} onSave={saveSettingsHandler} />
       <RecapPanel open={recap.open} text={recap.text} loading={recap.loading} onClose={() => setRecap((r) => ({ ...r, open: false }))} onExport={exportTranscript} />
+      {!settingsOpen && !ctxOpen && !recap.open && <CopilotTour tour={tour} />}
       {pipRoot && createPortal(<FloatingAnswer content={pipContent} streaming={streaming.active} mode={pipMode} listening={listen.active} transcript={listen.transcript} />, pipRoot)}
     </div>
   );
 }
 
-function HeaderBtn({ onClick, icon, label, active, testid }) {
+function HeaderBtn({ onClick, icon, label, active, testid, n }) {
   return (
     <button onClick={onClick} data-testid={testid} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${active ? "border-red-500/40 bg-red-950/40 text-red-300" : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-white"}`}>
-      {icon} <span className="hidden sm:inline">{label}</span>
+      {n && <StepNum n={n} />}{icon} <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }

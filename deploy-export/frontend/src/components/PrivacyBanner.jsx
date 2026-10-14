@@ -4,11 +4,11 @@ import { ShieldCheck, X } from "lucide-react";
 export default function PrivacyBanner() {
   const [show, setShow] = useState(false);
   useEffect(() => {
-    try { setShow(localStorage.getItem("privacyAccepted") !== "1"); } catch { setShow(true); }
+    try { setShow(localStorage.getItem("privacyAcceptedV2") !== "1"); } catch { setShow(true); }
   }, []);
   if (!show) return null;
   const accept = () => {
-    try { localStorage.setItem("privacyAccepted", "1"); } catch { /* ignore */ }
+    try { localStorage.setItem("privacyAcceptedV2", "1"); } catch { /* ignore */ }
     setShow(false);
   };
   return (
@@ -19,6 +19,10 @@ export default function PrivacyBanner() {
           Confidentialité : certaines données d'analyse (rapport ATS, score, date, IP anonymisée) peuvent être
           enregistrées à des fins administratives et d'amélioration du service. Votre CV n'est conservé que si
           vous cochez explicitement le consentement avant « Analyser ». Données supprimées automatiquement après 90 jours.
+          <span className="mt-1 block text-slate-400" data-testid="privacy-disclaimer">
+            CareerOS est un outil d'aide à la recherche d'emploi, à la préparation des candidatures et à la préparation des entrevues.
+            Les décisions, réponses et documents finaux demeurent sous la responsabilité du membre.
+          </span>
         </p>
         <button
           onClick={accept}

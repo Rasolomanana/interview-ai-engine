@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
+import { GoalsSelect } from "@/components/careeros/GoalsSelect";
 import { careeros } from "@/lib/careeros";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
 
@@ -50,12 +51,7 @@ export default function Profile() {
         <section className="space-y-4">
           <div>
             <p className="mb-2 text-xs font-medium text-slate-300">Objectifs de carrière</p>
-            <div className="flex flex-wrap gap-2" data-testid="goals-list">
-              {goals.map((g) => (
-                <button key={g} type="button" onClick={() => toggleGoal(g)} data-testid={`goal-${g.replace(/[^a-z]/gi, "-")}`}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${p.goals?.includes(g) ? "border-indigo-400/60 bg-indigo-500/15 text-white" : "border-white/10 text-slate-400 hover:text-white"}`}>{g}</button>
-              ))}
-            </div>
+            <GoalsSelect options={goals} value={p.goals || []} onToggle={toggleGoal} onClear={() => setP({ ...p, goals: [] })} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {TEXT.map(([k, l]) => <label key={k}><span className="mb-1 block text-xs text-slate-400">{l}</span><input value={p[k] || ""} onChange={set(k)} className={inputCls} data-testid={`profile-${k}-input`} /></label>)}

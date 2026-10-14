@@ -1,4 +1,11 @@
-# PRD — Copilote Entretien IA
+# PRD — Copilote Entretien IA / CareerOS
+
+## Amélioration (juin 2026) — Objectifs compacts, Copilote numéroté, mention de responsabilité
+- Career Memory : « Objectifs de carrière » = une seule ligne (`GoalsSelect`, popover multi-cases à cocher, résumé 2 puces + « +N », compteur x/12, « Tout désélectionner »). testids `goals-select-trigger`, `goal-*`, `goals-count`.
+- Copilote : boutons numérotés selon le parcours (1 Contexte, 2 Réglages, 3 Écoute, 4 Live, 5 Flottant, 6 Capture, 7 Envoyer, 8 Récap) + visite guidée 8 étapes (`CopilotTour`, carte flottante non modale, surbrillance du bouton ciblé, Passer/Précédent/Suivant/Terminer). Affichée une fois (localStorage `copilotTourDone`), relançable via bouton « Visite » (`copilot-tour-btn`). Masquée pendant l'ouverture de Réglages/Contexte/Récap.
+- Bandeau confidentialité : ajout de la mention « CareerOS est un outil d'aide… responsabilité du membre » (`privacy-disclaimer`) ; clé `privacyAcceptedV2` pour réafficher le bandeau une fois à tous.
+- Testé en preview (screenshots desktop + mobile, pas de débordement). Export deploy-export synchronisé. Lot UX GPS + ce lot : À PUBLIER (Save to GitHub → Render → Cloudflare) puis validation production.
+
 
 ## Amélioration (juin 2026) — Indicateur « capture locale » bien visible
 - État `screenCapturing` : bannière verte proéminente au-dessus du composer pendant une capture d'écran active : « 🔒 Capture d'écran LOCALE active — invisible pour le recruteur. Ce n'est PAS le partage Teams/Zoom. » + bouton « Arrêter la capture » (`stop-screen-capture-btn`).
