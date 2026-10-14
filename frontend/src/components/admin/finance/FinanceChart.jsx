@@ -7,7 +7,7 @@ export const FinanceChart = ({ history }) => {
   return (
     <Panel title="Évolution mensuelle (6 mois)" icon={BarChart3} testid="finance-chart">
       <div className="h-64 w-full">
-        <ResponsiveContainer>
+        <ResponsiveContainer width="100%" height="100%" minWidth={200} initialDimension={{ width: 600, height: 256 }}>
           <ComposedChart data={data} margin={{ top: 5, right: 8, left: -12, bottom: 0 }}>
             <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
             <XAxis dataKey="m" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />

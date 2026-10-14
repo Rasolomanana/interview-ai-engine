@@ -1,5 +1,12 @@
 # PRD — Copilote Entretien IA / CareerOS
 
+## Fonctionnalité (juin 2026) — Admin « Rentabilité CareerOS »
+- Backend `careeros/finance.py` : journal `ai_usage` (chaque appel IA serveur : fournisseur, modèle, bucket, facturation, fonctionnalité copilote/analyse/premium/entreprise, jetons estimés ≈ 4 car./jeton) branché dans `_stream_with_fallback`, `_generate_text`, analyse entreprise (preview + deploy-export). `member_activity` (membre actif par mois, via current_user). `finance_months` (prix, payants forcés, ajustements, coûts plateforme CAD/USD, factures IA réelles). `admin_settings.finance` (taux USD→CAD, tarifs $/M jetons).
+- Endpoints admin : GET `/api/admin/finance?month=`, PUT `/api/admin/finance/{month}`, PUT `/api/admin/finance-settings`, GET `/api/admin/members`, PUT `/api/admin/members/{id}/paid`.
+- Frontend : onglet « Rentabilité CareerOS » (components/admin/finance/*) : KPI, 4 réponses clés, graphique 6 mois (recharts), revenus, coûts, IA par modèle, estimé vs réel, par membre, alertes/projection fin de mois, projections 100/500/1000, membres payants (switch), éditeur (Sheet).
+- Testé : iteration_26 → backend 13/13, frontend 100 %, mobile sans débordement. Données de test saisies en preview pour 2026-10.
+- Limites : jetons estimés (pas de comptage exact fournisseur) ; Gemini navigateur (clé du membre) non compté ; « actifs » des mois antérieurs au déploiement non disponibles.
+
 ## Amélioration (juin 2026) — Historique Radar : Trouvées / Nouvelles cliquables
 - Backend : chaque offre garde `seen_runs` ($addToSet à chaque passage) ; runs marqués `tracked: True`. Endpoint `GET /api/careeros/radar/runs/{run_id}/offers?kind=found|new` (isolé par membre, 404 si autre membre, `complete` false pour anciennes recherches non suivies → seules les nouvelles sont listables).
 - Frontend : `RunOffersDialog` (liste priorité, titre, entreprise, lieu, source, IPS, lien offre). Chiffres Trouvées/Nouvelles cliquables dans `RadarHistory` (testids `radar-run-found-*`, `radar-run-new-*`).

@@ -1,0 +1,29 @@
+{
+  "summary": "Backend+frontend testing of Rentabilité CareerOS admin finance dashboard. 13/13 backend pytest tests pass (auth, month summary, 6-month history, past-month zero platform costs, save+recalc with correct gross/adjustments/net/platform conversion/margin, invalid month 422, settings fx/pricing update, members list, 404 on unknown member, paid toggle affects count, AI usage logging via /api/generate SSE, providers list). Frontend admin login + Rentabilité CareerOS tab + all required data-testid elements present (kpi-revenue/platform/ai/margin/active, finance-answers/chart/revenue/costs/ai-buckets/ai-providers/per-member/alerts/projections, projection-100/500/1000, finance-members, finance-month, finance-edit-btn). Editor sheet opens, price/adjustment/cost/fx changes save and refresh KPIs (margin went 317.62 -> 317.40 when fx 1.37 -> 1.40 then restored). Mobile 390px: no horizontal page overflow (scrollWidth == innerWidth 390). Activité tab default content (stat cards, LLM split) still works.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Finance chart (ResponsiveContainer)", "issues": ["Recharts emits width(-1)/height(-1) console warnings on first render — chart renders fine after mount but a minWidth/minHeight on the ResponsiveContainer wrapper would eliminate the warning."]},
+      {"screen": "Admin finance (desktop 1920)", "issues": ["Playwright reported Sheet bounding box x=1913, width=576 (extending past 1920 viewport). Visually the Sheet still renders readable content via animation, but at exactly 1920 viewport the right edge is clipped on some browsers. Not blocking — real users can scroll horizontally within sheet; buttons triggered via JS click. May be a shadcn Sheet transform-animation measurement artifact."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_finance.py", "/app/test_reports/pytest/finance_results.xml"],
+  "action_items": [
+    "(Optional) Add minWidth/minHeight to FinanceChart ResponsiveContainer to silence recharts warning.",
+    "(Note, not a bug) In the current preview DB, paid_override=10 is set on the current month, so toggling an individual member's paid flag correctly does NOT change the 'paid' count (per spec — override wins). Verified the toggle persists via PUT /api/admin/members/{id}/paid, and when paid_override is cleared the count does follow flags (asserted in test_members_toggle_paid_affects_count)."
+  ],
+  "critical_code_review_comments": [
+    "finance.py is well-structured, uses async properly, excludes _id, validates with Pydantic, parametrizes month regex, computes CAD conversion via fx. Good coverage of edge cases (past-month zero platform, invoice gap_cad/gap_pct, scenario ratio_assumed flag).",
+    "AI usage logger is fire-and-forget with exception swallow — correct for non-critical telemetry.",
+    "Mark_active uses $setOnInsert upsert — idempotent per month per user, good."
+  ],
+  "updated_files": ["/app/backend/tests/test_finance.py (new)"],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100% core flows"},
+  "test_credentials": "Admin password: admin2026 (from /app/backend/.env ADMIN_PASSWORD). Member: membre.test@careeros.dev / CareerOS2026!",
+  "seed_data_creation": "No new seed data. Preview DB state restored to original (price 19.99, fx 1.37, paid_override 10, Render 7 USD + Domaine 2 CAD, openrouter invoice 0.5 USD) after each mutating test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Finance feature fully tested — backend endpoints (/api/admin/finance, /api/admin/finance/{month}, /api/admin/finance-settings, /api/admin/members, /api/admin/members/{id}/paid) all pass. AI usage logging via /api/generate confirmed to append feature='copilote' bucket. Frontend editor Sheet opens off the right edge on 1920 viewport (shadcn drawer) — use el.click() via JS evaluate if automating. Mobile 390 fine. Chart emits harmless recharts width/height warning on first render."
+}
