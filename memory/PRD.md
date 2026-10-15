@@ -383,3 +383,11 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - PortalHealth : tableau triable (Entreprise, Plateforme, Qualité, Lues, Retenues, État) trié par Retenues décroissant ; pastilles qualité = filtre du tableau ; clic ligne = filtre offres « Entreprise : X » ; cartes sur mobile ; note explicative si 0 lue / 0 retenue / échec / bloqué.
 - Vérifié par capture Playwright (bureau + 390 px) en preview ; testing agent non concluant (erreur de script de connexion, aucune anomalie applicative).
 - Suite : Sources présentées en tableau (Source · Statut · Trouvées · Analysées) avec chiffres cliquables soulignés (même style que l'historique, composant Num exporté de RadarHistory) ; colonnes Lues et Retenues du tableau Portails cliquables (filtre entreprise). Vérifié par capture en preview (bureau + 390 px, sans débordement).
+
+## 2026-06 — « Pourquoi ce score ? », exigences, règles corrigées, offre externe
+- GET /api/careeros/radar/offers/{id}/explain : réévalue gratuitement les offres « règles » avec les règles actuelles et renvoie IPS, critères, requirements_rules (+ requirements_ai si analyse IA).
+- POST /api/careeros/radar/external : offre collée (texte ; lien lu seulement s'il publie des données JobPosting ; LinkedIn → 422 « collez le texte »). source=externe, hors quota de 50/jour.
+- radar_rules : exigences détectées (années, langues, diplômes, syndiqué, quart, centre de distribution, supervision, SST, permis, compétences, certifications, lieu) ✓/✗/? ; « chef » n'est plus senior ; équivalence chef/superviseur/gestionnaire/contremaître/directeur adjoint (encadrement) ; pluriels et écriture inclusive ; compétences opérations ajoutées (Office, Outlook, réception, expédition…).
+- Prompt IA : renvoie requirements (étiquetées « Confirmé par l'analyse IA ») ; les exigences par règles restent affichées séparément.
+- UI : bouton « Pourquoi ce score ? » (panneau : méthode règles / IA, ce qu'il manque pour la priorité A, critères triés par points perdus, éliminatoires, exigences X/Y, bouton analyse approfondie) ; bouton « Analyser une offre externe ».
+- Tests : iteration_32 → backend 7/7, frontend 100 % (preview).
