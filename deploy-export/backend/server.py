@@ -798,6 +798,8 @@ from careeros.ai_credits import openrouter_credits as _or_credits  # noqa: E402
 app.include_router(create_finance_router(db, _admin_check, _or_credits))
 from careeros.connectors import create_connectors_router  # noqa: E402
 app.include_router(create_connectors_router(db, _admin_check))
+from careeros.knowledge import create_knowledge_admin_router  # noqa: E402
+app.include_router(create_knowledge_admin_router(db, _admin_check))
 auth_router, current_member = create_auth(db)
 app.include_router(auth_router)
 careeros_router = create_careeros_router(db, current_member, _generate_text, _fetch_page_text, _parse_json_object)

@@ -98,6 +98,7 @@ export const radar = {
   detectPortal: (b) => call("/careeros/radar/portal/detect", { method: "POST", body: b }),
   discoverPortal: (b) => call("/careeros/radar/portal/discover", { method: "POST", body: b }),
   directory: () => call("/careeros/radar/directory"),
+  knowledgeMatch: (names) => call("/careeros/radar/knowledge/match", { method: "POST", body: { names } }),
 };
 
 export const followup = {

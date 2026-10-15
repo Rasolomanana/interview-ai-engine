@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FinanceDashboard } from "@/components/admin/finance/FinanceDashboard";
 import { ClickNum, DetailDialog } from "@/components/admin/DetailDialog";
 import { Connectors } from "@/components/admin/Connectors";
+import { KnowledgeBase } from "@/components/admin/KnowledgeBase";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(4)}`;
 const num = (n) => (Number(n) || 0).toLocaleString();
@@ -188,7 +189,9 @@ export default function AdminDashboard() {
           <TabsTrigger value="activite" data-testid="admin-tab-activity">Activité</TabsTrigger>
           <TabsTrigger value="rentabilite" data-testid="admin-tab-finance">Rentabilité CareerOS</TabsTrigger>
           <TabsTrigger value="connecteurs" data-testid="admin-tab-connectors">Connecteurs</TabsTrigger>
+          <TabsTrigger value="base" data-testid="admin-tab-knowledge">Base commune</TabsTrigger>
         </TabsList>
+        <TabsContent value="base"><KnowledgeBase /></TabsContent>
         <TabsContent value="connecteurs"><Connectors /></TabsContent>
         <TabsContent value="rentabilite"><FinanceDashboard /></TabsContent>
         <TabsContent value="activite">

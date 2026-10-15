@@ -19,6 +19,7 @@ from . import radar_rules as RR
 from . import radar_sources as S
 from . import radar_discovery as D
 from . import radar_auto as AU
+from . import knowledge as KB
 from .decision_report import build_decision_report
 from .ips import compute_ips
 from .prompts import SYSTEM
@@ -257,6 +258,10 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             run["portals"] = run["errors"].pop("_portals", {})
             for pname, pv in run["portals"].items():
                 pv["matched"] = sum(1 for o in offers if o["source"] == pv["kind"] and o.get("company") == pname)
+            try:
+                await KB.record_run(db, st["companies"], run["portals"])
+            except Exception:  # noqa: BLE001
+                logger.exception("knowledge record_run")
             seen, fresh = set(), []
             for o in offers:
                 k = _key(o)
@@ -399,7 +404,6 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 comps.append(co)
         data["companies"] = comps
         await db.radar_settings.update_one({"user_id": user["id"]}, {"$set": {**data, "updated_at": _now().isoformat()}, "$unset": {"boards": ""}}, upsert=True)
-        await AU.share(db, user["id"], comps)
         todo = [c["name"] for c in comps if c["enabled"] and not c["kind"] and not c.get("checked_at")]
         if todo:  # new companies: automatic discovery in the background
             asyncio.create_task(AU.auto_detect(db, user["id"], todo, limit=10))
@@ -454,9 +458,24 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
     @router.post("/portal/discover")
     async def discover_portal(body: DiscoverBody, user: dict = Depends(current_user)):
         try:
-            return await asyncio.wait_for(D.discover(body.name.strip(), body.website.strip()), timeout=45)
+            shared = await KB.lookup(db, body.name)
+            r = await asyncio.wait_for(D.discover(body.name.strip(), body.website.strip(), (shared or {}).get("portal_url", "")), timeout=45)
+            await AU.learn(db, body.name.strip(), r, shared)
+            return {**r, "knowledge": KB.public(shared) if shared else None}
         except asyncio.TimeoutError:
             return {"name": body.name, "candidates": [], "unsupported": [], "message": "Détection trop longue : réessayez ou collez l'URL du portail. Jooble reste utilisé en repli."}
+
+    class MatchBody(BaseModel):
+        names: List[str] = Field(default=[], max_length=150)
+
+    @router.post("/knowledge/match")
+    async def knowledge_match(body: MatchBody, user: dict = Depends(current_user)):
+        out = {}
+        for n in body.names[:150]:
+            card = await KB.lookup(db, n)
+            if card and (KB.usable(card) or card.get("status") == "bloque"):
+                out[n] = {**KB.public(card), "slug": card["slug"], "usable": KB.usable(card)}
+        return {"items": out}
 
     @router.get("/directory")
     async def employer_directory(user: dict = Depends(current_user)):
@@ -714,6 +733,8 @@ async def ensure_radar_indexes(db):
     await db.radar_offers.create_index([("user_id", 1), ("first_seen", -1)])
     await db.radar_offers.create_index("id", unique=True)
     await db.portal_directory.create_index("key")
+    await db.portal_knowledge.create_index("key", unique=True)
+    await KB.migrate(db)
     await db.radar_notices.create_index([("user_id", 1), ("status", 1), ("at", -1)])
     await db.radar_runs.create_index([("user_id", 1), ("at", -1)])
     await db.radar_cron_log.create_index("at")

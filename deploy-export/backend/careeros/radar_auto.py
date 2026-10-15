@@ -1,6 +1,5 @@
 """CareerOS Radar — automatic portal discovery: shared anonymous directory, auto-association with undo, daily re-detection, company suggestions."""
 import asyncio
-import hashlib
 import logging
 import re
 import uuid
@@ -27,19 +26,21 @@ def same_company(a: str, b: str) -> bool:
     return bool(ta and tb and (ta <= tb or tb <= ta))
 
 
-async def share(db, user_id: str, companies: list):
-    """Anonymous shared directory: company name -> public portal. Only a hashed member id is kept, to count confirmations."""
-    h = hashlib.sha256(user_id.encode()).hexdigest()[:16]
-    for c in companies:
-        if c.get("kind") and c.get("slug") and c.get("portal_url") and c.get("enabled", True):
-            await db.portal_directory.update_one({"key": D.norm(c["name"]), "kind": c["kind"], "slug": c["slug"]},
-                                                 {"$set": {"name": c["name"], "portal_url": c["portal_url"], "updated_at": _now()}, "$addToSet": {"members": h}}, upsert=True)
-
-
 async def shared_lookup(db, name: str):
-    rows = [r async for r in db.portal_directory.find({"key": D.norm(name)}, {"_id": 0})]
-    rows.sort(key=lambda r: -len(r.get("members") or []))
-    return rows[0] if rows else None
+    from . import knowledge as KB
+    return await KB.lookup(db, name)
+
+
+async def _associate(db, user_id: str, c: dict, best: dict) -> dict:
+    sel = {"user_id": user_id, "companies.name": c["name"]}
+    via = " · Base commune" if best["origin"] == "base commune" else ""
+    await db.radar_settings.update_one(sel, {"$set": {"companies.$.kind": best["kind"], "companies.$.slug": best["slug"], "companies.$.portal_url": best["portal_url"],
+                                                      "companies.$.auto": True, "companies.$.checked_at": _now(),
+                                                      "companies.$.detected": f"Associé automatiquement{via} · {best['kind_label']}"}})
+    await db.radar_notices.update_one({"user_id": user_id, "company": c["name"], "kind": best["kind"], "status": "new"},
+                                      {"$set": {"at": _now(), "kind_label": best["kind_label"], "count": best["count"], "origin": best["origin"], "portal_url": best["portal_url"]},
+                                       "$setOnInsert": {"id": str(uuid.uuid4())}}, upsert=True)
+    return {"name": c["name"], "associated": best["kind"], "origin": best["origin"]}
 
 
 def _certain(cand: dict, name: str, shared) -> bool:
@@ -48,32 +49,47 @@ def _certain(cand: dict, name: str, shared) -> bool:
     if cand["origin"] != "annuaire partagé":
         return True
     named = bool(_tokens(name) & set(re.findall(r"[a-z0-9]+", f"{cand['slug']} {cand['portal_url']}".lower())))
-    return named or len((shared or {}).get("members") or []) >= 2  # one member only: the portal must carry the company name
+    return named or (shared or {}).get("validations", 0) >= 2  # single validation: the portal must carry the company name
 
 
 async def detect_one(db, user_id: str, c: dict) -> dict:
+    from . import knowledge as KB
     shared = await shared_lookup(db, c["name"])
+    blocked = set(c.get("auto_block") or [])
+    sel = {"user_id": user_id, "companies.name": c["name"]}
+    if KB.usable(shared) and shared["kind"] not in blocked:  # collective knowledge: no network discovery needed
+        return await _associate(db, user_id, c, {**KB.public(shared), "slug": shared["slug"], "origin": "base commune", "count": shared.get("recent_offers") or 0})
+    week = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    if shared and shared.get("status") == "bloque" and (shared.get("last_validated") or "") >= week:
+        label = f"Bloqué (anti-robot) : {KB.public(shared)['kind_label']}"
+        await db.radar_settings.update_one(sel, {"$set": {"companies.$.detected": label[:160], "companies.$.checked_at": _now()}})
+        return {"name": c["name"], "associated": ""}
     try:
         r = await asyncio.wait_for(D.discover(c["name"], c.get("website", ""), (shared or {}).get("portal_url", "")), timeout=50)
     except Exception:  # noqa: BLE001
         r = {"candidates": [], "message": "Détection interrompue : nouvel essai au prochain passage."}
-    blocked = set(c.get("auto_block") or [])
+    await learn(db, c["name"], r, shared)
     best = next((x for x in r["candidates"] if x["kind"] not in blocked and _certain(x, c["name"], shared)), None)
-    sel = {"user_id": user_id, "companies.name": c["name"]}
     if best:
-        await db.radar_settings.update_one(sel, {"$set": {"companies.$.kind": best["kind"], "companies.$.slug": best["slug"], "companies.$.portal_url": best["portal_url"],
-                                                          "companies.$.auto": True, "companies.$.checked_at": _now(),
-                                                          "companies.$.detected": f"Associé automatiquement · {best['kind_label']}"}})
-        await db.radar_notices.update_one({"user_id": user_id, "company": c["name"], "kind": best["kind"], "status": "new"},
-                                          {"$set": {"at": _now(), "kind_label": best["kind_label"], "count": best["count"], "origin": best["origin"], "portal_url": best["portal_url"]},
-                                           "$setOnInsert": {"id": str(uuid.uuid4())}}, upsert=True)
-        return {"name": c["name"], "associated": best["kind"]}
+        return await _associate(db, user_id, c, best)
     ok = [x for x in r["candidates"] if x.get("ok")]
     label = (f"Suggestion : {ok[0]['kind_label']} (à confirmer)" if ok else
              f"Bloqué (anti-robot) : {r['candidates'][0]['kind_label']}" if r["candidates"] and r["candidates"][0].get("blocked") else
              f"Non pris en charge : {', '.join(r['unsupported'])}" if r.get("unsupported") else "Aucun portail trouvé · suivi via Jooble")
     await db.radar_settings.update_one(sel, {"$set": {"companies.$.detected": label[:160], "companies.$.checked_at": _now()}})
     return {"name": c["name"], "associated": ""}
+
+
+async def learn(db, name: str, r: dict, shared=None):
+    """Feed the shared knowledge base with confirmed discoveries (official origin + successful read + offers) and 403 blocks."""
+    from . import knowledge as KB
+    for x in r.get("candidates") or []:
+        if x.get("origin") not in CERTAIN:
+            continue
+        if x.get("blocked"):
+            await KB.record(db, name, x["kind"], x["slug"], x["portal_url"], "bloque")
+        elif _certain(x, name, shared) or (x.get("ok") and x.get("count") and x.get("quality") == "fragile" and x["origin"] in ("annuaire", "site")):
+            await KB.record(db, name, x["kind"], x["slug"], x["portal_url"], x.get("quality") or "fiable", x["count"])
 
 
 async def auto_detect(db, user_id: str, names: list = None, limit: int = 3) -> list:
