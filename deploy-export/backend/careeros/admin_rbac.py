@@ -25,7 +25,12 @@ def sections_for(roles) -> list:
     return [s for s in SECTIONS if s in out]
 
 
-def section_of(path: str) -> str:
+TRACE_PREFIX = {"m": "overview", "f": "overview", "r": "overview", "g": "geo", "b": "business", "a": "activite", "fin": "finance"}
+
+
+def section_of(path: str, metric: str = "") -> str:
+    if path == "/api/admin/trace":
+        return TRACE_PREFIX.get(metric.split("_", 1)[0], "super")
     return next((s for p, s in PATHS if path == p or path.startswith(p + "/")), "super")
 
 
@@ -41,7 +46,7 @@ def make_rbac_middleware(db):
                     return JSONResponse({"detail": e.detail}, status_code=401)
                 u = await db.users.find_one({"id": uid}, {"_id": 0, "admin_roles": 1}) or {}
                 roles = u.get("admin_roles") or []
-                sec = section_of(p)
+                sec = section_of(p, request.query_params.get("metric", ""))
                 allowed = sections_for(roles)
                 if sec not in allowed and not (sec == "super" and "super_admin" in roles):
                     return JSONResponse({"detail": "Accès refusé : votre rôle ne donne pas accès à cette section."}, status_code=403)

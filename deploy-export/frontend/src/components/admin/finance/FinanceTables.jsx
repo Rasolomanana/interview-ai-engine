@@ -1,6 +1,9 @@
 import { AlertTriangle, Calculator, Cpu, Layers, Rocket, UserRound } from "lucide-react";
 import { cad, cadFine, num, pct, Panel, Row, tone, usd } from "./fmt";
+import { useState } from "react";
 import { Nature } from "./Nature";
+import { useTrace } from "@/components/admin/TraceDialog";
+import { ClickNum, DetailDialog } from "@/components/admin/DetailDialog";
 
 const Table = ({ head, children, testid, min = 520 }) => (
   <div className="overflow-x-auto">
@@ -80,22 +83,32 @@ export const CostsPanel = ({ s }) => (
   </Panel>
 );
 
-export const AiTables = ({ s }) => (
+export const AiTables = ({ s }) => {
+  const [traceNode, trace] = useTrace();
+  const open = () => trace("fin_ai_calls", s.month);
+  return (
   <Panel title="Consommation IA journalisée" icon={Cpu} testid="finance-ai-buckets" right={<Nature kind="estimated" />}>
+    {traceNode}
     <Table head={["Modèle", "Appels", "Jetons entrée", "Jetons sortie", "Coût estimé"]}>
-      {s.buckets.map((b) => <tr key={b.key} data-testid={`ai-bucket-${b.key}`}><Td left>{b.label}</Td><Td>{num(b.calls)}</Td><Td>{num(b.tokens_in)}</Td><Td>{num(b.tokens_out)}</Td><Td>{cadFine(b.est_cad)}</Td></tr>)}
-      <tr className="font-semibold text-white"><Td left>Total du mois</Td><Td>{num(s.calls)}</Td><Td /><Td /><Td>{cadFine(s.buckets.reduce((a, b) => a + b.est_cad, 0))}</Td></tr>
+      {s.buckets.map((b) => <tr key={b.key} data-testid={`ai-bucket-${b.key}`}><Td left>{b.label}</Td><Td><ClickNum onClick={open} testid={`ai-bucket-calls-${b.key}`}>{num(b.calls)}</ClickNum></Td><Td>{num(b.tokens_in)}</Td><Td>{num(b.tokens_out)}</Td><Td>{cadFine(b.est_cad)}</Td></tr>)}
+      <tr className="font-semibold text-white"><Td left>Total du mois</Td><Td><ClickNum onClick={open} testid="ai-calls-total">{num(s.calls)}</ClickNum></Td><Td /><Td /><Td>{cadFine(s.buckets.reduce((a, b) => a + b.est_cad, 0))}</Td></tr>
     </Table>
     {s.features.length > 0 && <p className="mt-3 text-[11px] text-slate-400" data-testid="ai-features">Par fonctionnalité : {s.features.map((f) => `${f.feature} ${num(f.calls)} appels · ${cadFine(f.est_cad)}`).join(" — ")}</p>}
     <p className="mt-2 text-[11px] text-slate-500">Jetons estimés (≈ 4 caractères par jeton) × tarifs officiels. La facture réelle saisie dans le mois remplace cette estimation.</p>
   </Panel>
-);
+  );
+};
 
 const per = (x, n) => (n ? x / n : null);
 
 export const PerMember = ({ s }) => {
   const f = s.families;
   const m = s.members;
+  const [detail, setDetail] = useState(null);
+  const [traceNode, trace] = useTrace();
+  const DIV = [["membres actifs", "fin_active"], ["actifs payants", "fin_active_paid"], ["membres payants", "fin_paid"]];
+  const formula = (l, v, n, i) => setDetail({ title: `${l} par ${DIV[i][0]}`, cols: [["k", "Élément"], ["v", "Valeur"]],
+    rows: [{ k: l, v: cadFine(v) }, { k: `Nombre de ${DIV[i][0]}`, v: num(n) }, { k: "Calcul", v: n ? `${cadFine(v)} ÷ ${num(n)} = ${cadFine(v / n)}` : "Division impossible (0)" }] });
   const rows = [
     ["Revenu", s.revenue.used], ["Infrastructure", f.infrastructure.used_cad], ["IA", f.ia.used_cad], ["Marketing", f.marketing.used_cad],
     ["Développement", f.developpement.used_cad], ["Coût d'exploitation", s.ops_cad], ["Coût total", s.total_cad],
@@ -103,25 +116,30 @@ export const PerMember = ({ s }) => {
   ];
   return (
     <Panel title="Rentabilité par membre" icon={UserRound} testid="finance-per-member" right={<Nature kind="calculated" />}>
+      {traceNode}<DetailDialog detail={detail} onClose={() => setDetail(null)} />
       <Table head={["Indicateur", "Par membre actif", "Par actif payant", "Par membre payant"]} min={560}>
         {rows.map(([l, v]) => {
           const profit = l.startsWith("Profit");
           return (
             <tr key={l} className={profit || l === "Coût total" ? "font-semibold" : ""} data-testid={`per-member-${l}`}>
               <Td left>{l}</Td>
-              {[m.active, m.active_paid, m.paid].map((n, i) => <Td key={i} className={profit ? tone(per(v, n)) : ""}>{cadFine(per(v, n))}</Td>)}
+              {[m.active, m.active_paid, m.paid].map((n, i) => <Td key={i} className={profit ? tone(per(v, n)) : ""}><ClickNum onClick={() => formula(l, v, n, i)} testid={`per-member-cell-${l}-${i}`}>{cadFine(per(v, n))}</ClickNum></Td>)}
             </tr>);
         })}
       </Table>
-      <p className="mt-2 text-[11px] text-slate-500">Inscrits {num(m.registered)} · actifs (connectés ce mois) {num(m.active)} · payants {num(m.paid)} · actifs payants {num(m.active_paid)}.</p>
+      <p className="mt-2 text-[11px] text-slate-500">Inscrits <ClickNum onClick={() => trace("m_total")} testid="per-member-registered">{num(m.registered)}</ClickNum> · actifs (connectés ce mois) <ClickNum onClick={() => trace("fin_active", s.month)} testid="per-member-active">{num(m.active)}</ClickNum> · payants <ClickNum onClick={() => trace("fin_paid", s.month)} testid="per-member-paid">{num(m.paid)}</ClickNum> · actifs payants <ClickNum onClick={() => trace("fin_active_paid", s.month)} testid="per-member-active-paid">{num(m.active_paid)}</ClickNum>.</p>
     </Panel>
   );
 };
 
 export const Alerts = ({ s }) => {
   const c = s.credit;
+  const [detail, setDetail] = useState(null);
+  const warnList = (w) => setDetail({ title: `${WARN[w]} · lignes concernées`, cols: [["name", "Fournisseur"], ["category", "Catégorie"], ["date", "Date"], ["used", "Montant retenu"]],
+    rows: s.lines.filter((l) => l.warnings.includes(w)).map((l) => ({ name: l.name, category: l.category, date: l.billing_date || l.due_date || "—", used: cadFine(l.used_cad) })) });
   return (
     <Panel title="Alertes et projection de consommation" icon={AlertTriangle} testid="finance-alerts">
+      <DetailDialog detail={detail} onClose={() => setDetail(null)} />
       <div className="grid gap-3 sm:grid-cols-3">
         <div data-testid="finance-credit">
           <p className="flex items-center gap-1.5 text-[11px] uppercase text-slate-500">Crédit OpenRouter restant <Nature kind="real" /></p>
@@ -133,18 +151,25 @@ export const Alerts = ({ s }) => {
         <div data-testid="finance-pace-margin"><p className="flex items-center gap-1.5 text-[11px] uppercase text-slate-500">Marge d'exploitation projetée <Nature kind="estimated" /></p><p className={`text-xl font-bold ${tone(s.pace.operating_margin_month_end_cad)}`}>{cad(s.pace.operating_margin_month_end_cad)}</p></div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2" data-testid="finance-warnings">
-        {Object.entries(s.warnings).map(([w, n]) => <span key={w} className={`rounded-lg border px-2.5 py-1 text-xs ${n ? "border-amber-400/40 bg-amber-500/10 text-amber-300" : "border-white/10 text-slate-500"}`} data-testid={`finance-warning-${w}`}>⚠ {WARN[w]} : {n}</span>)}
+        {Object.entries(s.warnings).map(([w, n]) => <button type="button" onClick={() => warnList(w)} key={w} className={`rounded-lg border px-2.5 py-1 text-xs underline decoration-current/30 underline-offset-2 ${n ? "border-amber-400/40 bg-amber-500/10 text-amber-300" : "border-white/10 text-slate-500"}`} data-testid={`finance-warning-${w}`}>⚠ {WARN[w]} : {n}</button>)}
       </div>
       <p className="mt-3 text-[11px] text-slate-500">Le seuil d'alerte et l'e-mail se règlent dans la carte « Crédit IA restant » de l'onglet Activité.</p>
     </Panel>
   );
 };
 
-export const Projections = ({ s }) => (
+export const Projections = ({ s }) => {
+  const [detail, setDetail] = useState(null);
+  const open = (x) => setDetail({ title: `Projection · ${num(x.members)} membres actifs`, cols: [["k", "Élément"], ["v", "Valeur"]],
+    rows: [{ k: "Membres payants projetés", v: `${num(x.members)} × ${s.scenario_basis.ratio_assumed ? 100 : s.scenario_basis.paid_ratio_pct} % = ${num(x.paid)}` },
+      { k: "Revenus", v: `${num(x.paid)} × prix = ${cad(x.revenue_cad)}` }, { k: "IA", v: `${num(x.members)} × ${cadFine(s.scenario_basis.ai_per_active_cad)} = ${cad(x.ai_cad)}` },
+      { k: "Coûts fixes (niveau actuel)", v: cad(x.fixed_cad) }, { k: "Marge d'exploitation", v: `${cad(x.revenue_cad)} − ${cad(x.ai_cad)} − ${cad(x.fixed_cad)} = ${cad(x.margin_cad)} (${pct(x.margin_pct)})` }] });
+  return (
   <Panel title="Projection financière (exploitation)" icon={Rocket} testid="finance-projections" right={<Nature kind="estimated" />}>
+    <DetailDialog detail={detail} onClose={() => setDetail(null)} />
     <div className="grid gap-3 sm:grid-cols-3">
       {s.scenarios.map((x) => (
-        <div key={x.members} className="rounded-xl border border-white/10 bg-black/30 p-4" data-testid={`projection-${x.members}`}>
+        <div key={x.members} role="button" tabIndex={0} onClick={() => open(x)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(x); } }} className="cursor-pointer rounded-xl border border-white/10 bg-black/30 p-4 hover:border-emerald-400/40" data-testid={`projection-${x.members}`}>
           <p className="text-[11px] font-mono uppercase tracking-widest text-slate-400">{num(x.members)} membres actifs</p>
           <p className={`mt-1 text-2xl font-bold ${tone(x.margin_cad)}`}>{cad(x.margin_cad)}</p>
           <p className="text-[11px] text-slate-400">marge d'exploitation / mois · {pct(x.margin_pct)}</p>
@@ -157,4 +182,5 @@ export const Projections = ({ s }) => (
       Hypothèses : {s.scenario_basis.ratio_assumed ? "100 % des membres actifs payants (aucun membre actif payant encore)" : `${s.scenario_basis.paid_ratio_pct} % des actifs payants (taux actuel)`} · IA {cadFine(s.scenario_basis.ai_per_active_cad)} par membre actif · infrastructure, marketing et autres fixes au niveau actuel · développement exclu.
     </p>
   </Panel>
-);
+  );
+};

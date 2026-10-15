@@ -43,7 +43,8 @@ export const KnowledgeBase = () => {
                 <td className={`pr-3 ${CONF[r.confidence][1]}`} data-testid={`knowledge-conf-${i}`}>{CONF[r.confidence][0]}</td>
                 <td className="pr-3 font-mono"><ClickNum testid={`knowledge-validations-${i}`} onClick={() => setDetail({ title: `${r.name} · indice de confiance`, cols: [["k", "Élément"], ["v", "Valeur"]],
                   rows: [{ k: "Validations (jours distincts)", v: r.validations }, { k: "Dernière validation réussie", v: date(r.last_success) }, { k: "Offres lues au dernier passage", v: r.recent_offers }, { k: "Dernier contrôle", v: date(r.last_validated) }] })}>{r.validations}</ClickNum></td>
-                <td className="pr-3 font-mono">{r.recent_offers}</td>
+                <td className="pr-3 font-mono"><ClickNum testid={`knowledge-offers-${i}`} onClick={() => setDetail({ title: `${r.name} · indice de confiance`, cols: [["k", "Élément"], ["v", "Valeur"]],
+                  rows: [{ k: "Validations (jours distincts)", v: r.validations }, { k: "Dernière validation réussie", v: date(r.last_success) }, { k: "Offres lues au dernier passage", v: r.recent_offers }, { k: "Dernier contrôle", v: date(r.last_validated) }] })}>{r.recent_offers}</ClickNum></td>
                 <td className="pr-3">{date(r.last_validated)}</td>
               </tr>))}</tbody>
           </table>

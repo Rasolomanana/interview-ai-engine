@@ -39,6 +39,28 @@ def _title(s: str) -> str:
     return s[:1].upper() + s[1:].lower() if s else ""
 
 
+async def geo_labels(db) -> dict:
+    """member id -> (country, province, city) display labels, as used by the Géographie tab."""
+    locs = {s["user_id"]: s.get("location") or "" async for s in db.radar_settings.find({}, {"_id": 0, "user_id": 1, "location": 1})}
+    profiles = {p["user_id"]: p async for p in db.career_profiles.find({}, {"_id": 0, "user_id": 1, "location": 1, "country": 1, "province": 1, "city": 1})}
+    out = {}
+    async for u in db.users.find({}, {"_id": 0, "id": 1}):
+        g = member_geo(profiles.get(u["id"], {}), locs.get(u["id"], ""))
+        out[u["id"]] = (g["country"] or "Non renseigné", f"{g['province']} ({g['country'] or '?'})" if g["province"] else "Non renseigné",
+                        f"{g['city']}, {g['province'] or g['country'] or '?'}" if g["city"] else "Non renseigné")
+    return out
+
+
+def role_labels(target_roles: str, keywords=None) -> set:
+    return {_title(x) for x in re.split(r"[,;/\n]", target_roles or "") if len(x.strip()) > 2} | {_title(x) for x in keywords or [] if len(x.strip()) > 2}
+
+
+async def member_roles(db) -> dict:
+    tr = {p["user_id"]: p.get("target_roles") or "" async for p in db.career_profiles.find({}, {"_id": 0, "user_id": 1, "target_roles": 1})}
+    kw = {s["user_id"]: s.get("keywords") or [] async for s in db.radar_settings.find({}, {"_id": 0, "user_id": 1, "keywords": 1})}
+    return {u: role_labels(tr.get(u, ""), kw.get(u)) for u in set(tr) | set(kw)}
+
+
 def create_insights_router(db):
     router = APIRouter(prefix="/api/admin/insights")
 
@@ -83,14 +105,11 @@ def create_insights_router(db):
     @router.get("/geo")
     async def geo(x_admin_password: str = Header(None)):
         _check_admin(x_admin_password)
-        locs = {s["user_id"]: s.get("location") or "" async for s in db.radar_settings.find({}, {"_id": 0, "user_id": 1, "location": 1})}
-        profiles = {p["user_id"]: p async for p in db.career_profiles.find({}, {"_id": 0, "user_id": 1, "location": 1, "country": 1, "province": 1, "city": 1})}
         countries, provinces, cities = Counter(), Counter(), Counter()
-        async for u in db.users.find({}, {"_id": 0, "id": 1}):
-            g = member_geo(profiles.get(u["id"], {}), locs.get(u["id"], ""))
-            countries[g["country"] or "Non renseigné"] += 1
-            provinces[f"{g['province']} ({g['country'] or '?'})" if g["province"] else "Non renseigné"] += 1
-            cities[f"{g['city']}, {g['province'] or g['country'] or '?'}" if g["city"] else "Non renseigné"] += 1
+        for c, p, ci in (await geo_labels(db)).values():
+            countries[c] += 1
+            provinces[p] += 1
+            cities[ci] += 1
         m = not is_super()
         return {"countries": _top(countries, merge=m), "provinces": _top(provinces, merge=m), "cities": _top(cities, 40, merge=m),
                 "merged": m, "note": "Champs Pays / Province / Ville de la Career Memory, sinon déduits de la localisation (Career Memory ou Radar)."}
@@ -100,12 +119,9 @@ def create_insights_router(db):
         _check_admin(x_admin_password)
         roles, companies, portals = Counter(), Counter(), Counter()
         names = {}
-        async for p in db.career_profiles.find({}, {"_id": 0, "user_id": 1, "target_roles": 1}):
-            for r in {_title(x) for x in re.split(r"[,;/\n]", p.get("target_roles") or "") if len(x.strip()) > 2}:
-                roles[r] += 1
-        async for s in db.radar_settings.find({}, {"_id": 0, "keywords": 1, "companies": 1}):
-            for k in {_title(x) for x in s.get("keywords") or [] if len(x.strip()) > 2}:
-                roles[k] += 1
+        for labels in (await member_roles(db)).values():
+            roles.update(labels)  # one count per member and role
+        async for s in db.radar_settings.find({}, {"_id": 0, "companies": 1}):
             for c in s.get("companies") or []:
                 if isinstance(c, dict) and c.get("enabled", True) and c.get("name"):
                     k = KB.key(c["name"]) or c["name"].lower()

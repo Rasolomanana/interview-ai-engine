@@ -64,6 +64,7 @@ export const adminCatalogArchive = (pwd, kind, id, archived) => adminCall(`/fina
 export const adminCatalogDelete = (pwd, kind, id) => adminCall(`/finance-${kind}/${id}`, pwd, { method: "DELETE" });
 export const adminSetPaid = (pwd, id, paid) => adminCall(`/members/${id}/paid`, pwd, { method: "PUT", body: JSON.stringify({ paid }) });
 
+export const adminTrace = (pwd, metric, key = "", days) => adminCall(`/trace?metric=${metric}&key=${encodeURIComponent(key)}${days !== undefined ? `&days=${days}` : ""}`, pwd);
 export const adminMe = (pwd) => adminCall("/me", pwd);
 export const adminInsights = (pwd, part, days) => adminCall(`/insights/${part}${days !== undefined ? `?days=${days}` : ""}`, pwd);
 export const adminRoles = (pwd, q = "") => adminCall(`/roles?q=${encodeURIComponent(q)}`, pwd);

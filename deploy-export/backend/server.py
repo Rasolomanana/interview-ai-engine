@@ -812,6 +812,8 @@ from careeros.admin_insights import create_insights_router  # noqa: E402
 from careeros.sharing import create_sharing_router  # noqa: E402
 app.include_router(create_rbac_router(db))
 app.include_router(create_insights_router(db))
+from careeros.admin_trace import create_trace_router  # noqa: E402
+app.include_router(create_trace_router(db))
 app.include_router(create_sharing_router(db, current_member))
 app.middleware("http")(make_rbac_middleware(db))
 app.add_middleware(

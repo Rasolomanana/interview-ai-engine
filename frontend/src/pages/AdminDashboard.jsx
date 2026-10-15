@@ -19,6 +19,7 @@ import { FinanceDashboard } from "@/components/admin/finance/FinanceDashboard";
 import { ClickNum, DetailDialog } from "@/components/admin/DetailDialog";
 import { Connectors } from "@/components/admin/Connectors";
 import { KnowledgeBase } from "@/components/admin/KnowledgeBase";
+import { useTrace } from "@/components/admin/TraceDialog";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(4)}`;
 const num = (n) => (Number(n) || 0).toLocaleString();
@@ -69,6 +70,7 @@ export default function AdminDashboard() {
   usePageTitle("Administration");
   const [pwd, setPwd] = useState("");
   const [me, setMe] = useState(null);
+  const [traceNode, trace] = useTrace();
   const [authed, setAuthed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
@@ -177,11 +179,6 @@ export default function AdminDashboard() {
     ["base", "Base commune", "knowledge", "connecteurs"], ["roles", "Rôles", "roles", "roles"]].filter((x) => has(x[3]));
   const t = stats?.totals || {};
   const llm = stats?.llm || { calls: 0, tokens_in: 0, tokens_out: 0, cost: 0, by_provider: {} };
-  const byDay = (key, title) => setDetail({ title: `${title} · détail par jour (30 j)`, cols: [["day", "Jour"], ["v", title]],
-    rows: (stats?.by_day || []).filter((d) => key in d).map((d) => ({ day: d.bucket, v: num(d[key]) })).reverse(),
-    note: key in ((stats?.by_day || [])[0] || {}) ? undefined : "Pas de série quotidienne pour cet indicateur : total cumulé uniquement." });
-  const providers = (title) => setDetail({ title: `${title} · par fournisseur`, cols: [["p", "Fournisseur"], ["calls", "Appels"], ["tin", "Tokens entrée"], ["tout", "Tokens sortie"], ["cost", "Coût"]],
-    rows: Object.entries(llm.by_provider || {}).map(([p, v]) => ({ p, calls: num(v.calls), tin: num(v.tokens_in), tout: num(v.tokens_out), cost: money(v.cost) })) });
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-6 text-slate-200" data-testid="admin-dashboard">
@@ -224,11 +221,11 @@ export default function AdminDashboard() {
         {has("finance") && <TabsContent value="rentabilite"><FinanceDashboard /></TabsContent>}
         {has("activite") && <TabsContent value="activite">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard icon={Users} label="Visiteurs" value={num(t.visitors)} accent="text-indigo-400" onClick={() => byDay("visitors", "Visiteurs")} />
-          <StatCard icon={PlayCircle} label="Simulations" value={num(t.simulations)} accent="text-emerald-400" onClick={() => byDay("simulations", "Simulations")} />
-          <StatCard icon={FileSearch} label="Analyses ATS" value={num(t.ats_analyses)} accent="text-sky-400" onClick={() => byDay("ats", "Analyses ATS")} />
-          <StatCard icon={FileText} label="CV analysés" value={num(t.cvs_analyzed)} accent="text-cyan-400" onClick={() => byDay("ats", "CV analysés (via analyses ATS)")} />
-          <StatCard icon={Mail} label="Lettres" value={num(t.cover_letters)} accent="text-amber-400" onClick={() => byDay("cover_letters", "Lettres")} />
+          <StatCard icon={Users} label="Visiteurs" value={num(t.visitors)} accent="text-indigo-400" onClick={() => trace("a_visitors")} />
+          <StatCard icon={PlayCircle} label="Simulations" value={num(t.simulations)} accent="text-emerald-400" onClick={() => trace("a_simulations")} />
+          <StatCard icon={FileSearch} label="Analyses ATS" value={num(t.ats_analyses)} accent="text-sky-400" onClick={() => trace("a_ats")} />
+          <StatCard icon={FileText} label="CV analysés" value={num(t.cvs_analyzed)} accent="text-cyan-400" onClick={() => trace("a_cvs")} />
+          <StatCard icon={Mail} label="Lettres" value={num(t.cover_letters)} accent="text-amber-400" onClick={() => trace("a_letters")} />
         </div>
 
         {has("finance") && <CreditCard />}
@@ -241,29 +238,29 @@ export default function AdminDashboard() {
             <span className="text-[10px] text-slate-500">(reportée par le client — couvre Gemini & Serveur)</span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div><div className="text-[10px] uppercase text-slate-500">Appels</div><ClickNum onClick={() => providers("Appels")} testid="admin-llm-calls" className="text-xl font-bold text-white">{num(llm.calls)}</ClickNum></div>
-            <div><div className="text-[10px] uppercase text-slate-500">Tokens entrée</div><ClickNum onClick={() => providers("Tokens entrée")} testid="admin-llm-tin" className="text-xl font-bold text-white">{num(llm.tokens_in)}</ClickNum></div>
-            <div><div className="text-[10px] uppercase text-slate-500">Tokens sortie</div><ClickNum onClick={() => providers("Tokens sortie")} testid="admin-llm-tout" className="text-xl font-bold text-white">{num(llm.tokens_out)}</ClickNum></div>
-            <div><div className="text-[10px] uppercase text-slate-500">Coût estimé</div><ClickNum onClick={() => providers("Coût estimé")} testid="admin-llm-cost" className="text-xl font-bold text-amber-300">{money(llm.cost)}</ClickNum></div>
+            <div><div className="text-[10px] uppercase text-slate-500">Appels</div><ClickNum onClick={() => trace("a_llm")} testid="admin-llm-calls" className="text-xl font-bold text-white">{num(llm.calls)}</ClickNum></div>
+            <div><div className="text-[10px] uppercase text-slate-500">Tokens entrée</div><ClickNum onClick={() => trace("a_llm")} testid="admin-llm-tin" className="text-xl font-bold text-white">{num(llm.tokens_in)}</ClickNum></div>
+            <div><div className="text-[10px] uppercase text-slate-500">Tokens sortie</div><ClickNum onClick={() => trace("a_llm")} testid="admin-llm-tout" className="text-xl font-bold text-white">{num(llm.tokens_out)}</ClickNum></div>
+            <div><div className="text-[10px] uppercase text-slate-500">Coût estimé</div><ClickNum onClick={() => trace("a_llm")} testid="admin-llm-cost" className="text-xl font-bold text-amber-300">{money(llm.cost)}</ClickNum></div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3" data-testid="admin-llm-split">
             <div data-testid="admin-gemini-calls" className="rounded-xl border border-sky-500/20 bg-sky-950/20 p-3">
               <div className="text-[10px] uppercase text-sky-300">Appels Gemini (navigateur)</div>
-              <ClickNum onClick={() => providers("Appels Gemini")} testid="admin-gemini-num" className="text-2xl font-bold text-white">{num(llm.gemini_calls)}</ClickNum>
+              <ClickNum onClick={() => trace("a_llm", "gemini")} testid="admin-gemini-num" className="text-2xl font-bold text-white">{num(llm.gemini_calls)}</ClickNum>
               <div className="text-[11px] text-slate-400">{money(llm.gemini_cost)}</div>
             </div>
             <div data-testid="admin-server-calls" className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-950/20 p-3">
               <div className="text-[10px] uppercase text-fuchsia-300">Appels Serveur (OpenRouter gratuit/payant, Anthropic)</div>
-              <ClickNum onClick={() => providers("Appels serveur")} testid="admin-server-num" className="text-2xl font-bold text-white">{num(llm.server_calls)}</ClickNum>
+              <ClickNum onClick={() => trace("a_llm", "!gemini")} testid="admin-server-num" className="text-2xl font-bold text-white">{num(llm.server_calls)}</ClickNum>
               <div className="text-[11px] text-slate-400">{money(llm.server_cost)}</div>
             </div>
           </div>
           {Object.keys(llm.by_provider || {}).length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
               {Object.entries(llm.by_provider).map(([p, v]) => (
-                <span key={p} data-testid={`admin-provider-${p}`} className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-slate-300">
+                <button type="button" onClick={() => trace("a_llm", p)} key={p} data-testid={`admin-provider-${p}`} className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-slate-300 underline decoration-white/20 underline-offset-2 hover:border-white/30">
                   <b className="text-white">{p}</b> · {num(v.calls)} appels · {money(v.cost)}
-                </span>
+                </button>
               ))}
             </div>
           )}
@@ -316,6 +313,7 @@ export default function AdminDashboard() {
         <a href="/careeros" className="mt-6 block text-center text-xs text-slate-500 hover:text-slate-300">← Retour à l'application</a>
       </div>
       <DetailDialog detail={detail} onClose={() => setDetail(null)} />
+      {traceNode}
     </div>
   );
 }
