@@ -41,7 +41,7 @@ export const RunOffersDialog = ({ sel, onClose }) => {
           {!data.complete && <p className="flex items-start gap-2 rounded-lg border border-amber-400/20 bg-amber-500/5 p-2.5 text-xs text-amber-200" data-testid="run-offers-partial"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />Cette recherche est antérieure au suivi détaillé : seules les offres apparues pour la première fois lors de cette recherche sont listées. Les prochaines recherches afficheront la liste complète.</p>}
           {sel.kind === "skipped" && <p className="rounded-lg border border-white/10 bg-white/5 p-2.5 text-xs text-slate-300" data-testid="run-offers-skipped-note">Ces offres ont été trouvées mais pas notées : la limite de 50 analyses par jour était atteinte. Elles passent en priorité au prochain passage, les titres les plus proches de vos postes visés d'abord. Celles qui ont été analysées depuis affichent leur IPS.</p>}
           {data.offers.length === 0 ? <p className="text-sm text-slate-500" data-testid="run-offers-empty">Aucune offre à afficher.</p>
-            : <ul data-testid="run-offers-list">{data.offers.map((o) => <OfferLine key={o.id} o={o} />)}</ul>}
+            : <ul className="min-w-0" data-testid="run-offers-list">{data.offers.map((o) => <OfferLine key={o.id} o={o} />)}</ul>}
         </>}
       </DialogContent>
     </Dialog>

@@ -1,0 +1,39 @@
+{
+  "summary": "Tested the 'all numbers clickable' feature (Phase 1 Radar + Phase 2 Admin). Backend: 16/16 pytest pass (run_offers for all 8 kinds, analyzed=37 for run bd807f88, src_boards subset of found, skipped all have ips=None, invalid kind 422, unknown run 404, no auth 401/403, admin connectors supported rows have names[]/portals[] with name/quality/fetched/matched/error, backlog has names[], bad admin pw rejected). Frontend: Radar history Analysées -> 'Offres analysées pendant ce passage' (37 rows), W/S source numbers -> 74/94 rows, the 'N alerte(s)' button opens run-alerts-dialog (Sobeys 403 on 2026-10-14), the '(+17 reportées)' number opens the skipped dialog with the skipped note, Sources total-found -> radar-filter-banner (168) and clicking it again clears the filter, the IPS Radar button opens explain-panel. Admin: all 5 stat cards, 6 LLM numbers and every Connecteurs number checked (stopped at the SmartRecruiters row) open admin-detail-dialog; all 10 Rentabilité KPIs scroll to and highlight their section. Mobile 390px: no page horizontal overflow. Fixed one mobile bug in RunOffersDialog (title off-screen). Two spec gaps found: the 403 alert has no anti-robot advice, and the skipped list is empty or contradicts its own note.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/careeros/radar/runs/{id}/offers?kind=skipped", "issue": "The query filters ips=None, so offers deferred in that run but analysed later are excluded. The UI note says 'Celles qui ont été analysées depuis affichent leur IPS', which can never happen. For run 58c73d8e (2026-10-13, skipped_limit=17) the dialog shows '0 offre(s)'. Partly expected because that run is untracked (partial note shown), but even tracked runs will lose deferred offers once they get analysed. Better: select in-run offers whose analyzed_at is null or later than run.finished_at."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RunOffersDialog (mobile 390px)", "issue": "FIXED by testing agent. DialogContent is a CSS grid and the <ul> grid item kept min-width:auto, so truncate/nowrap offer lines widened the column to 1061px and the centred title and count were off-screen. Added className='min-w-0' to the <ul>. Verified: 388px wide on mobile, title visible; desktop unchanged.", "selector": "[data-testid='run-offers-list']", "priority": "HIGH (fixed)"}
+    ],
+    "integration_issues": [
+      {"flow": "Radar Historique -> alert dialog (403)", "issue": "The spec asks for anti-robot advice on a 403. AlertsDialog TODO(k) returns the generic 'Source momentanément indisponible : l'entreprise reste couverte par Jooble.' for every portal key, with no 403/anti-robot check. The raw message is also a truncated technical httpx string ending in 'For more information check: https://dev'.", "affected_selectors": ["[data-testid='run-alerts-dialog']", "[data-testid^='run-alert-successfactors-Sobeys']"]}
+    ],
+    "design_issues": [
+      {"screen": "Radar Sources table", "issues": ["Latest run (10:18) has analyzed=0, so every Analysées cell is a plain 0 (by design) while the 'Analysées aujourd'hui' card shows 45. This can confuse users; consider labelling the table 'dernier passage'. The radar-source-analyzed-{k} click path could not be exercised with current data.", "The a_* filter uses lastOffers.filter(o => o.ips), i.e. offers with any IPS, not offers analysed in the last run. When a run's analyzed count > 0, the banner count will not match the clicked number (for example 168 shown vs N clicked). Use the backend kind=analyzed list or analyzed_at for consistency."]},
+      {"screen": "Admin", "issues": ["Admin ClickNum renders zeros (Fragile/Bloquée/Repli = 0) as clickable buttons that open '0 ligne(s)' dialogs, unlike the member side where zeros are plain text. This is inconsistent.", "FinanceKpis Kpi cards and StatCards are clickable <div>s with no role, tabIndex or keyboard handler, so keyboard users cannot reach them."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_clickable_numbers.py", "/app/test_reports/pytest/pytest_clickable.xml"],
+  "action_items": [
+    "AlertsDialog: when the error value contains '403' or 'Forbidden', show anti-robot advice (e.g. 'Protection anti-robot volontaire de l'employeur : rien à faire, l'entreprise reste suivie via Jooble') and shorten or clean the raw httpx message",
+    "run_offers kind=skipped: include deferred offers analysed later (analyzed_at > run end or null) so the list matches skipped_limit and the note",
+    "Radar Sources a_* filter: use analysed-in-run offers so the count matches the clicked number",
+    "Optional: make admin zero values non-clickable for consistency; add role=button/tabIndex to clickable KPI and stat cards"
+  ],
+  "critical_code_review_comments": [
+    "RunOffersDialog: grid-based DialogContent needs min-w-0 on children that contain truncated text (fixed for the ul). Check other dialogs that use truncate inside shadcn DialogContent.",
+    "AdminDashboard StatCard and FinanceKpis Kpi use onClick on a div, which is not keyboard accessible."
+  ],
+  "updated_files": ["/app/frontend/src/components/careeros/RunOffersDialog.jsx", "/app/backend/tests/test_clickable_numbers.py"],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "~90% (all click paths work; 403 advice missing; skipped list empty or inconsistent)"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login: inject the login JSON into localStorage 'careeros.tokens' and set radarTourDone=1. Run bd807f88 (2026-10-15 10:03) has analyzed=37, W=74, S=94. Day 2026-10-14 runs have the Sobeys 403 alert. Day 2026-10-13 runs (e.g. 58c73d8e) have skipped_limit=17 but are untracked, so the skipped list is empty. The latest run (10:18) has analyzed=0, so Sources Analysées cells are not clickable. Admin password is ADMIN_PASSWORD in backend/.env.",
+  "rca of the issue": "Mobile dialog overflow: shadcn DialogContent uses display:grid. Grid items default to min-width:auto, so a descendant with white-space:nowrap (truncate) expands the implicit column to the full text length (1061px), centring the header off-screen. Fixed with min-w-0 on the list. Missing 403 advice: the TODO() helper in RadarHistory.jsx has no branch for the error value, only for the key prefix."
+}

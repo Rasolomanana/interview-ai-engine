@@ -509,8 +509,8 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         if kind == "analyzed":  # analysed during this run (rules or AI)
             end = run.get("finished_at") or (datetime.fromisoformat(run["at"]) + timedelta(minutes=30)).isoformat()
             q = {"user_id": user["id"], "analyzed_at": {"$gte": run["at"], "$lte": end}, "source": {"$ne": "externe"}}
-        elif kind == "skipped":
-            q["ips"] = None
+        elif kind == "skipped":  # deferred by the daily limit, including those analysed by a later run
+            q = {"user_id": user["id"], "$and": [in_run, {"$or": [{"ips": None}, {"analyzed_at": {"$gt": run.get("finished_at") or run["at"]}}]}]}
         proj = {"_id": 0, "description": 0, "dedupe_key": 0, "user_id": 0, "seen_runs": 0}
         offers = [o async for o in db.radar_offers.find(q, proj).sort("first_seen", -1).limit(500)]
         if kind.startswith("src_"):

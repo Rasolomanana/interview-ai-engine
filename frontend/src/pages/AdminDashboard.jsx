@@ -19,7 +19,7 @@ const num = (n) => (Number(n) || 0).toLocaleString();
 
 function StatCard({ icon: Icon, label, value, accent, onClick }) {
   return (
-    <div data-testid={`stat-${label}`} onClick={onClick} className="cursor-pointer rounded-2xl border border-white/10 bg-slate-900/60 p-5 transition-colors hover:border-white/25" title="Afficher le détail par jour">
+    <div data-testid={`stat-${label}`} onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onClick?.()} className="cursor-pointer rounded-2xl border border-white/10 bg-slate-900/60 p-5 transition-colors hover:border-white/25" title="Afficher le détail par jour">
       <div className="flex items-center gap-2 text-slate-400">
         <Icon className={`h-4 w-4 ${accent}`} />
         <span className="text-[11px] font-mono uppercase tracking-widest">{label}</span>

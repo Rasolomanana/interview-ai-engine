@@ -414,3 +414,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Admin → Connecteurs → « Journal du passage quotidien ». Vérifié en preview : appel manuel du cron → 11 membres traités, journal complet (done).
 - À valider : prochain 06:00 en production (journal + ligne Automatique).
 - Suite incident cron : la réponse de production {"started":true,"members":2} n'a pas de log_id → la production exécute encore une version antérieure au correctif (non redéployée). Ajouts : la réponse du cron indique skipped_disabled et skipped_inactive ; GET /api/careeros/radar/cron-status (inclusion du membre + raison + dernier passage automatique), affiché sous le marqueur du jour dans Radar. Vérifié en preview (curl + capture).
+
+## 2026-06 — Règle permanente : tous les chiffres sont cliquables
+- RÈGLE PRODUIT : tout chiffre affiché (membre ou admin) doit être cliquable et ouvrir une liste ou un détail, avec un style souligné cohérent (Num / ClickNum / StatFilter). À appliquer à toute nouvelle fonction.
+- Phase 1 (Radar) : historique (Analysées, reportées, J/W/S, alertes → AlertsDialog avec libellé, message nettoyé, conseil 403 anti-robot) ; run_offers kinds analyzed|skipped|src_* ; Sources : Analysées + totaux ; IPS des cartes → « Pourquoi ce score ? ».
+- Phase 2 (Admin) : DetailDialog générique ; StatCards Activité → détail par jour ; chiffres LLM → par fournisseur ; Connecteurs (entreprises, membres, lues, retenues, réussite, fiable/fragile/bloquée/repli, backlog) → listes ; KPI Rentabilité → défilement vers la section détaillée avec surbrillance.
+- Tests : iteration_35 → backend 16/16, frontend ~90 % puis correctifs (conseil 403, liste des reportées incluant celles analysées plus tard, filtre Analysées par passage, accessibilité clavier des cartes). Le correctif mobile de RunOffersDialog vient de l'agent de test.

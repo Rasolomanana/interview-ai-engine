@@ -136,7 +136,7 @@ export default function Radar() {
   if (f?.startsWith("src:")) {
     const k = f.slice(4), an = k.startsWith("a_"), g = an ? k.slice(2) : k;
     FILTERS[f] = [`${an ? "Analysées" : "Trouvées"} · ${g === "all" ? "toutes sources" : `source ${SRC[g]}`} (dernier passage)`,
-      lastOffers.filter((o) => (g === "all" || srcOf(o) === g) && (!an || o.ips))];
+      lastOffers.filter((o) => (g === "all" || srcOf(o) === g) && (!an || (o.analyzed_at && d.last_run && o.analyzed_at >= d.last_run.at)))];
   }
   if (f?.startsWith("co:")) FILTERS[f] = [`Entreprise : ${f.slice(3)} (dernier passage)`, lastOffers.filter((o) => (o.company || "").toLowerCase() === f.slice(3).toLowerCase())];
   const pick = (k) => {

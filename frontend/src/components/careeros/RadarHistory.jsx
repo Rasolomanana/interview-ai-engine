@@ -51,8 +51,8 @@ const AlertsDialog = ({ run, onClose }) => (
       <ul className="space-y-2">{run && Object.entries(run.errors || {}).map(([k, v]) => (
         <li key={k} className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs" data-testid={`run-alert-${k.replace(/[^a-z0-9]/gi, "-")}`}>
           <p className="font-semibold text-amber-200">{ERR(k)}</p>
-          <p className="mt-1 text-slate-300">{String(v)}</p>
-          <p className="mt-1 text-slate-500">Que faire : {TODO(k)}</p>
+          <p className="mt-1 text-slate-300">{/403|forbidden/i.test(String(v)) ? "Accès refusé par le portail (HTTP 403 : protection anti-robot)." : String(v).replace(/\s*For more information check:.*$/i, "")}</p>
+          <p className="mt-1 text-slate-500">Que faire : {/403|forbidden|anti-robot/i.test(String(v)) ? "Portail protégé volontairement par l'employeur (anti-robot) : aucune action requise, l'entreprise reste suivie via Jooble." : TODO(k)}</p>
         </li>))}</ul>
     </DialogContent>
   </Dialog>

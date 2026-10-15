@@ -11,7 +11,7 @@ const go = (t) => {
 };
 
 const Kpi = ({ icon: Icon, label, value, sub, valueClass = "text-white", testid, nature, realPct, to }) => (
-  <div onClick={() => go(to)} title="Afficher le détail" className="min-w-0 cursor-pointer rounded-2xl border border-white/10 bg-slate-900/60 p-4 transition-colors hover:border-emerald-400/40" data-testid={testid}>
+  <div onClick={() => go(to)} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && go(to)} title="Afficher le détail" className="min-w-0 cursor-pointer rounded-2xl border border-white/10 bg-slate-900/60 p-4 transition-colors hover:border-emerald-400/40" data-testid={testid}>
     <div className="flex flex-wrap items-start justify-between gap-1.5">
       <p className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-slate-400"><Icon className="h-3.5 w-3.5 shrink-0 text-emerald-400" />{label}</p>
       {nature && <Nature kind={nature} realPct={realPct} testid={`${testid}-nature`} />}
