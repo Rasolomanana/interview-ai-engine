@@ -420,3 +420,8 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Phase 1 (Radar) : historique (Analysées, reportées, J/W/S, alertes → AlertsDialog avec libellé, message nettoyé, conseil 403 anti-robot) ; run_offers kinds analyzed|skipped|src_* ; Sources : Analysées + totaux ; IPS des cartes → « Pourquoi ce score ? ».
 - Phase 2 (Admin) : DetailDialog générique ; StatCards Activité → détail par jour ; chiffres LLM → par fournisseur ; Connecteurs (entreprises, membres, lues, retenues, réussite, fiable/fragile/bloquée/repli, backlog) → listes ; KPI Rentabilité → défilement vers la section détaillée avec surbrillance.
 - Tests : iteration_35 → backend 16/16, frontend ~90 % puis correctifs (conseil 403, liste des reportées incluant celles analysées plus tard, filtre Analysées par passage, accessibilité clavier des cartes). Le correctif mobile de RunOffersDialog vient de l'agent de test.
+
+## 2026-10-15 — Vérification cron 06h (sans action manuelle)
+- Code cron revu (quota remis à zéro à minuit Toronto, aucun verrou bloquant pour le cron, membres actifs 7 j + Radar activé).
+- Simulation preview « lendemain » : log radar_cron_log -> done, 11 membres, runs quotidien créés, 0 erreur.
+- deploy-export/backend/careeros et frontend/src identiques au preview (server.py diffère volontairement : chaîne LLM autonome).
