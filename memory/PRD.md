@@ -399,3 +399,10 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Découverte : Airbus (Workday ag.wd3/Airbus) dans l'annuaire ; pages anti-robot (Incapsula/Cloudflare) signalées ; Dayforce reconnu « API protégée » (403, non contourné) → Jooble.
 - Tests : iteration_33 → backend 11/11, frontend 100 % (preview).
 - 2026-06 : en-têtes de priorité colorés (Radar.jsx SectionHead) : A émeraude avec halo pulsé + pastille animée quand ≥1 offre (« Agir maintenant »), B ambre (« Optimiser puis postuler »), C rose (« À éviter ») ; animation désactivée si prefers-reduced-motion. Vérifié par capture (bureau + mobile).
+
+## 2026-06 — Découverte automatique des portails (A+B+C+D) + lecture « Pourquoi ce score ? »
+- radar_auto.py : annuaire partagé anonyme (collection portal_directory : clé entreprise → portail public, membres hachés), association automatique si certitude (annuaire / annuaire partagé nommé ou ≥2 membres / lien officiel du site, lecture fiable, ≥1 offre), notifications radar_notices (OK / Modifier / Annuler ; annuler → auto_block), suggestions d'entreprises récurrentes non suivies, re-détection quotidienne (cron, 3 entreprises/membre, 1×/semaine/entreprise).
+- radar.py : PUT settings partage les associations + détection auto en arrière-plan des nouvelles entreprises (retour auto_detecting) + blocage si retrait manuel ; POST /companies/follow ; GET /suggestions ; GET /notices ; POST /notices/{id}/ack|undo ; Company : auto, auto_block, checked_at.
+- Annuaire statique : +15 employeurs vérifiés (Agropur, Molson Coors, Cascades, Purolator, Alstom, Kuehne+Nagel, Domtar, Home Depot Canada, Dollarama, Vidéotron, TD, BMO, Thales, Colabor, Cogeco).
+- Frontend : AutoNotices, CompanySuggestions (« Entreprises qui recrutent pour vos postes »), badge « auto », toast de détection ; ScoreExplain : Fond clair (défaut) / Fond sombre / A+ (reading-light.css), critères lisibles sur mobile.
+- Tests : iteration_34 → backend 11/11, frontend 100 % ; notifications dédupliquées et débordement mobile des suggestions corrigés ensuite (vérifié par capture).

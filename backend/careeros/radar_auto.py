@@ -64,8 +64,9 @@ async def detect_one(db, user_id: str, c: dict) -> dict:
         await db.radar_settings.update_one(sel, {"$set": {"companies.$.kind": best["kind"], "companies.$.slug": best["slug"], "companies.$.portal_url": best["portal_url"],
                                                           "companies.$.auto": True, "companies.$.checked_at": _now(),
                                                           "companies.$.detected": f"Associé automatiquement · {best['kind_label']}"}})
-        await db.radar_notices.insert_one({"id": str(uuid.uuid4()), "user_id": user_id, "at": _now(), "status": "new", "company": c["name"], "kind": best["kind"],
-                                           "kind_label": best["kind_label"], "count": best["count"], "origin": best["origin"], "portal_url": best["portal_url"]})
+        await db.radar_notices.update_one({"user_id": user_id, "company": c["name"], "kind": best["kind"], "status": "new"},
+                                          {"$set": {"at": _now(), "kind_label": best["kind_label"], "count": best["count"], "origin": best["origin"], "portal_url": best["portal_url"]},
+                                           "$setOnInsert": {"id": str(uuid.uuid4())}}, upsert=True)
         return {"name": c["name"], "associated": best["kind"]}
     ok = [x for x in r["candidates"] if x.get("ok")]
     label = (f"Suggestion : {ok[0]['kind_label']} (à confirmer)" if ok else
