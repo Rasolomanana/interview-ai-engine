@@ -11,6 +11,7 @@ import { CreditCard } from "@/components/admin/CreditCard";
 import { ThemeToggle, usePageTitle } from "@/components/careeros/ThemeToggle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FinanceDashboard } from "@/components/admin/finance/FinanceDashboard";
+import { Connectors } from "@/components/admin/Connectors";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(4)}`;
 const num = (n) => (Number(n) || 0).toLocaleString();
@@ -179,7 +180,9 @@ export default function AdminDashboard() {
         <TabsList className="mb-4 border border-white/10 bg-slate-900" data-testid="admin-tabs">
           <TabsTrigger value="activite" data-testid="admin-tab-activity">Activité</TabsTrigger>
           <TabsTrigger value="rentabilite" data-testid="admin-tab-finance">Rentabilité CareerOS</TabsTrigger>
+          <TabsTrigger value="connecteurs" data-testid="admin-tab-connectors">Connecteurs</TabsTrigger>
         </TabsList>
+        <TabsContent value="connecteurs"><Connectors /></TabsContent>
         <TabsContent value="rentabilite"><FinanceDashboard /></TabsContent>
         <TabsContent value="activite">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

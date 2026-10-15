@@ -19,7 +19,7 @@ def _clean(text: str) -> str:
 
 
 WORKDAY_CANADA = "a30a87ed25634629aa6c3958aa2b91ea"  # Workday's global country id for Canada
-PORTAL_KINDS = ("workday", "successfactors", "oracle", "icims", "greenhouse", "lever", "ashby", "smartrecruiters", "amazon")
+PORTAL_KINDS = ("workday", "successfactors", "oracle", "icims", "ukg", "greenhouse", "lever", "ashby", "smartrecruiters", "amazon")
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"}
 SOURCE_GROUP = {"jooble": "jooble", "adzuna": "adzuna", "workday": "workday"}  # anything else → "boards"
 
@@ -43,6 +43,9 @@ def parse_portal(url: str) -> tuple:
     m = re.search(r"https?://([a-z0-9.-]+\.oraclecloud\.com)/hcmUI/CandidateExperience/[a-z]{2}(?:-[a-z]{2})?/sites/([A-Za-z0-9_]+)", u, re.I)
     if m:
         return "oracle", f"{m.group(1).lower()}/{m.group(2)}"
+    m = re.search(r"https?://(recruiting\d*\.ultipro\.(?:com|ca))/([A-Za-z0-9]+)/JobBoard/([0-9a-f-]{36})", u, re.I)
+    if m:
+        return "ukg", f"{m.group(1).lower()}/{m.group(2)}/{m.group(3).lower()}"
     m = re.search(r"https?://([a-z0-9-]+\.icims\.com)", u, re.I)
     if m:
         return "icims", m.group(1).lower()
@@ -105,6 +108,27 @@ async def oracle(client, slug: str, company: str, keywords: list):
                 out[j["Id"]] = {"source": "oracle", "external_id": str(j["Id"]), "title": j.get("Title", ""), "company": company,
                                 "location": j.get("PrimaryLocation") or "", "url": f"https://{host}/hcmUI/CandidateExperience/fr-CA/sites/{site}/job/{j['Id']}",
                                 "description": _clean(j.get("ShortDescriptionStr") or ""), "posted_at": (j.get("PostedDate") or "")[:10], "salary": ""}
+    return list(out.values())
+
+
+async def ukg(client, slug: str, company: str, keywords: list):
+    """UKG Pro (UltiPro) Recruiting job boards: public JSON search."""
+    host, tenant, board = slug.split("/", 2)
+    base = f"https://{host}/{tenant}/JobBoard/{board}"
+    out = {}
+    for text in (keywords[:3] or [""]):
+        body = {"opportunitySearch": {"Top": 50, "Skip": 0, "QueryString": text,
+                                      "OrderBy": [{"Value": "postedDateDesc", "PropertyName": "PostedDate", "Ascending": False}],
+                                      "Filters": [{"t": "TermsSearchFilterDto", "fieldName": f, "extra": None, "values": []} for f in (4, 5, 6)]},
+                "matchCriteria": {"PreferredJobs": [], "Educations": [], "LicenseAndCertifications": [], "Skills": [], "hasNoLicenses": False, "SkippedSkills": []}}
+        r = await client.post(f"{base}/JobBoardView/LoadSearchResults", json=body, headers={**UA, "Accept": "application/json"})
+        r.raise_for_status()
+        for j in r.json().get("opportunities") or []:
+            loc = ((j.get("Locations") or [{}])[0].get("Address") or {})
+            out[j["Id"]] = {"source": "ukg", "external_id": j["Id"], "title": j.get("Title", ""), "company": company,
+                            "location": ", ".join(x for x in (loc.get("City"), (loc.get("State") or {}).get("Code"), (loc.get("Country") or {}).get("Code")) if x),
+                            "url": f"{base}/OpportunityDetail?opportunityId={j['Id']}", "description": _clean(j.get("BriefDescription") or ""),
+                            "posted_at": (j.get("PostedDate") or "")[:10], "salary": ""}
     return list(out.values())
 
 
@@ -243,6 +267,8 @@ async def board(client, kind: str, slug: str, company: str, keywords: list = Non
         return await successfactors(client, slug, company, keywords or [])
     if kind == "oracle":
         return await oracle(client, slug, company, keywords or [])
+    if kind == "ukg":
+        return await ukg(client, slug, company, keywords or [])
     if kind == "icims":
         return await icims(client, slug, company, keywords or [])
     if kind == "smartrecruiters":

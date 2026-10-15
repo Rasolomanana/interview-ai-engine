@@ -7,7 +7,7 @@ import { EmployerDirectory } from "@/components/careeros/EmployerDirectory";
 import { CompanySummary, detectedLabel } from "@/components/careeros/CompanySummary";
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400/60";
-const KIND = { workday: "Workday", successfactors: "SuccessFactors", oracle: "Oracle", icims: "iCIMS", greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", smartrecruiters: "SmartRecruiters", amazon: "amazon.jobs" };
+const KIND = { workday: "Workday", successfactors: "SuccessFactors", oracle: "Oracle", icims: "iCIMS", greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", smartrecruiters: "SmartRecruiters", amazon: "amazon.jobs", ukg: "UKG" };
 
 export const parseImport = (text) => text.split("\n").flatMap((l) => (/https?:|\|/.test(l) ? [l] : l.split(","))).map((l) => l.trim()).filter(Boolean).map((l) => {
   const [name, url = ""] = l.split(/\s*[|\t;]\s*/);
@@ -83,7 +83,7 @@ export const CompanyManager = ({ companies, setCompanies }) => {
   };
   const addFromDirectory = (d) => {
     setCompanies(mergeCompanies(companies, [{ name: d.name, enabled: true, portal_url: d.ok ? d.portal_url : "", kind: d.ok ? d.kind : "", slug: d.ok ? d.slug : "", website: "",
-      detected: d.ok ? "" : d.kind ? `Illisible : ${d.kind_label}` : `Non pris en charge : ${d.ats || "non identifié"}` }]));
+      detected: d.ok ? "" : d.blocked ? `Bloqué (anti-robot) : ${d.kind_label}` : d.kind ? `Illisible : ${d.kind_label}` : `Non pris en charge : ${d.ats || "non identifié"}` }]));
     toast.success(d.ok ? `${d.name} ajoutée avec son portail ${d.kind_label}.` : `${d.name} ajoutée : suivie via Jooble.`);
   };
   const update = (i, patch) => setCompanies(companies.map((c, j) => (j === i ? { ...c, ...patch } : c)));

@@ -48,6 +48,7 @@ export const adminFinance = (pwd, month) => adminCall(`/finance${month ? `?month
 export const adminSaveFinanceMonth = (pwd, month, body) => adminCall(`/finance/${month}`, pwd, { method: "PUT", body: JSON.stringify(body) });
 export const adminSaveFinanceSettings = (pwd, body) => adminCall("/finance-settings", pwd, { method: "PUT", body: JSON.stringify(body) });
 export const adminMembers = (pwd) => adminCall("/members", pwd);
+export const adminConnectors = (pwd) => adminCall("/connectors", pwd);
 export const adminFinanceCatalog = (pwd) => adminCall("/finance-catalog", pwd);
 export const adminFinanceAudit = (pwd, id) => adminCall(`/finance-audit${id ? `?entity_id=${id}` : ""}`, pwd);
 const body = (method, data) => ({ method, body: data === undefined ? undefined : JSON.stringify(data) });

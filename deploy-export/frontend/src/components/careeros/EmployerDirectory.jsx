@@ -23,7 +23,7 @@ export const EmployerDirectory = ({ companies, onAdd }) => {
               <div key={d.name} className="flex items-center gap-2 rounded-lg border border-white/[0.06] px-2 py-1.5 text-[11px]" data-testid={`employer-${d.name.replace(/[^a-z0-9]/gi, "-")}`}>
                 {d.ok ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
                 <span className="min-w-0 flex-1"><b className="text-slate-100">{d.name}</b>
-                  <span className="block truncate text-slate-500">{d.ok ? `${d.kind_label} · ${d.count} offre(s)` : d.kind ? "Portail illisible · repli Jooble" : `${d.ats || "Portail"} non pris en charge · Jooble`} · {d.sector}</span></span>
+                  <span className="block truncate text-slate-500">{d.ok ? `${d.kind_label} · ${d.count} offre(s)` : d.blocked ? "Bloqué par l'employeur (anti-robot) · Jooble" : d.kind ? "Portail illisible · repli Jooble" : `${d.ats || "Portail"} non pris en charge · Jooble`} · {d.sector}</span></span>
                 <button type="button" disabled={on} onClick={() => onAdd(d)} className="flex shrink-0 items-center gap-1 rounded-full border border-indigo-400/40 px-2 py-0.5 text-indigo-300 disabled:border-white/10 disabled:text-slate-500" data-testid={`employer-add-${d.name.replace(/[^a-z0-9]/gi, "-")}`}>
                   {on ? "Suivie" : <><Plus className="h-3 w-3" />Ajouter</>}</button>
               </div>);

@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 
-const LABEL = { workday: "Workday", successfactors: "SuccessFactors", oracle: "Oracle Recruiting", icims: "iCIMS", greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", smartrecruiters: "SmartRecruiters", amazon: "amazon.jobs" };
+const LABEL = { workday: "Workday", successfactors: "SuccessFactors", oracle: "Oracle Recruiting", icims: "iCIMS", greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", smartrecruiters: "SmartRecruiters", amazon: "amazon.jobs", ukg: "UKG" };
 
 export const PortalHealth = ({ status, run }) => {
   const portals = Object.entries(run?.portals || {});
@@ -22,7 +22,7 @@ export const PortalHealth = ({ status, run }) => {
               <span className={`h-2 w-2 shrink-0 rounded-full ${p.ok ? "bg-emerald-400" : "bg-amber-400"}`} />
               <span className="min-w-0 truncate text-slate-200">{name}</span>
               <span className="shrink-0 text-slate-500">{LABEL[p.kind] || p.kind}</span>
-              <span className="ml-auto shrink-0 text-slate-400">{p.ok ? `${p.fetched} lues · ${p.matched ?? 0} retenues` : <span className="flex items-center gap-1 text-amber-300"><TriangleAlert className="h-3 w-3" />échec · repli Jooble</span>}</span>
+              <span className="ml-auto shrink-0 text-slate-400">{p.ok ? `${p.fetched} lues · ${p.matched ?? 0} retenues` : <span className="flex items-center gap-1 text-amber-300"><TriangleAlert className="h-3 w-3" />{p.blocked ? "bloqué (anti-robot)" : "échec"} · repli Jooble</span>}</span>
             </div>))}
         </div>)}
     </section>

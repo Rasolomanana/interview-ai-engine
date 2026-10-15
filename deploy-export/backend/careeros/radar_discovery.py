@@ -9,7 +9,7 @@ import httpx
 from . import radar_sources as S
 
 KIND_LABEL = {"workday": "Workday", "successfactors": "SuccessFactors", "oracle": "Oracle Recruiting", "icims": "iCIMS",
-              "greenhouse": "Greenhouse", "lever": "Lever", "ashby": "Ashby", "smartrecruiters": "SmartRecruiters", "amazon": "amazon.jobs"}
+              "greenhouse": "Greenhouse", "lever": "Lever", "ashby": "Ashby", "smartrecruiters": "SmartRecruiters", "amazon": "amazon.jobs", "ukg": "UKG (UltiPro)"}
 WD = lambda host, site: f"https://{host}.myworkdayjobs.com/fr-CA/{site}"  # noqa: E731
 SF = lambda host: f"https://{host}/services/rss/job/"  # noqa: E731
 # Portals checked live before being proposed. url "" = no public feed → followed via Jooble.
@@ -30,15 +30,23 @@ DIRECTORY = [
 ]
 NO_FEED_ATS = {"Banque Nationale": "Avature", "Bell": "Phenom", "Air Canada": "Phenom", "Metro": "portail propriétaire", "CGI": "Njoyn"}
 UNSUPPORTED = {"taleo.net": "Taleo", "phenompeople": "Phenom", "avature": "Avature", "njoyn": "Njoyn", "silkroad": "SilkRoad",
-               "jobvite": "Jobvite", "ultipro": "UKG"}
+               "jobvite": "Jobvite"}
 ATS = [
     (r"https?://[a-z0-9-]+\.wd\d+\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?[A-Za-z0-9_-]+", None),
     (r"https?://[a-z0-9.-]+\.oraclecloud\.com/hcmUI/CandidateExperience/[a-zA-Z-]+/sites/[A-Za-z0-9_]+", None),
-    (r"https?://[a-z0-9-]+\.icims\.com", None), (r"https?://(?:boards|job-boards)\.greenhouse\.io/[a-z0-9_-]+", None),
+    (r"https?://[a-z0-9-]+\.icims\.com", None), (r"https?://recruiting\d*\.ultipro\.(?:com|ca)/[A-Za-z0-9]+/JobBoard/[0-9a-f-]{36}", None), (r"https?://(?:boards|job-boards)\.greenhouse\.io/[a-z0-9_-]+", None),
     (r"https?://jobs\.lever\.co/[a-z0-9_-]+", None), (r"https?://jobs\.ashbyhq\.com/[a-z0-9_.-]+", None),
     (r"https?://(?:jobs|careers)\.smartrecruiters\.com/[A-Za-z0-9_-]+", None),
 ]
 _cache = {"at": 0, "data": None}
+
+
+def is_blocked(e) -> bool:
+    resp = getattr(e, "response", None)
+    if resp is None or resp.status_code not in (403, 429, 503):
+        return False
+    t = resp.text[:3000].lower()
+    return resp.status_code == 403 or "just a moment" in t or "cf-ray" in str(resp.headers).lower() or "captcha" in t
 
 
 def norm(name: str) -> str:
@@ -70,6 +78,9 @@ async def verify(client, kind: str, slug: str, name: str) -> dict:
             offers = await S.board(client, kind, slug, name, [])
         return {"ok": True, "count": len(offers), "message": f"Portail {KIND_LABEL[kind]} vérifié : {len(offers)} offre(s) visibles."}
     except Exception as e:  # noqa: BLE001
+        if is_blocked(e):
+            return {"ok": False, "blocked": True, "count": 0,
+                    "message": f"Portail {KIND_LABEL.get(kind, kind)} détecté mais bloqué volontairement par l'employeur (403 / protection anti-robot) : suivi via Jooble."}
         return {"ok": False, "count": 0, "message": f"Portail {KIND_LABEL.get(kind, kind)} détecté mais illisible ({(str(e) or type(e).__name__)[:70]}) : Jooble reste utilisé en repli."}
 
 
@@ -143,7 +154,9 @@ async def discover(name: str, website: str = "") -> dict:
         out.append({"kind": k, "kind_label": KIND_LABEL.get(k, k), "slug": s, "portal_url": url, "origin": origin[(k, s)], **v})
     out.sort(key=lambda x: (not x["ok"], x["origin"] != "annuaire", -x["count"]))
     bad = [x["kind_label"] for x in out if not x["ok"]]
+    blocked = [x["kind_label"] for x in out if x.get("blocked")]
     msg = "" if any(x["ok"] for x in out) else (
+        f"Portail {', '.join(dict.fromkeys(blocked))} détecté mais bloqué volontairement par l'employeur (403 / protection anti-robot) : l'entreprise reste suivie via Jooble." if blocked else
         f"Portail {', '.join(dict.fromkeys(bad))} détecté mais illisible : l'entreprise reste suivie via Jooble." if bad else
         f"Portail {', '.join(sorted(unsupported))} détecté mais non pris en charge : l'entreprise reste suivie via Jooble." if unsupported
         else "Aucun portail compatible détecté : l'entreprise reste suivie via Jooble.")
