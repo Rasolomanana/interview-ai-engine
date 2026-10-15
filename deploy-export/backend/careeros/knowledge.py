@@ -43,7 +43,7 @@ async def record(db, name: str, kind: str, slug: str, portal_url: str, status: s
     if status == "bloque":
         if cur and not same and cur.get("status") != "bloque":
             return  # a blocked alternative never hides a working portal
-        upd = {"status": "bloque", "last_validated": now}
+        upd = {"status": "bloque", "last_validated": now, "recent_offers": 0}
     else:
         today = now[:10]
         fresh = not same or (cur.get("last_success") or "")[:10] != today  # at most one validation per day
@@ -62,7 +62,7 @@ async def lookup(db, name: str):
     card = await db.portal_knowledge.find_one({"key": k}, {"_id": 0})
     if not card:
         async for c in db.portal_knowledge.find({}, {"_id": 0}):
-            if AU.same_company(name, c["name"]):
+            if min(len(k.split()), len(c["key"].split())) >= 2 and AU.same_company(name, c["name"]):  # fuzzy only on multi-word names (never "Québec" alone)
                 card = c
                 break
     return card

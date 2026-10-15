@@ -8,10 +8,13 @@ const CONF = { elevee: "élevée", moyenne: "moyenne", faible: "faible" };
 export const fromKnowledge = (k) => ({ kind: k.kind, slug: k.slug, portal_url: k.portal_url, auto: true, detected: `Associé automatiquement · Base commune · ${k.kind_label}` });
 
 // One-click association for a company without a portal: shared knowledge first, then the loupe's best readable candidate.
+export const blockedKind = (c, match) => (match && !match.usable ? match.kind_label : (c.detected || "").startsWith("Bloqué (anti-robot) : ") ? c.detected.slice(22) : "");
+
 export const QuickAssociate = ({ c, i, match, onPick }) => {
   const [busy, setBusy] = useState(false);
-  if (match && !match.usable) {
-    return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-rose-300" title="Portail protégé par l'employeur : CareerOS ne le contourne pas" data-testid={`radar-company-blocked-${i}`}><ShieldAlert className="h-3.5 w-3.5" />{match.kind_label} bloqué (403) · Jooble</span>;
+  const blocked = blockedKind(c, match);
+  if (blocked) {
+    return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-rose-300" title="Portail protégé volontairement par l'employeur : CareerOS ne le contourne pas et suit l'entreprise via Jooble" data-testid={`radar-company-blocked-${i}`}><ShieldAlert className="h-3.5 w-3.5" />{blocked} bloqué (403) · Jooble</span>;
   }
   const go = async () => {
     if (match) { onPick(fromKnowledge(match)); toast.success(`${c.name} associée via la base commune CareerOS (${match.kind_label}).`); return; }

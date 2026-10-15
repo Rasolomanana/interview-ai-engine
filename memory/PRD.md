@@ -425,3 +425,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Code cron revu (quota remis à zéro à minuit Toronto, aucun verrou bloquant pour le cron, membres actifs 7 j + Radar activé).
 - Simulation preview « lendemain » : log radar_cron_log -> done, 11 membres, runs quotidien créés, 0 erreur.
 - deploy-export/backend/careeros et frontend/src identiques au preview (server.py diffère volontairement : chaîne LLM autonome).
+
+## 2026-10-15 — Base commune CareerOS + Réglages allégés
+- backend/careeros/knowledge.py : collection portal_knowledge (1 fiche/employeur, clé normalisée, fusion, plus récent gagne), statut fiable/fragile/bloque, confiance (validations/jour, dernière réussite, offres lues). Aucune donnée membre. Migration depuis portal_directory.
+- Alimentée par : passages Radar (portails lus avec offres, 403), loupe/discover (origines officielles). Utilisée par detect_one (association auto si fiable + confiance élevée/moyenne, annulable), ajout entreprise (frontend), /radar/knowledge/match.
+- Réglages Radar : associées masquées par défaut + bouton Afficher/Masquer, bouton « Associer » 1 clic (base commune puis loupe), badge bloqué 403.
+- Admin : onglet « Base commune » (GET /api/admin/knowledge). Tests iteration_36 + tests/test_knowledge_base.py (6/6).

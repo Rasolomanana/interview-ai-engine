@@ -26,7 +26,7 @@ export const KnowledgeBase = () => {
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {KPIS.map(([k, label, f]) => (
-          <div key={k} role="button" tabIndex={0} onClick={() => open(label, f)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && open(label, f)}
+          <div key={k} role="button" tabIndex={0} onClick={() => open(label, f)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(label, f); } }}
             className="cursor-pointer rounded-xl border border-white/10 p-3 hover:border-emerald-400/40" data-testid={`knowledge-kpi-${k}`}>
             <p className="text-[11px] text-slate-500">{label}</p><p className="font-mono text-xl font-bold text-white">{d.stats[k]}</p>
           </div>))}

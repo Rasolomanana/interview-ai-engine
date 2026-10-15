@@ -1,0 +1,40 @@
+{
+  "summary": "Tested the Base commune CareerOS shared knowledge base from start to finish. Backend: 6/6 pytest pass (admin /knowledge auth and anonymous-only fields plus stats, one card per employer, /knowledge/match variants and 401, two Radar runs on the same day do not double-increment validations, a blocked alternative never replaces a working card). Frontend member: the Réglages company filter hides associated companies by default, the info text and toggle work, adding 'Desjardins Groupe' auto-associates from the base commune (toast, Workday + AUTO badge, hidden until the toggle is used, persisted after Enregistrer), the quick 'Associer · Workday' button works on an imported 'Walmart Canada Inc', plain 'Associer' runs discovery and shows a Jooble fallback toast, and a blocked card shows 'SuccessFactors bloqué (403) · Jooble'. Admin: the Base commune tab shows KPIs, rows, KPI detail dialogs and the validations confidence dialog. One a11y bug fixed: Enter on a KPI card did not open the dialog.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "KB.lookup fallback (knowledge.py:64-67) used by /knowledge/match, detect_one and add-company", "issue": "Token subset matching gives false positives for generic or one-word names: 'Québec' and 'Hydro' -> Hydro-Québec, 'Montréal' -> Ville de Montréal, 'Amazon Web Services' -> Amazon. These cards are usable, so the wrong employer portal is AUTO-associated. Suggest requiring >=2 shared tokens, or the card's token set being a subset of the query name (not the reverse) when the query has only 1 token, or a minimum token length."},
+      {"endpoint": "knowledge.record (status=bloque on a new card)", "issue": "recent_offers and last_success are not set, so the admin table shows an empty 'Offres lues' cell for blocked cards. Default them to 0 / ''."},
+      {"endpoint": "_tokens normalisation", "issue": "'canada' is stripped, so 'Canada' / 'Postes Canada' style names reduce to 0 or 1 tokens: an empty key means the card is never recorded, and single tokens make false-positive matches more likely."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "KnowledgeBase KPI cards", "issue": "Pressing Enter on a focused KPI did not open the detail dialog (Space did). FIXED by adding e.preventDefault() in onKeyDown. Retested: Enter now opens the dialog.", "selector": "[data-testid^=knowledge-kpi-]", "priority": "LOW (fixed)"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Réglages du Radar", "issues": ["The settings tour (Visite des réglages) auto-opens and its popover covers the add-company row and the 'Ajouter' button. A first click on Ajouter is swallowed until the tour is skipped.", "Blocked row shows 'Jooble' twice (kind column 'Jooble' + 'SuccessFactors bloqué (403) · Jooble')."]},
+      {"screen": "Réglages du Radar", "issues": ["Sobeys is counted in 'Bloquées par l'employeur' (from its member-level detected label) but its row shows a generic 'Associer' button, not the blocked badge, because the shared base has no blocked card for it. The two signals are inconsistent."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_knowledge_base.py", "/app/test_reports/pytest/pytest_knowledge.xml"],
+  "action_items": [
+    "Tighten KB.lookup fuzzy matching to avoid generic one-token matches (Québec, Montréal, Hydro) that auto-associate the wrong employer",
+    "Set recent_offers=0 when creating a blocked card",
+    "Prevent the settings tour popover from covering the add-company row (or skip the tour when the user interacts)",
+    "Optional: show the blocked badge in rows whose detected label says 'Bloqué' even without a KB card, and drop the duplicate 'Jooble' label"
+  ],
+  "critical_code_review_comments": [
+    "knowledge.lookup does a full collection scan (async for over all cards) for every non-exact name. /knowledge/match calls it for up to 150 names, which is O(N*M). Fine now (12 cards) but it will not scale; precompute tokens or cache.",
+    "knowledge_match returns slug in addition to the public fields. This is acceptable (public employer info), but the admin and public schemas differ.",
+    "record(): when the same card is re-validated on a new day after being 'bloque', validations keeps counting from before. This is intended but worth documenting.",
+    "Migrated cards (Cascades) have last_success='' and stay 'faible' forever until a member's run re-validates them, so they are never usable."
+  ],
+  "updated_files": ["/app/frontend/src/components/admin/KnowledgeBase.jsx", "/app/backend/tests/test_knowledge_base.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% of requested flows (1 a11y bug fixed)"},
+  "seed_data_creation": "Temporarily inserted the KB card 'TEST Bloquee Zorg' (bloque) to test the blocked UI, then deleted it. The cleanup also removed a stale 'TEST_BMO' card left by a previous agent. Test companies (Desjardins Groupe, Walmart Canada Inc, TEST_Inconnue Zzqx, TEST Bloquee Zorg) were removed. The member is back to their original 14 companies.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_knowledge_base.py triggers 2 Radar runs (~30s total). The member's settings tour auto-opens in the Réglages dialog: click the 'Passer' button before interacting. Set localStorage privacyAcceptedV2=1 and radarTourDone=1 before login. The server clock is Oct 2026."
+}

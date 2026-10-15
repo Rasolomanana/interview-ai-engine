@@ -70,7 +70,7 @@ export const RadarSettingsDialog = ({ onClose }) => {
             </div>
             <CompanyManager companies={s.companies} setCompanies={(companies) => setS({ ...s, companies })} />
           </div>
-          <PageTour tour={tour} steps={SETTINGS_STEPS} label="Visite des réglages" testid="radar-settings-tour" className="absolute bottom-20 right-4 z-[70]" />
+          <PageTour tour={tour} steps={SETTINGS_STEPS} label="Visite des réglages" testid="radar-settings-tour" className="absolute right-4 top-20 z-[70]" />
           <div className="shrink-0 border-t border-white/[0.06] bg-[#121520] px-5 py-3 sm:px-6" data-testid="radar-settings-footer">
             <button onClick={save} disabled={busy} data-testid="radar-settings-save-btn" className="w-full rounded-xl bg-indigo-500 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">{busy ? "Enregistrement…" : "Enregistrer"}</button>
           </div>

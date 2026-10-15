@@ -1,6 +1,6 @@
 import { KIND_LABEL } from "@/lib/portals";
 import { useEffect, useState } from "react";
-import { QuickAssociate, fromKnowledge } from "@/components/careeros/QuickAssociate";
+import { QuickAssociate, blockedKind, fromKnowledge } from "@/components/careeros/QuickAssociate";
 import { Building2, CheckCircle2, Eye, EyeOff, Loader2, Plus, RefreshCw, Search, Trash2, Upload, Wand2 } from "lucide-react";
 import { InfoTip } from "@/components/careeros/guide/InfoTip";
 import { toast } from "sonner";
@@ -48,7 +48,7 @@ const CompanyRow = ({ c, i, onChange, onRemove, result, setResult, match }) => {
       <input value={c.portal_url} onChange={(e) => onChange({ portal_url: e.target.value, kind: "", slug: "" })} placeholder="URL portail carrières (optionnel)" className={inputCls} data-testid={`radar-company-url-${i}`} />
       {c.kind ? <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-emerald-300" data-testid={`radar-company-kind-${i}`}><CheckCircle2 className="h-3.5 w-3.5" />{KIND[c.kind]}{c.auto && <span className="rounded border border-emerald-400/40 px-1 text-[9px] uppercase" title="Associé automatiquement : modifiable ou supprimable à tout moment" data-testid={`radar-company-auto-${i}`}>auto</span>}</span>
         : c.portal_url ? <button type="button" onClick={check} disabled={checking} className="whitespace-nowrap text-[11px] text-indigo-300" data-testid={`radar-company-check-${i}`}>{checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-amber-300" title="Portail pas encore reconnu : cliquez pour vérifier">À vérifier</span>}</button>
-          : <span className="whitespace-nowrap text-[11px] text-slate-500" data-testid={`radar-company-kind-${i}`}>Jooble</span>}
+          : blockedKind(c, match) ? <span /> : <span className="whitespace-nowrap text-[11px] text-slate-500" data-testid={`radar-company-kind-${i}`}>Jooble</span>}
       {!c.kind ? <QuickAssociate c={c} i={i} match={match} onPick={onChange} /> : <span />}
       <button type="button" onClick={() => setOpen(!show)} title="Trouver le portail" className="p-1.5 text-indigo-300 hover:text-white" data-testid={`radar-company-find-${i}`}><Search className="h-4 w-4" /></button>
       <button type="button" onClick={onRemove} className="p-1.5 text-slate-500 hover:text-rose-300" data-testid={`radar-company-remove-${i}`}><Trash2 className="h-4 w-4" /></button>
