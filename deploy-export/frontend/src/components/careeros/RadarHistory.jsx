@@ -25,7 +25,7 @@ export const TodayMarker = ({ runs, running }) => {
   );
 };
 
-const Num = ({ n, onClick, testid }) => (n ? (
+export const Num = ({ n, onClick, testid }) => (n ? (
   <button type="button" onClick={onClick} data-testid={testid} title="Afficher ces offres"
     className="rounded-md px-1.5 py-0.5 font-semibold text-indigo-300 underline decoration-indigo-400/40 underline-offset-2 transition-colors hover:bg-indigo-500/10 hover:text-indigo-200">{n}</button>
 ) : <span className="px-1.5">0</span>);

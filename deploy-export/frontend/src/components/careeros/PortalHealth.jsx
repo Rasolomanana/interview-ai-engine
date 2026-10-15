@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowDownUp, TriangleAlert } from "lucide-react";
 import { InfoTip } from "@/components/careeros/guide/InfoTip";
+import { Num } from "@/components/careeros/RadarHistory";
 import { KIND_LABEL, QUALITY, qualityOf } from "@/lib/portals";
 
 const tid = (n) => n.replace(/[^a-z0-9]/gi, "-");
@@ -24,8 +25,8 @@ const Row = ({ p, active, onPick }) => (
     <td className="py-2 pl-2 pr-3 font-medium text-slate-100">{p.name}</td>
     <td className="py-2 pr-3 text-slate-400">{KIND_LABEL[p.kind] || p.kind}</td>
     <td className="py-2 pr-3"><QualityBadge p={p} /></td>
-    <td className="py-2 pr-3 text-right tabular-nums text-slate-300">{p.fetched || 0}</td>
-    <td className="py-2 pr-3 text-right tabular-nums font-semibold text-white">{p.matched ?? 0}</td>
+    <td className="py-2 pr-3 text-right tabular-nums" onClick={(e) => e.stopPropagation()}><Num n={p.fetched || 0} onClick={() => onPick?.(p.name)} testid={`portal-fetched-${tid(p.name)}`} /></td>
+    <td className="py-2 pr-3 text-right tabular-nums" onClick={(e) => e.stopPropagation()}><Num n={p.matched || 0} onClick={() => onPick?.(p.name)} testid={`portal-matched-${tid(p.name)}`} /></td>
     <td className={`py-2 pr-2 ${p.ok && p.matched ? "text-slate-500" : "text-amber-300/90"}`}>{note(p)}</td>
   </tr>
 );
@@ -33,7 +34,7 @@ const Row = ({ p, active, onPick }) => (
 const Card = ({ p, active, onPick }) => (
   <button type="button" onClick={() => onPick?.(p.name)} className={`w-full rounded-xl border p-3 text-left text-xs ${active ? "border-indigo-400/60 bg-indigo-500/10" : "border-white/[0.06] bg-black/20"}`} data-testid={`portal-card-${tid(p.name)}`}>
     <div className="flex items-center justify-between gap-2"><span className="font-semibold text-slate-100">{p.name}</span><QualityBadge p={p} /></div>
-    <div className="mt-1 flex justify-between text-slate-400"><span>{KIND_LABEL[p.kind] || p.kind}</span><span>{p.fetched || 0} lues · <b className="text-white">{p.matched ?? 0}</b> retenues</span></div>
+    <div className="mt-1 flex justify-between text-slate-400"><span>{KIND_LABEL[p.kind] || p.kind}</span><span className="text-indigo-300 underline decoration-indigo-400/40 underline-offset-2">{p.fetched || 0} lues · <b>{p.matched ?? 0}</b> retenues</span></div>
     {(!p.ok || !p.matched) && <p className="mt-1 flex items-center gap-1 text-amber-300/90"><TriangleAlert className="h-3 w-3" />{note(p)}</p>}
   </button>
 );
@@ -80,7 +81,7 @@ export const PortalHealth = ({ status, run, active, onPick }) => {
           </table>
         </div>
         <div className="grid gap-2 md:hidden" data-testid="portal-cards">{rows.map((p) => <Card key={p.name} p={p} active={active === p.name} onPick={onPick} />)}</div>
-        <p className="mt-2 text-[11px] text-slate-500">Cliquez une entreprise pour afficher ses offres retenues · cliquez une pastille pour filtrer le tableau.</p>
+        <p className="mt-2 text-[11px] text-slate-500">Cliquez un chiffre (Lues / Retenues) ou une entreprise pour afficher ses offres · les offres lues mais non retenues ne correspondent pas à vos postes / ville et ne sont pas conservées · cliquez une pastille pour filtrer le tableau.</p>
       </>)}
     </section>
   );
