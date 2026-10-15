@@ -48,7 +48,7 @@ export const Overview = () => {
       <section className={panel} data-testid="ov-radar">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200"><Radar className="h-4 w-4 text-emerald-400" />Utilisation du Radar (30 jours)</h3>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-          <Kpi label="Radar activé" value={fmt(r.enabled)} sub={<button type="button" onClick={(e) => { e.stopPropagation(); trace("r_configured"); }} className="underline" data-testid="ov-radar-configured">{fmt(r.configured)} configuré(s)</button>} testid="ov-radar-enabled" onClick={() => trace("r_enabled")} />
+          <Kpi label="Radar activé" value={fmt(r.enabled)} sub={<button type="button" onClick={(e) => { e.stopPropagation(); trace("r_configured"); }} onKeyDown={(e) => e.stopPropagation()} className="underline" data-testid="ov-radar-configured">{fmt(r.configured)} configuré(s)</button>} testid="ov-radar-enabled" onClick={() => trace("r_enabled")} />
           <Kpi label="Membres utilisateurs" value={fmt(r.members_30d)} testid="ov-radar-members" onClick={() => trace("r_members")} />
           <Kpi label="Passages" value={fmt(r.runs_30d)} testid="ov-radar-runs" onClick={() => trace("r_runs")} />
           <Kpi label="Automatiques" value={fmt(r.runs_auto)} testid="ov-radar-auto" onClick={() => trace("r_auto")} />

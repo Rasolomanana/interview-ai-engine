@@ -30,7 +30,7 @@ TRACE_PREFIX = {"m": "overview", "f": "overview", "r": "overview", "g": "geo", "
 
 def section_of(path: str, metric: str = "") -> str:
     if path == "/api/admin/trace":
-        return TRACE_PREFIX.get(metric.split("_", 1)[0], "super")
+        return TRACE_PREFIX.get(metric.split("_", 1)[0], "unknown")
     return next((s for p, s in PATHS if path == p or path.startswith(p + "/")), "super")
 
 
@@ -48,7 +48,7 @@ def make_rbac_middleware(db):
                 roles = u.get("admin_roles") or []
                 sec = section_of(p, request.query_params.get("metric", ""))
                 allowed = sections_for(roles)
-                if sec not in allowed and not (sec == "super" and "super_admin" in roles):
+                if sec != "unknown" and sec not in allowed and not (sec == "super" and "super_admin" in roles):  # unknown trace metric -> 422 by the endpoint
                     return JSONResponse({"detail": "Accès refusé : votre rôle ne donne pas accès à cette section."}, status_code=403)
                 ADMIN_CTX.set({"user_id": uid, "roles": roles, "super": "super_admin" in roles})
         return await call_next(request)

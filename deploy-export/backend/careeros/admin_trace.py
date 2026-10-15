@@ -35,24 +35,31 @@ def pseudo(uid: str) -> str:
     return f"Membre #{hashlib.sha256((uid or '').encode()).hexdigest()[:6].upper()}"
 
 
+class _Names(dict):
+    def get(self, k, default=None):
+        return super().get(k) or f"{pseudo(k)} (compte supprimé)"
+
+
 def create_trace_router(db):
     router = APIRouter(prefix="/api/admin")
 
     async def who(super_: bool) -> dict:
-        if not super_:
-            return {}
-        return {u["id"]: f"{u.get('name') or '—'} <{u.get('email')}>" async for u in db.users.find({}, {"_id": 0, "id": 1, "name": 1, "email": 1})}
+        """uid -> display label; members deleted since are labelled as such."""
+        users = {u["id"]: f"{u.get('name') or '—'} <{u.get('email')}>" async for u in db.users.find({}, {"_id": 0, "id": 1, "name": 1, "email": 1})}
+        return _Names(users if super_ else {k: pseudo(k) for k in users})
 
     async def members(flt: dict, super_: bool, ids=None):
         if ids is not None:
             flt = {**flt, "id": {"$in": list(ids)}}
         radar = {s["user_id"]: s.get("enabled", True) async for s in db.radar_settings.find({}, {"_id": 0, "user_id": 1, "enabled": 1})}
         geo = await geo_labels(db)
+        city_n = Counter(v[2] for v in geo.values())
+        city = lambda uid: (lambda c: c if super_ or city_n[c] >= MIN_CELL or c == "Non renseigné" else f"Autres (groupe de moins de {MIN_CELL})")(geo.get(uid, ("", "", "—"))[2])  # noqa: E731
         rows = []
         async for u in db.users.find(flt, {"_id": 0, "id": 1, "name": 1, "email": 1, "created_at": 1, "last_seen_at": 1, "paid": 1}).sort("created_at", -1).limit(LIMIT):
             rows.append({"member": f"{u.get('name') or '—'} <{u['email']}>" if super_ else pseudo(u["id"]), "created": _d(u.get("created_at")),
                          "seen": _d(u.get("last_seen_at")), "paid": "oui" if u.get("paid") else "non",
-                         "radar": "oui" if radar.get(u["id"]) else ("désactivé" if u["id"] in radar else "non configuré"), "city": geo.get(u["id"], ("", "", "—"))[2]})
+                         "radar": "oui" if radar.get(u["id"]) else ("désactivé" if u["id"] in radar else "non configuré"), "city": city(u["id"])})
         return MEMBER_COLS, rows
 
     async def offers(flt: dict, super_: bool):
@@ -204,6 +211,11 @@ def create_trace_router(db):
         elif metric in ("fin_active", "fin_paid", "fin_active_paid"):
             month = key or _now().strftime("%Y-%m")
             act = set(await db.member_activity.distinct("user_id", {"month": month}))
+            if month == _now().strftime("%Y-%m"):  # same rule as Rentabilité: activity log + connections this month
+                act |= set(await db.users.distinct("id", {"last_seen_at": {"$gte": f"{month}-01"}}))
+            doc = await db.finance_months.find_one({"month": month}, {"_id": 0, "paid_override": 1}) or {}
+            if doc.get("paid_override") is not None:
+                note = f"Nombre de payants saisi manuellement pour {month} : {doc['paid_override']}. La liste ci-dessous montre les membres cochés « payant »."
             if metric == "fin_active":
                 title, (cols, rows) = f"Membres actifs · {month}", await members({}, sup, act)
             elif metric == "fin_paid":

@@ -90,7 +90,7 @@ def create_insights_router(db):
         runs = [r async for r in db.radar_runs.find({"at": {"$gte": a30}}, {"_id": 0, "user_id": 1, "trigger": 1, "at": 1})]
         runs_by_day = Counter(r["at"][:10] for r in runs)
         radar = {"enabled": sum(1 for s in st if s.get("enabled", True)), "configured": len(st),
-                 "members_30d": len({r["user_id"] for r in runs}), "runs_30d": len(runs),
+                 "members_30d": len({r["user_id"] for r in runs} & {u["id"] for u in users}), "runs_30d": len(runs),
                  "runs_auto": sum(r.get("trigger") == "quotidien" for r in runs), "runs_manual": sum(r.get("trigger") != "quotidien" for r in runs),
                  "analyzed_30d": await db.radar_offers.count_documents({"analyzed_at": {"$gte": a30}}),
                  "packs_30d": await db.applications.count_documents({"created_at": {"$gte": a30}, "origin.type": "radar"}),

@@ -440,3 +440,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - users.paid_since suivi (renouvellement). Événement anonyme « visit » par session (entonnoir).
 - Frontend : onglets Admin filtrés par rôle, connexion Admin avec compte CareerOS, Overview/Geography/Business/Roles, SharingPanel dans Career Memory.
 - Tests : iteration_37 + tests/test_admin_rbac_insights_sharing.py (41/41).
+
+## 2026-10-15 — Traçabilité de tous les chiffres Admin
+- careeros/admin_trace.py : GET /api/admin/trace?metric=&key=&days= (m_*, f_*, r_*, g_*, b_*, a_*, fin_*) -> lignes réelles (1000 max). Super Admin : nom+e-mail ; autres rôles : « Membre #XXXXXX », petites villes regroupées ; packs/candidatures : poste+entreprise Super Admin seulement.
+- RBAC : section de la trace selon le préfixe du metric.
+- Frontend : useTrace() / TraceDialog (recherche, tri, compteur, CSV) branché sur Tableau de bord, Géographie, Analyse métier, Activité, Rentabilité (KPI, appels IA, par membre = formule, alertes, projections), Base commune.
+- Tests : iteration_38 + tests/test_admin_trace.py (16/16).

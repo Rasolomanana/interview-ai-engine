@@ -34,7 +34,7 @@ const TraceTable = ({ t }) => {
         <div className="max-h-[55vh] overflow-auto"><table className="w-full text-left text-xs" data-testid="trace-table">
           <thead className="sticky top-0 bg-slate-900 text-slate-500"><tr>{t.cols.map(([k, l]) => (
             <th key={k} className="py-1.5 pr-3 font-medium"><button type="button" onClick={() => setSort(sort?.[0] === k ? [k, -sort[1]] : [k, 1])} className="flex items-center gap-1 hover:text-white" data-testid={`trace-sort-${k}`}>{l}<ArrowUpDown className="h-3 w-3" /></button></th>))}</tr></thead>
-          <tbody>{rows.map((r, i) => <tr key={i} className="border-t border-white/5" data-testid={`trace-row-${i}`}>{t.cols.map(([k]) => <td key={k} className="py-1.5 pr-3 text-slate-300">{r[k] ?? "—"}</td>)}</tr>)}</tbody>
+          <tbody>{rows.map((r, i) => <tr key={i} className="border-t border-white/5" data-testid={`trace-row-${i}`}>{t.cols.map(([k]) => <td key={k} className={`py-1.5 pr-3 text-slate-300 ${["date", "created", "seen", "first"].includes(k) ? "whitespace-nowrap" : ""}`}>{r[k] ?? "—"}</td>)}</tr>)}</tbody>
         </table></div>)}
     </>
   );
