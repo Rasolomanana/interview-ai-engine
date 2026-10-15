@@ -1,0 +1,27 @@
+{
+  "summary": "Batch A+B+C validation. BACKEND: created /app/backend/tests/test_radar_batch_abc.py (14 tests, 14/14 PASS in 33.6 s on live portals). Covers (A) Walmart Canada → workday walmart.wd504/WalmartExternal ok+fiable; Metro → kind='schema' slug talent.metro.ca/sitemap.xml ok+count>0+fiable; Loblaw → schema ok; Costco → taleobe slug phf.tbe.taleo.net/phf02/COSTCO/41 ok+fragile, zero www./cdn. icims false-positives, 'Taleo' excluded from unsupported; Sobeys → successfactors remains blocked (regression preserved → Jooble fallback). (B) POST /detect: {url:'https://talent.metro.ca/sitemap.xml'} → kind=schema ok=True; {url:'phf.tbe.taleo.net/.../jobSearch?...cws=41&org=COSTCO'} → kind=taleobe. PUT /settings now accepts kind='schema' and kind='taleobe' and persists (snapshot+restore used). (C) GET /directory lists Metro (schema, ok) and Walmart Canada (workday, ok). Regressions on earlier connectors (Bell phenom, BNC avature, HDR taleo, Desjardins workday) and GET /api/admin/connectors (X-Admin-Password) all PASS. FRONTEND (Playwright): on /careeros/radar after clearing radarTourDone and setting beginner, radar-tour auto-opens with 5 steps — walked Suivant 1→5 (progress reports VISITE DU RADAR · n/5), Précédent returns to 4/5, Passer closes, radar-tour-btn reopens, radar-tour-close works. InfoTips infotip-sources/portails/qualite/compteurs each open their popover content panels. In RadarSettingsDialog, radar-settings-tour auto-opens with 5 steps, Suivant walks 1→5, finish present and functional, radar-settings-tour-btn reopens. InfoTips infotip-couverture/loupe/detection all open content. radar-redetect-btn renders « Re-détecter (3) » (3 companies with detected 'Non pris en charge'/'Illisible') and is enabled. radar-detect-all-btn present. Mobile 390×844: dialog width = 390 = window width = body scrollWidth → no horizontal overflow of header or dialog. PrivacyBanner (« J'ai compris ») dismissed before interacting on each page.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_radar_batch_abc.py",
+    "/app/test_reports/pytest/radar_batch_abc.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "radar_sources.py: FRAGILE now includes 'taleobe' alongside icims/avature/phenom — matches reality (Taleobe is HTML scraping with no public API).",
+    "radar_discovery.py: ICIMS_HOST regex excludes www.|cdn\\d*.|images. hosts, preventing the Costco false positives (www.icims.com, cdn02.icims.com).",
+    "radar_discovery.py line 184: unsupported -= {'Taleo'} when a Taleobe candidate is found — avoids double-flagging Costco. Correct.",
+    "DIRECTORY correctly declares Walmart Canada as workday walmart.wd504/WalmartExternal (not US walmart.wd5) and Metro via talent.metro.ca/sitemap.xml (schema.org).",
+    "CompanyManager.REDETECT = /^(Non pris en charge|Illisible)/ exactly matches the detected labels produced by the detectAll path and EmployerDirectory.addFromDirectory. Button count is live and detectAll(REDETECT) correctly filters.",
+    "SETTINGS_STEPS+RADAR_STEPS: both have 5 entries, no duplicate target testids. Tour auto-opens only when beginner && !localStorage[key], per usePageTour.",
+    "InfoTip renders only when beginner mode is on — ConceptRow and all infotip-* testids depend on GuideProvider's beginner flag. For tour targets to highlight, the target element must have the matching data-testid; verified for radar-settings-btn, radar-run-btn, radar-stats, radar-source-status, radar-portal-health (page tour) and company-summary, radar-directory-toggle, radar-detect-all-btn, radar-company-find-0, radar-settings-save-btn (settings tour).",
+    "Potential minor: when the RadarSettingsDialog's settings tour auto-opens and the Radar page tour was also set to auto-open earlier, Radar.jsx guards against this by only mounting <PageTour radar-tour/> when !settings — good."
+  ],
+  "updated_files": ["/app/backend/tests/test_radar_batch_abc.py (new)"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (radar tour 5/5 + settings tour 5/5 + 7 InfoTips + Re-détecter(3) + mobile 390px no overflow)"},
+  "test_credentials": "Member membre.test@careeros.dev / CareerOS2026! · Admin X-Admin-Password from backend/.env",
+  "seed_data_creation": "Transient TEST_Metro_Schema / TEST_Costco_Taleobe companies written then restored in TestSettingsNewKinds.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Live external portals; discover for Metro/Loblaw/Costco takes 20–40 s each. Member account currently has 13 active companies with 3 marked 'Non pris en charge/Illisible' which makes the Re-détecter(3) count a reliable live assertion. Admin header: X-Admin-Password. The PrivacyBanner must be dismissed before clicking Settings/Tour buttons (it covers the lower-right where the tour card renders)."
+}

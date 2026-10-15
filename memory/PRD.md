@@ -367,3 +367,13 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Tests : iteration_30 → backend 11/11, frontend 100 % (preview). Pas encore validé en production par l'utilisateur.
 - En attente : validation prod du correctif fuseau America/Toronto (Radar manuel du soir + ligne « Automatique » 06:00 du lendemain).
 - Backlog : Njoyn (CGI), Jobvite, SilkRoad, portail propriétaire Metro ; surveiller les faux positifs du motif Avature /SearchJobs.
+
+## 2026-06 — Lot A+B+C : détection corrigée, nouveaux lecteurs, guides Radar
+- Nouveau connecteur générique « Site carrières (schema.org) » (kind `schema`) : plan du site public + données JobPosting (norme Google for Jobs), offres expirées (validThrough) exclues. Metro (talent.metro.ca) et Loblaw lus ainsi.
+- Nouveau lecteur Taleo Business Edition (kind `taleobe`, fragile) : Costco (offres corporatives US uniquement → Costco Canada reste sur Jooble en pratique).
+- Détection : essai careers.nom.ca (Walmart Canada = Workday walmart.wd504), faux positifs www/cdn iCIMS ignorés, plateformes « non prises en charge » retenues seulement sur un vrai lien, Taleo retiré si Taleo BE trouvé, iCIMS redirigé signalé.
+- Annuaire : Metro (schema), Walmart Canada (Workday).
+- Bouton « Re-détecter (N) » : relance la loupe sur les entreprises Non prises en charge / Illisibles (association toujours manuelle).
+- Guides : PageTour générique (guide/PageTour.jsx) ; visite Radar 5 étapes + visite Réglages 5 étapes (auto en mode Débutant, relançables) ; InfoTips sources, portails, qualité, compteurs, couverture, loupe, détection, associer.
+- Indeed / LinkedIn : pas d'API publique d'offres, et leurs conditions interdisent l'extraction automatisée, donc rien n'a été intégré.
+- Tests : iteration_31 → backend 14/14, frontend 100 % (preview). Validation production en attente.
