@@ -40,6 +40,7 @@ export async function adminLogin(password) {
 }
 
 async function adminCall(path, password, opts = {}) {
+  if (!opts.method && sessionStorage.getItem("adminIncludeTest") === "1") path += `${path.includes("?") ? "&" : "?"}include_test=true`;
   if (isMemberAdmin()) return memberCall(`/admin${path}`, { method: opts.method || "GET", body: opts.body ? JSON.parse(opts.body) : undefined });
   const r = await fetch(`${ADMIN_BASE()}${path}`, { ...opts, headers: { "X-Admin-Password": password, "Content-Type": "application/json", ...(opts.headers || {}) } });
   let d = {}; try { d = await r.json(); } catch { /* ignore */ }
@@ -68,6 +69,7 @@ export const adminTrace = (pwd, metric, key = "", days) => adminCall(`/trace?met
 export const adminMe = (pwd) => adminCall("/me", pwd);
 export const adminInsights = (pwd, part, days) => adminCall(`/insights/${part}${days !== undefined ? `?days=${days}` : ""}`, pwd);
 export const adminRoles = (pwd, q = "") => adminCall(`/roles?q=${encodeURIComponent(q)}`, pwd);
+export const adminSetTest = (pwd, id, isTest) => adminCall(`/roles/${id}/test`, pwd, { method: "PUT", body: JSON.stringify({ is_test: isTest }) });
 export const adminSetRoles = (pwd, id, roles) => adminCall(`/roles/${id}`, pwd, { method: "PUT", body: JSON.stringify({ roles }) });
 
 export async function adminLlmHealth(password) {

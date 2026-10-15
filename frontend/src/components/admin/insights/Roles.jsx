@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Search, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { adminRoles, adminSetRoles } from "@/lib/api";
+import { adminRoles, adminSetRoles, adminSetTest } from "@/lib/api";
 import { Spinner, panel, pwd, useAdminData } from "./ui";
 
 export const ROLE_LABEL = { super_admin: "Super Admin", support: "Support", marketing: "Marketing", conseiller: "Conseiller carrière" };
@@ -11,15 +11,27 @@ export const Roles = () => {
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   const [local, setLocal] = useState({});
+  const [tests, setTests] = useState({});
+  const [showTest, setShowTest] = useState(false);
   const d = useAdminData(() => adminRoles(pwd(), query), [query]);
   if (!d) return <Spinner />;
   const toggle = async (u, r) => {
     const cur = local[u.id] || u.admin_roles;
     const next = cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r];
+    if (next.length > cur.length && (tests[u.id] ?? u.is_test) && !window.confirm(`${u.email} est un compte de test. Lui attribuer le rôle ${ROLE_LABEL[r]} quand même ?`)) return;
     setLocal({ ...local, [u.id]: next });
     try { await adminSetRoles(pwd(), u.id, next); toast.success(`${u.email} : ${next.map((x) => ROLE_LABEL[x]).join(", ") || "aucun rôle"}`); }
     catch (e) { setLocal({ ...local, [u.id]: cur }); toast.error(e.message); }
   };
+  const markTest = async (u) => {
+    const v = !(tests[u.id] ?? u.is_test);
+    setTests({ ...tests, [u.id]: v });
+    try { await adminSetTest(pwd(), u.id, v); toast.success(`${u.email} : ${v ? "compte de test" : "membre réel"}`); }
+    catch (e) { setTests({ ...tests, [u.id]: !v }); toast.error(e.message); }
+  };
+  const isT = (u) => tests[u.id] ?? u.is_test;
+  const shown = d.members.filter((u) => showTest || !isT(u));
+  const nTest = d.members.filter(isT).length;
   return (
     <section className={`${panel} space-y-4`} data-testid="admin-roles">
       <div>
@@ -33,14 +45,16 @@ export const Roles = () => {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un membre (e-mail ou nom)" className="flex-1 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none" data-testid="roles-search-input" />
         <button type="submit" className="flex items-center gap-1 rounded-xl border border-emerald-400/40 px-3 text-sm text-emerald-200" data-testid="roles-search-btn"><Search className="h-4 w-4" />Rechercher</button>
       </form>
+      <label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" className="accent-amber-500" checked={showTest} onChange={(e) => setShowTest(e.target.checked)} data-testid="roles-show-test" />Afficher les comptes de test ({nTest}) · détectés automatiquement (@careeros.dev) ou marqués manuellement</label>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-[12px]">
-          <thead className="text-slate-500"><tr className="border-b border-white/10"><th className="py-2 pr-3 font-medium">Membre</th>{Object.values(ROLE_LABEL).map((l) => <th key={l} className="py-2 pr-3 text-center font-medium">{l}</th>)}</tr></thead>
-          <tbody>{d.members.map((u, i) => {
+          <thead className="text-slate-500"><tr className="border-b border-white/10"><th className="py-2 pr-3 font-medium">Membre</th><th className="py-2 pr-3 text-center font-medium">Compte de test</th>{Object.values(ROLE_LABEL).map((l) => <th key={l} className="py-2 pr-3 text-center font-medium">{l}</th>)}</tr></thead>
+          <tbody>{shown.map((u, i) => {
             const roles = local[u.id] || u.admin_roles;
             return (
               <tr key={u.id} className="border-b border-white/5" data-testid={`roles-row-${i}`}>
-                <td className="py-2 pr-3"><p className="text-white">{u.name || "—"}</p><p className="text-slate-500">{u.email}</p></td>
+                <td className="py-2 pr-3"><p className="text-white">{u.name || "—"}{isT(u) && <span className="ml-1.5 rounded border border-amber-400/40 px-1 text-[9px] font-semibold text-amber-300" data-testid={`roles-test-badge-${i}`}>TEST</span>}</p><p className="text-slate-500">{u.email}</p></td>
+                <td className="pr-3 text-center"><input type="checkbox" className="h-4 w-4 accent-amber-500" checked={!!isT(u)} onChange={() => markTest(u)} aria-label={`Compte de test : ${u.email}`} data-testid={`roles-is-test-${i}`} /></td>
                 {Object.keys(ROLE_LABEL).map((r) => (
                   <td key={r} className="pr-3 text-center"><input type="checkbox" className="h-4 w-4 accent-emerald-500" checked={roles.includes(r)} onChange={() => toggle(u, r)} aria-label={`${ROLE_LABEL[r]} pour ${u.email}`} data-testid={`roles-${r}-${i}`} /></td>))}
               </tr>);

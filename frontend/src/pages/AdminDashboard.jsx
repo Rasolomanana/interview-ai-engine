@@ -71,6 +71,8 @@ export default function AdminDashboard() {
   const [pwd, setPwd] = useState("");
   const [me, setMe] = useState(null);
   const [traceNode, trace] = useTrace();
+  const [withTest, setWithTest] = useState(() => sessionStorage.getItem("adminIncludeTest") === "1");
+  const toggleTest = () => { const v = !withTest; sessionStorage.setItem("adminIncludeTest", v ? "1" : "0"); setWithTest(v); };
   const [authed, setAuthed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
@@ -192,6 +194,10 @@ export default function AdminDashboard() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ThemeToggle />
+            <button type="button" onClick={toggleTest} aria-pressed={withTest} data-testid="admin-include-test-toggle" title="Comptes @careeros.dev ou marqués test : exclus par défaut des statistiques"
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${withTest ? "border-amber-400/50 bg-amber-500/10 text-amber-200" : "border-white/10 bg-slate-900 text-slate-300 hover:border-white/20"}`}>
+              <span className={`h-2 w-2 rounded-full ${withTest ? "bg-amber-400" : "bg-slate-600"}`} />{withTest ? "Comptes de test inclus" : "Afficher les comptes de test"}
+            </button>
             <button onClick={() => load(sessionStorage.getItem("adminPwd"))} data-testid="admin-refresh-btn" className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs hover:border-white/20">
               <RefreshCw className="h-3.5 w-3.5" /> Rafraîchir
             </button>
@@ -208,7 +214,8 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        <Tabs defaultValue={tabs[0]?.[0]}>
+        {withTest && <p className="mb-3 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200" data-testid="admin-test-banner">Comptes de test inclus dans les statistiques (mode validation). Désactivez pour ne voir que les membres réels.</p>}
+        <Tabs key={withTest ? "t" : "p"} defaultValue={tabs[0]?.[0]}>
         <TabsList className="mb-4 h-auto flex-wrap border border-white/10 bg-slate-900" data-testid="admin-tabs">
           {tabs.map(([v, label, id]) => <TabsTrigger key={v} value={v} data-testid={`admin-tab-${id}`}>{label}</TabsTrigger>)}
         </TabsList>

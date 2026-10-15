@@ -23,7 +23,7 @@ export const MembersPaid = ({ onChange }) => {
           {shown.map((m) => (
             <div key={m.id} className="flex items-center justify-between gap-3 border-t border-white/[0.06] py-2 text-sm first:border-t-0" data-testid={`member-${m.id}`}>
               <div className="min-w-0">
-                <p className="truncate text-slate-200">{m.name || m.email}</p>
+                <p className="truncate text-slate-200">{m.name || m.email}{m.is_test && <span className="ml-1.5 rounded border border-amber-400/40 px-1 text-[9px] font-semibold text-amber-300" data-testid={`member-test-${m.id}`}>TEST</span>}</p>
                 <p className="truncate text-[11px] text-slate-500">{m.email} · {m.active_month ? "actif ce mois" : "inactif ce mois"}</p>
               </div>
               <label className="flex shrink-0 items-center gap-2 text-xs text-slate-400">Payant<Switch checked={m.paid} onCheckedChange={(v) => toggle(m, v)} data-testid={`member-paid-${m.id}`} /></label>

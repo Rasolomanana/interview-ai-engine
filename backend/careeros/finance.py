@@ -3,6 +3,8 @@ import calendar
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta
+
+from .testaccounts import is_test, scope, uf
 from typing import List, Optional
 from zoneinfo import ZoneInfo
 
@@ -252,11 +254,11 @@ def create_finance_router(db, check_admin, credits_fn=None):
 
     async def _members(month: str):
         start, end, _ = _bounds(month)
-        registered = await db.users.count_documents({"created_at": {"$lt": end}})
-        active = {a["user_id"] async for a in db.member_activity.find({"month": month}, {"user_id": 1})}
+        registered = await db.users.count_documents(uf({"created_at": {"$lt": end}}, "id"))
+        active = {a["user_id"] async for a in db.member_activity.find(uf({"month": month}), {"user_id": 1})}
         if month == month_key():
-            active |= {u["id"] async for u in db.users.find({"last_seen_at": {"$gte": start}}, {"id": 1})}
-        flagged = {u["id"] async for u in db.users.find({"paid": True}, {"id": 1})}
+            active |= {u["id"] async for u in db.users.find(uf({"last_seen_at": {"$gte": start}}, "id"), {"id": 1})}
+        flagged = {u["id"] async for u in db.users.find(uf({"paid": True}, "id"), {"id": 1})}
         return registered, active, flagged
 
     async def _ai(month: str, pricing: dict):
@@ -415,8 +417,9 @@ def create_finance_router(db, check_admin, credits_fn=None):
                 "days_left": round(c["remaining"] / daily_usd, 1) if daily_usd > 0 else None, "low": (c.get("remaining_pct") or 0) <= th}
 
     @router.get("/finance")
-    async def finance(month: Optional[str] = Query(None, pattern=M_PATTERN), x_admin_password: str = Header(None)):
+    async def finance(month: Optional[str] = Query(None, pattern=M_PATTERN), include_test: bool = False, x_admin_password: str = Header(None)):
         check_admin(x_admin_password)
+        await scope(db, include_test)
         month = month or month_key()
         s = await summary(month)
         hist, (y, m) = [], map(int, month.split("-"))
@@ -578,9 +581,9 @@ def create_finance_router(db, check_admin, credits_fn=None):
     async def members(x_admin_password: str = Header(None)):
         check_admin(x_admin_password)
         since = (datetime.now(timezone.utc) - timedelta(days=400)).isoformat()
-        cur = db.users.find({}, {"_id": 0, "id": 1, "email": 1, "name": 1, "created_at": 1, "last_seen_at": 1, "paid": 1}).sort("created_at", -1).limit(1000)
+        cur = db.users.find({}, {"_id": 0, "id": 1, "email": 1, "name": 1, "created_at": 1, "last_seen_at": 1, "paid": 1, "is_test": 1}).sort("created_at", -1).limit(1000)
         start, _, _ = _bounds(month_key())
-        return [{**u, "paid": bool(u.get("paid")), "active_month": (u.get("last_seen_at") or "") >= start, "recent": (u.get("last_seen_at") or "") >= since}
+        return [{**u, "is_test": is_test(u), "paid": bool(u.get("paid")), "active_month": (u.get("last_seen_at") or "") >= start, "recent": (u.get("last_seen_at") or "") >= since}
                 async for u in cur]
 
     @router.put("/members/{user_id}/paid")

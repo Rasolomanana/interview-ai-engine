@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from admin import ADMIN_CTX, _check_admin
 from .auth import _decode
+from .testaccounts import is_test
 
 ROLES = {"super_admin": "Super Admin", "support": "Support", "marketing": "Marketing", "conseiller": "Conseiller carrière"}
 SECTIONS = ("overview", "geo", "business", "activite", "connecteurs", "finance", "roles")
@@ -85,9 +86,20 @@ def create_rbac_router(db):
     async def list_roles(q: str = "", x_admin_password: str = Header(None)):
         _check_admin(x_admin_password)
         flt = {"$or": [{"email": {"$regex": q, "$options": "i"}}, {"name": {"$regex": q, "$options": "i"}}]} if q.strip() else {}
-        rows = [u async for u in db.users.find(flt, {"_id": 0, "id": 1, "email": 1, "name": 1, "created_at": 1, "admin_roles": 1}).sort("created_at", -1).limit(300)]
+        rows = [u async for u in db.users.find(flt, {"_id": 0, "id": 1, "email": 1, "name": 1, "created_at": 1, "admin_roles": 1, "is_test": 1}).sort("created_at", -1).limit(300)]
         return {"roles": ROLES, "role_sections": {k: sorted(v) for k, v in ROLE_SECTIONS.items()},
-                "members": [{**u, "admin_roles": u.get("admin_roles") or []} for u in rows]}
+                "members": [{**u, "admin_roles": u.get("admin_roles") or [], "is_test": is_test(u)} for u in rows]}
+
+    class TestBody(BaseModel):
+        is_test: bool
+
+    @router.put("/roles/{user_id}/test")
+    async def set_test(user_id: str, body: TestBody, x_admin_password: str = Header(None)):
+        _check_admin(x_admin_password)
+        r = await db.users.update_one({"id": user_id}, {"$set": {"is_test": body.is_test}})
+        if not r.matched_count:
+            raise HTTPException(status_code=404, detail="Membre introuvable")
+        return {"ok": True, "is_test": body.is_test}
 
     @router.put("/roles/{user_id}")
     async def set_roles(user_id: str, body: RolesBody, x_admin_password: str = Header(None)):

@@ -446,3 +446,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - RBAC : section de la trace selon le préfixe du metric.
 - Frontend : useTrace() / TraceDialog (recherche, tri, compteur, CSV) branché sur Tableau de bord, Géographie, Analyse métier, Activité, Rentabilité (KPI, appels IA, par membre = formule, alertes, projections), Base commune.
 - Tests : iteration_38 + tests/test_admin_trace.py (16/16).
+
+## 2026-10-15 — Comptes de test
+- careeros/testaccounts.py : compte de test = @careeros.dev par défaut ou users.is_test explicite ; exclusion par contextvar (scope/uf) dans insights, trace, finance (_members). Paramètre include_test=true.
+- PUT /api/admin/roles/{id}/test ; Rôles : colonne « Compte de test », badge TEST, filtre « Afficher les comptes de test », confirmation avant rôle sur compte test.
+- Admin : bouton global « Afficher les comptes de test » (sessionStorage adminIncludeTest) ; badge TEST dans Membres payants ; colonne test dans les traces membres.
+- Démo réelle preview : membre.reel.demo@example.com / Reel2026!demo.

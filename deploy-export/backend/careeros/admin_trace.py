@@ -11,6 +11,7 @@ from . import knowledge as KB
 from .admin_insights import MIN_CELL, geo_labels, member_roles
 from .admin_rbac import is_super
 from .radar_discovery import KIND_LABEL
+from .testaccounts import EXCLUDE, is_test, scope, uf
 
 LIMIT = 1000
 MEMBER_COLS = [["member", "Membre"], ["created", "Inscription"], ["seen", "Dernière activité"], ["paid", "Payant"], ["radar", "Radar activé"], ["city", "Ville"]]
@@ -51,30 +52,30 @@ def create_trace_router(db):
     async def members(flt: dict, super_: bool, ids=None):
         if ids is not None:
             flt = {**flt, "id": {"$in": list(ids)}}
-        radar = {s["user_id"]: s.get("enabled", True) async for s in db.radar_settings.find({}, {"_id": 0, "user_id": 1, "enabled": 1})}
+        radar = {s["user_id"]: s.get("enabled", True) async for s in db.radar_settings.find(uf(), {"_id": 0, "user_id": 1, "enabled": 1})}
         geo = await geo_labels(db)
         city_n = Counter(v[2] for v in geo.values())
         city = lambda uid: (lambda c: c if super_ or city_n[c] >= MIN_CELL or c == "Non renseigné" else f"Autres (groupe de moins de {MIN_CELL})")(geo.get(uid, ("", "", "—"))[2])  # noqa: E731
         rows = []
-        async for u in db.users.find(flt, {"_id": 0, "id": 1, "name": 1, "email": 1, "created_at": 1, "last_seen_at": 1, "paid": 1}).sort("created_at", -1).limit(LIMIT):
+        async for u in db.users.find(uf(flt, "id"), {"_id": 0, "id": 1, "name": 1, "email": 1, "created_at": 1, "last_seen_at": 1, "paid": 1, "is_test": 1}).sort("created_at", -1).limit(LIMIT):
             rows.append({"member": f"{u.get('name') or '—'} <{u['email']}>" if super_ else pseudo(u["id"]), "created": _d(u.get("created_at")),
                          "seen": _d(u.get("last_seen_at")), "paid": "oui" if u.get("paid") else "non",
-                         "radar": "oui" if radar.get(u["id"]) else ("désactivé" if u["id"] in radar else "non configuré"), "city": city(u["id"])})
-        return MEMBER_COLS, rows
+                         "radar": "oui" if radar.get(u["id"]) else ("désactivé" if u["id"] in radar else "non configuré"), "city": city(u["id"]), "test": "TEST" if is_test(u) else ""})
+        return MEMBER_COLS + ([] if EXCLUDE.get() else [["test", "Compte de test"]]), rows
 
     async def offers(flt: dict, super_: bool):
         names = await who(super_)
         rows = [{"date": _d(o.get("analyzed_at")), "title": o.get("title"), "company": o.get("company"), "source": o.get("source"),
                  "ips": (o.get("ips") or {}).get("score"), "priority": (o.get("ips") or {}).get("priority") or "—",
                  "member": names.get(o["user_id"]) or pseudo(o["user_id"])}
-                async for o in db.radar_offers.find(flt, {"_id": 0, "user_id": 1, "analyzed_at": 1, "title": 1, "company": 1, "source": 1, "ips.score": 1, "ips.priority": 1})
+                async for o in db.radar_offers.find(uf(flt), {"_id": 0, "user_id": 1, "analyzed_at": 1, "title": 1, "company": 1, "source": 1, "ips.score": 1, "ips.priority": 1})
                 .sort("analyzed_at", -1).limit(LIMIT)]
         return OFFER_COLS, rows
 
     async def apps(flt: dict, super_: bool):
         names = await who(super_)
         rows = []
-        async for a in db.applications.find(flt, {"_id": 0, "user_id": 1, "created_at": 1, "ips": 1, "origin": 1, "parts.decision.poste": 1, "parts.decision.entreprise": 1}).sort("created_at", -1).limit(LIMIT):
+        async for a in db.applications.find(uf(flt), {"_id": 0, "user_id": 1, "created_at": 1, "ips": 1, "origin": 1, "parts.decision.poste": 1, "parts.decision.entreprise": 1}).sort("created_at", -1).limit(LIMIT):
             r = {"date": _d(a.get("created_at")), "member": names.get(a["user_id"]) or pseudo(a["user_id"]), "priority": (a.get("ips") or {}).get("priority") or "—",
                  "ips": (a.get("ips") or {}).get("score"), "origin": "Radar" if (a.get("origin") or {}).get("type") == "radar" else "Manuel"}
             if super_:
@@ -89,7 +90,7 @@ def create_trace_router(db):
         rows = [{"date": _d(r.get("at")), "member": names.get(r["user_id"]) or pseudo(r["user_id"]), "trigger": "Automatique" if r.get("trigger") == "quotidien" else "Manuel",
                  "fetched": r.get("fetched", 0), "new": r.get("new", 0), "analyzed": r.get("analyzed", 0), "skipped": r.get("skipped_limit", 0), "status": r.get("status"),
                  "alerts": len([k for k in (r.get("errors") or {}) if not k.startswith("_")])}
-                async for r in db.radar_runs.find(flt, {"_id": 0, "portals": 0, "by_source": 0}).sort("at", -1).limit(LIMIT)]
+                async for r in db.radar_runs.find(uf(flt), {"_id": 0, "portals": 0, "by_source": 0}).sort("at", -1).limit(LIMIT)]
         return RUN_COLS, rows
 
     async def events(type_, days, key=""):
@@ -123,8 +124,9 @@ def create_trace_router(db):
         return [["date", "Date"], ["score", "Score"], ["company", "Entreprise"], ["consent", "Consentement"], ["cv", "CV stocké"], ["ip", "IP (anon.)"]], rows
 
     @router.get("/trace")
-    async def trace(metric: str, key: str = "", days: int = 30, x_admin_password: str = Header(None)):
+    async def trace(metric: str, key: str = "", days: int = 30, include_test: bool = False, x_admin_password: str = Header(None)):
         _check_admin(x_admin_password)
+        await scope(db, include_test)
         sup = is_super()
         a7, a30 = _ago(7), _ago(30)
         since = _ago(days) if days else ""
@@ -147,10 +149,10 @@ def create_trace_router(db):
                 raise HTTPException(status_code=422, detail="Indicateur inconnu")
         elif metric.startswith("r_"):
             if metric in ("r_enabled", "r_configured"):
-                ids = {s["user_id"] async for s in db.radar_settings.find({"enabled": {"$ne": False}} if metric == "r_enabled" else {}, {"user_id": 1})}
+                ids = {s["user_id"] async for s in db.radar_settings.find(uf({"enabled": {"$ne": False}} if metric == "r_enabled" else {}), {"user_id": 1})}
                 title, (cols, rows) = ("Radar activé" if metric == "r_enabled" else "Radar configuré"), await members({}, sup, ids)
             elif metric == "r_members":
-                ids = set(await db.radar_runs.distinct("user_id", {"at": {"$gte": a30}}))
+                ids = set(await db.radar_runs.distinct("user_id", uf({"at": {"$gte": a30}})))
                 title, (cols, rows) = "Membres ayant utilisé le Radar (30 j)", await members({}, sup, ids)
             elif metric in ("r_runs", "r_auto", "r_manual"):
                 flt = {"at": {"$gte": a30}, **({"trigger": "quotidien"} if metric == "r_auto" else {"trigger": {"$ne": "quotidien"}} if metric == "r_manual" else {})}
@@ -176,7 +178,7 @@ def create_trace_router(db):
         elif metric in ("b_company", "b_portal"):
             names = await who(sup)
             rows = []
-            async for s in db.radar_settings.find({}, {"_id": 0, "user_id": 1, "companies": 1}):
+            async for s in db.radar_settings.find(uf(), {"_id": 0, "user_id": 1, "companies": 1}):
                 for c in s.get("companies") or []:
                     if not (isinstance(c, dict) and c.get("enabled", True) and c.get("name")):
                         continue
@@ -231,7 +233,11 @@ def create_trace_router(db):
             cols = [["date", "Date"], ["provider", "Fournisseur"], ["model", "Modèle"], ["feature", "Fonctionnalité"], ["tin", "Jetons entrée"], ["tout", "Jetons sortie"]]
         else:
             raise HTTPException(status_code=422, detail="Indicateur inconnu")
+        if not sup:
+            note = f"{note + ' ' if note else ''}Membres pseudonymisés pour votre rôle (aucun e-mail, aucun CV ni contenu de Career Memory)."
+        if EXCLUDE.get():
+            note = f"{note + ' ' if note else ''}Comptes de test exclus ({len(EXCLUDE.get())} compte(s), adresses @careeros.dev ou marqués test)."
         return {"title": title, "cols": cols, "rows": rows, "total": len(rows), "truncated": len(rows) >= LIMIT,
-                "note": note or (None if sup else "Membres pseudonymisés pour votre rôle (aucun e-mail, aucun CV ni contenu de Career Memory).")}
+                "note": note}
 
     return router
