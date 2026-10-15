@@ -6,7 +6,7 @@ from fastapi import APIRouter, Header
 from . import radar_sources as S
 from .radar_discovery import KIND_LABEL, norm
 
-NOW_SUPPORTED = {"UKG", "Avature", "Taleo", "Phenom"}  # older detections to re-run (loupe / « Tout détecter »)
+NOW_SUPPORTED = {"UKG", "Avature", "Taleo", "Phenom", "portail propriétaire"}  # older detections to re-run (loupe / « Tout détecter »)
 
 DIFFICULTY = {"UKG": ("Simple", 1.0), "Jobvite": ("Simple", 1.0), "Avature": ("Moyenne", 0.7), "Taleo": ("Moyenne", 0.7),
               "Njoyn": ("Moyenne", 0.7), "SilkRoad": ("Moyenne", 0.7), "Phenom": ("Difficile", 0.4), "portail propriétaire": ("Difficile", 0.3)}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CheckCircle2, Link2, Loader2, Search, TriangleAlert } from "lucide-react";
 import { radar } from "@/lib/careeros";
+import { InfoTip } from "@/components/careeros/guide/InfoTip";
 
 const inputCls = "w-full rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-indigo-400/60";
 const ORIGIN = { annuaire: "annuaire", site: "site carrières", devinette: "détection automatique" };
@@ -53,7 +54,7 @@ const SuggestBox = ({ c, i, result, onResult, onPick, onClose, auto }) => {
       </div>
       {busy && <p className="text-[11px] text-slate-400">Recherche du portail (annuaire, site carrières, portails publics)… jusqu'à 30 secondes.</p>}
       {result && !busy && <>
-        {(result.candidates || []).length > 0 && <p className="text-[11px] text-slate-400" data-testid={`portal-count-${i}`}>{result.candidates.length} proposition(s) · {result.candidates.filter((p) => p.ok).length} lisible(s)</p>}
+        {(result.candidates || []).length > 0 && <p className="flex items-center text-[11px] text-slate-400" data-testid={`portal-count-${i}`}>{result.candidates.length} proposition(s) · {result.candidates.filter((p) => p.ok).length} lisible(s)<InfoTip k="associer" /></p>}
         <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1" data-testid={`portal-results-${i}`}>
         {(result.candidates || []).map((p, k) => (
           <div key={`${p.kind}-${p.slug}`} className="flex flex-wrap items-center gap-2 rounded-lg border border-white/[0.06] bg-black/20 p-2 text-[11px] sm:flex-nowrap" data-testid={`portal-candidate-${i}-${p.kind}${k ? `-${k}` : ""}`}>

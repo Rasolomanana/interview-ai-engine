@@ -1,3 +1,5 @@
+import { InfoTip } from "@/components/careeros/guide/InfoTip";
+
 export const SOURCES = [["jooble", "Jooble"], ["workday", "Workday"], ["boards", "Sites carrières"], ["adzuna", "Adzuna"]];
 
 const state = (k, status) => {
@@ -8,7 +10,7 @@ const state = (k, status) => {
 
 export const SourceStatus = ({ status, run }) => (
   <section className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4" data-testid="radar-source-status">
-    <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">Sources</p>
+    <p className="mb-3 flex items-center font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">Sources<InfoTip k="sources" /></p>
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {SOURCES.map(([k, l]) => {
         const s = state(k, status);

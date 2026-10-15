@@ -1,6 +1,7 @@
 import { KIND_LABEL } from "@/lib/portals";
 import { useState } from "react";
-import { Building2, CheckCircle2, Loader2, Plus, Search, Trash2, Upload, Wand2 } from "lucide-react";
+import { Building2, CheckCircle2, Loader2, Plus, RefreshCw, Search, Trash2, Upload, Wand2 } from "lucide-react";
+import { InfoTip } from "@/components/careeros/guide/InfoTip";
 import { toast } from "sonner";
 import { radar } from "@/lib/careeros";
 import { PortalSuggest, discoverFor } from "@/components/careeros/PortalSuggest";
@@ -9,6 +10,7 @@ import { CompanySummary, detectedLabel } from "@/components/careeros/CompanySumm
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400/60";
 const KIND = KIND_LABEL;
+const REDETECT = (c) => /^(Non pris en charge|Illisible)/.test(c.detected || "");
 
 export const parseImport = (text) => text.split("\n").flatMap((l) => (/https?:|\|/.test(l) ? [l] : l.split(","))).map((l) => l.trim()).filter(Boolean).map((l) => {
   const [name, url = ""] = l.split(/\s*[|\t;]\s*/);
@@ -63,9 +65,9 @@ export const CompanyManager = ({ companies, setCompanies }) => {
   const [results, setResults] = useState({});
   const [dir, setDir] = useState(false);
   const [scan, setScan] = useState(null);
-  const detectAll = async () => {
-    const todo = companies.map((c, i) => [c, i]).filter(([c]) => c.enabled && !c.kind);
-    if (!todo.length) { toast.message("Toutes les entreprises actives ont déjà un portail."); return; }
+  const detectAll = async (only) => {
+    const todo = companies.map((c, i) => [c, i]).filter(([c]) => c.enabled && !c.kind && (!only || only(c)));
+    if (!todo.length) { toast.message(only ? "Aucune entreprise non prise en charge ou illisible à re-détecter." : "Toutes les entreprises actives ont déjà un portail."); return; }
     let found = 0;
     const det = {};
     for (let k = 0; k < todo.length; k++) {
@@ -91,13 +93,16 @@ export const CompanyManager = ({ companies, setCompanies }) => {
   const add = () => { if (!name.trim()) return; setCompanies(mergeCompanies(companies, [{ name: name.trim(), enabled: true, portal_url: url.trim(), kind: "", slug: "" }])); setName(""); setUrl(""); };
   const doImport = () => { const items = parseImport(bulk); setCompanies(mergeCompanies(companies, items)); toast.success(`${items.length} entreprise(s) importée(s)`); setBulk(""); setImporting(false); };
   const active = companies.filter((c) => c.enabled).length;
+  const redetectN = companies.filter((c) => c.enabled && !c.kind && REDETECT(c)).length;
   return (
     <div className="space-y-2" data-testid="radar-company-manager">
       <div className="flex items-center justify-between">
-        <p className="text-slate-300">Entreprises suivies <span className="text-slate-500" data-testid="radar-company-count">({active}/{companies.length} actives)</span></p>
+        <p className="flex items-center text-slate-300">Entreprises suivies<InfoTip k="loupe" /><span className="ml-1 text-slate-500" data-testid="radar-company-count">({active}/{companies.length} actives)</span></p>
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" onClick={() => setDir(!dir)} className="flex items-center gap-1 text-indigo-300" data-testid="radar-directory-toggle"><Building2 className="h-3.5 w-3.5" />Annuaire</button>
-          <button type="button" onClick={detectAll} disabled={!!scan} className="flex items-center gap-1 text-indigo-300 disabled:opacity-60" data-testid="radar-detect-all-btn">{scan ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}{scan ? `Détection ${scan}` : "Tout détecter"}</button>
+          <button type="button" onClick={() => detectAll()} disabled={!!scan} className="flex items-center gap-1 text-indigo-300 disabled:opacity-60" data-testid="radar-detect-all-btn">{scan ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}{scan ? `Détection ${scan}` : "Tout détecter"}</button>
+          <button type="button" onClick={() => detectAll(REDETECT)} disabled={!!scan || !redetectN} className="flex items-center gap-1 text-indigo-300 disabled:opacity-40" data-testid="radar-redetect-btn" title="Relance la loupe sur les entreprises non prises en charge ou illisibles"><RefreshCw className="h-3.5 w-3.5" />Re-détecter ({redetectN})</button>
+          <InfoTip k="detection" />
           <button type="button" onClick={() => setImporting(!importing)} className="flex items-center gap-1 text-indigo-300" data-testid="radar-import-toggle"><Upload className="h-3.5 w-3.5" />Importer une liste</button>
         </div>
       </div>

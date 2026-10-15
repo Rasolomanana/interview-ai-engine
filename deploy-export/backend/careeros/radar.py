@@ -28,7 +28,7 @@ DEFAULT_SOURCES = ["jooble", "workday", "boards"]
 AI_TOP = int(os.environ.get("RADAR_AI_TOP") or 5)  # AI confirmation of the best rule-scored offers, per member per day
 DEEP_LIMIT = int(os.environ.get("RADAR_DEEP_LIMIT") or 20)  # extra on-demand AI analyses per member per day
 ACTIVE_DAYS = 7
-SOURCE_RANK = {"workday": 0, "successfactors": 0, "oracle": 1, "ukg": 1, "taleo": 1, "amazon": 1, "avature": 2, "phenom": 2, "smartrecruiters": 1, "icims": 2, "greenhouse": 2, "lever": 2, "ashby": 2,
+SOURCE_RANK = {"workday": 0, "successfactors": 0, "oracle": 1, "ukg": 1, "taleo": 1, "amazon": 1, "avature": 2, "phenom": 2, "schema": 1, "taleobe": 2, "smartrecruiters": 1, "icims": 2, "greenhouse": 2, "lever": 2, "ashby": 2,
                "jooble": 3, "adzuna": 4}
 
 
@@ -51,7 +51,7 @@ class Company(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     enabled: bool = True
     portal_url: str = Field(default="", max_length=400)
-    kind: str = Field(default="", pattern="^(|workday|successfactors|oracle|icims|ukg|taleo|avature|phenom|greenhouse|lever|ashby|smartrecruiters|amazon)$")
+    kind: str = Field(default="", pattern="^(|workday|successfactors|oracle|icims|ukg|taleo|avature|phenom|schema|taleobe|greenhouse|lever|ashby|smartrecruiters|amazon)$")
     slug: str = Field(default="", max_length=200)
     website: str = Field(default="", max_length=200)
     detected: str = Field(default="", max_length=160)
@@ -193,7 +193,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             for o in r:
                 if company and not S.company_match(o, company):
                     continue
-                if (company or o["source"] in ("greenhouse", "lever", "ashby", "icims", "taleo", "avature", "phenom")) and not S.matches(o, kw):
+                if (company or o["source"] in ("greenhouse", "lever", "ashby", "icims", "taleo", "avature", "phenom", "schema", "taleobe")) and not S.matches(o, kw):
                     continue
                 offers.append(o)
         if jooble_ok and not jooble_raw:

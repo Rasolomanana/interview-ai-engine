@@ -1,4 +1,5 @@
 import { TriangleAlert } from "lucide-react";
+import { InfoTip } from "@/components/careeros/guide/InfoTip";
 import { KIND_LABEL, QUALITY, qualityOf } from "@/lib/portals";
 
 export const PortalHealth = ({ status, run }) => {
@@ -10,7 +11,7 @@ export const PortalHealth = ({ status, run }) => {
   return (
     <section className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4" data-testid="radar-portal-health">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-5 gap-y-1">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">Portails employeurs</p>
+        <p className="flex items-center font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">Portails employeurs<InfoTip k="portails" /></p>
         <span className="text-xs text-slate-300" data-testid="portal-configured">{configured} configuré(s)</span>
         <span className="text-xs text-slate-300" data-testid="portal-success-rate">Lecture réussie : {rate === null ? "—" : `${ok}/${portals.length} (${rate} %)`}</span>
         <span className="text-xs text-slate-300">Offres : {portals.reduce((a, [, p]) => a + (p.fetched || 0), 0)} lues · {portals.reduce((a, [, p]) => a + (p.matched || 0), 0)} retenues</span>
@@ -20,6 +21,7 @@ export const PortalHealth = ({ status, run }) => {
           {Object.entries(QUALITY).map(([k, q]) => (
             <span key={k} className="flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-black/20 px-2.5 py-1 text-[11px] text-slate-300" data-testid={`portal-quality-${k}`}>
               <span className={`h-2 w-2 rounded-full ${q.dot}`} />{q.label} : <b className="text-white">{counts[k] || 0}</b></span>))}
+          <InfoTip k="qualite" className="self-center" />
         </div>)}
       {portals.length === 0 ? <p className="text-xs text-slate-500" data-testid="portal-none">Aucun portail lu au dernier passage. Ajoutez des entreprises depuis l'annuaire ou « Trouver le portail » dans les réglages.</p> : (
         <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">

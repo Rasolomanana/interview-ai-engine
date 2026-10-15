@@ -1,6 +1,7 @@
 import { KIND_LABEL } from "@/lib/portals";
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { InfoTip } from "@/components/careeros/guide/InfoTip";
 
 const KIND = KIND_LABEL;
 
@@ -34,7 +35,8 @@ export const CompanySummary = ({ companies }) => {
   const unsupported = jooble.filter((c) => (c.detected || "").startsWith("Non pris en charge") || (c.detected || "").startsWith("Illisible"));
   const blocked = active.filter((c) => (c.detected || "").startsWith("Bloqué"));
   return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" data-testid="company-summary">
+    <div className="relative grid gap-2 sm:grid-cols-2 lg:grid-cols-4" data-testid="company-summary">
+      <span className="absolute -top-5 right-0"><InfoTip k="couverture" /></span>
       <Group title="Via portail employeur" items={portal} tone="border-emerald-400/25 bg-emerald-500/5" testid="summary-portal" render={(c) => `${c.name} · ${KIND[c.kind] || c.kind}`} />
       <Group title="Suivies via Jooble" items={jooble} tone="border-white/10 bg-white/[0.02]" testid="summary-jooble" render={(c) => `${c.name}${c.detected ? ` · ${c.detected}` : " · non détectée"}`} />
       <Group title="Détectées mais non prises en charge" items={unsupported} tone="border-amber-400/25 bg-amber-500/5" testid="summary-unsupported" render={(c) => `${c.name} · ${c.detected.replace(/^(Non pris en charge|Illisible) : /, "")} (repli Jooble)`} />

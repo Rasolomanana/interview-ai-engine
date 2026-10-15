@@ -5,6 +5,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { radar } from "@/lib/careeros";
 import { CompanyManager } from "@/components/careeros/CompanyManager";
 import { SOURCES } from "@/components/careeros/SourceStatus";
+import { PageTour, TourButton, usePageTour } from "@/components/careeros/guide/PageTour";
+
+const SETTINGS_STEPS = [
+  { target: "company-summary", title: "Couverture", text: "Combien d'entreprises sont lues à la source, suivies via Jooble, non prises en charge ou bloquées. Cliquez une case pour la liste." },
+  { target: "radar-directory-toggle", title: "Annuaire", text: "Grands employeurs du Québec et du Canada dont le portail est déjà vérifié : ajout en un clic." },
+  { target: "radar-detect-all-btn", title: "Tout détecter / Re-détecter", text: "Lance la loupe sur toutes les entreprises sans portail, ou seulement sur celles non prises en charge (après l'arrivée d'un nouveau connecteur)." },
+  { target: "radar-company-find-0", title: "Loupe et Associer", text: "La loupe propose le portail officiel d'une entreprise. Cliquez « Associer » pour le relier : rien n'est associé sans votre clic." },
+  { target: "radar-settings-save-btn", title: "Enregistrer", text: "Vos associations sont prises en compte au prochain passage du Radar, une fois enregistrées." },
+];
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400/60";
 const csv = (a) => (a || []).join(", ");
@@ -14,6 +23,7 @@ export const RadarSettingsDialog = ({ onClose }) => {
   const [s, setS] = useState(null);
   const [busy, setBusy] = useState(false);
   const [initial, setInitial] = useState("");
+  const tour = usePageTour("radarSettingsTourDone");
   useEffect(() => { radar.settings().then((r) => { setS(r); setInitial(JSON.stringify(r)); }).catch((e) => toast.error(e.message)); }, []);
   const close = () => {
     if (s && JSON.stringify(s) !== initial && !window.confirm("Vos modifications ne sont pas enregistrées. Fermer sans enregistrer ?")) return;
@@ -35,7 +45,7 @@ export const RadarSettingsDialog = ({ onClose }) => {
   return (
     <Dialog open onOpenChange={close}>
       <DialogContent className="flex max-h-[94vh] flex-col gap-0 overflow-hidden border-white/10 bg-[#121520] p-0 text-slate-100 sm:max-w-3xl" data-testid="radar-settings-dialog">
-        <DialogHeader className="shrink-0 border-b border-white/[0.06] px-5 pb-3 pt-5 sm:px-6"><DialogTitle className="font-display">Réglages du Radar</DialogTitle>
+        <DialogHeader className="shrink-0 border-b border-white/[0.06] px-5 pb-3 pt-5 sm:px-6"><DialogTitle className="flex flex-wrap items-center gap-3 pr-6 font-display">Réglages du Radar<TourButton onClick={tour.open} testid="radar-settings-tour-btn">Visite</TourButton></DialogTitle>
           <DialogDescription className="text-xs text-slate-400">Sources officielles uniquement. Recherche quotidienne + à la demande.</DialogDescription></DialogHeader>
         {!s ? <Loader2 className="m-6 h-5 w-5 animate-spin text-indigo-400" /> : (<>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 text-xs sm:px-6" data-testid="radar-settings-body">
@@ -53,6 +63,7 @@ export const RadarSettingsDialog = ({ onClose }) => {
             </div>
             <CompanyManager companies={s.companies} setCompanies={(companies) => setS({ ...s, companies })} />
           </div>
+          <PageTour tour={tour} steps={SETTINGS_STEPS} label="Visite des réglages" testid="radar-settings-tour" className="absolute bottom-20 right-4 z-[70]" />
           <div className="shrink-0 border-t border-white/[0.06] bg-[#121520] px-5 py-3 sm:px-6" data-testid="radar-settings-footer">
             <button onClick={save} disabled={busy} data-testid="radar-settings-save-btn" className="w-full rounded-xl bg-indigo-500 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">{busy ? "Enregistrement…" : "Enregistrer"}</button>
           </div>

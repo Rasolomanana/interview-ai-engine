@@ -10,6 +10,14 @@ export const GLOSSARY = {
   pack: { title: "Pack candidature", text: "En un clic : analyse ATS, IPS officiel, CV ATS et CV humain, lettre, questions d'entrevue, réponses STAR et simulation recruteur." },
   versions: { title: "Versions", text: "Chaque réanalyse crée une nouvelle version : rien n'est écrasé. Vous pouvez comparer l'évolution de l'IPS entre versions." },
   suivi: { title: "Suivi", text: "Brouillons d'e-mails (confirmation, remerciement, relance) et fichiers calendrier. Rien n'est envoyé ni ajouté sans votre validation." },
+  sources: { title: "Sources du Radar", text: "Jooble (agrégateur, source principale et repli), Workday et les autres sites carrières employeurs lus directement à la source, Adzuna en option. Le chiffre = offres trouvées au dernier passage." },
+  portails: { title: "Portails employeurs", text: "Les sites carrières de vos entreprises suivies, lus directement (Workday, SuccessFactors, Oracle, iCIMS, UKG, Taleo, Avature, Phenom, sites schema.org…). Une offre lue à la source est plus complète et plus fraîche qu'un extrait Jooble." },
+  qualite: { title: "Qualité de lecture", text: "Fiable : API ou flux structuré. Fragile : lecture « au mieux » d'une page web, résultats possiblement partiels. Bloquée : protection volontaire de l'employeur (403 / anti-robot), jamais contournée. Repli Jooble : lecture impossible, l'entreprise reste suivie via Jooble." },
+  compteurs: { title: "Compteurs du jour", text: "Cliquez un chiffre pour filtrer la liste. Analysées : règles (jusqu'à 50/jour) · IA (5 meilleures + analyses approfondies). Nouvelles et Déjà connues : résultat du dernier passage. Priorité A : à postuler en premier." },
+  couverture: { title: "Couverture des entreprises", text: "Via portail : lue à la source. Via Jooble : aucun portail associé. Non prises en charge : plateforme détectée mais pas encore lisible. Bloquées : l'employeur refuse les robots (403). Cliquez une case pour voir la liste." },
+  loupe: { title: "Trouver le portail (loupe)", text: "CareerOS cherche le portail officiel : annuaire, site web de l'entreprise, portails publics. Ajoutez le site web si rien n'est trouvé. Les suggestions vérifiées affichent le nombre d'offres visibles." },
+  associer: { title: "Associer", text: "Relie l'entreprise au portail proposé : ses offres seront lues directement à chaque passage. Rien n'est associé sans votre clic. Pensez à Enregistrer." },
+  detection: { title: "Annuaire, Tout détecter, Re-détecter", text: "Annuaire : grands employeurs déjà vérifiés, ajout en un clic. Tout détecter : lance la loupe sur toutes les entreprises sans portail. Re-détecter : relance seulement celles marquées non prises en charge ou illisibles (utile après l'ajout d'un nouveau connecteur)." },
   ics: { title: "Fichier .ics", text: "Fichier calendrier compatible Google Agenda, Outlook et Apple Calendrier : ouvrez-le pour ajouter l'entrevue vous-même." },
 };
 

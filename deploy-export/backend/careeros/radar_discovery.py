@@ -10,7 +10,7 @@ from . import radar_sources as S
 
 KIND_LABEL = {"workday": "Workday", "successfactors": "SuccessFactors", "oracle": "Oracle Recruiting", "icims": "iCIMS",
               "greenhouse": "Greenhouse", "lever": "Lever", "ashby": "Ashby", "smartrecruiters": "SmartRecruiters", "amazon": "amazon.jobs", "ukg": "UKG (UltiPro)",
-              "taleo": "Taleo", "avature": "Avature", "phenom": "Phenom"}
+              "taleo": "Taleo", "avature": "Avature", "phenom": "Phenom", "schema": "Site carrières (schema.org)", "taleobe": "Taleo Business Edition"}
 WD = lambda host, site: f"https://{host}.myworkdayjobs.com/fr-CA/{site}"  # noqa: E731
 SF = lambda host: f"https://{host}/services/rss/job/"  # noqa: E731
 # Portals checked live before being proposed. url "" = no public feed → followed via Jooble.
@@ -28,16 +28,18 @@ DIRECTORY = [
     ("Ubisoft", "https://careers.smartrecruiters.com/Ubisoft2", "Jeux vidéo"), ("Amazon", "https://www.amazon.jobs/fr", "Technologie"),
     ("Banque Nationale", "https://emplois.bnc.ca/fr_CA/careers/SearchJobs", "Finance"), ("Bell", "https://jobs.bell.ca/ca/fr/search-results", "Télécommunications"),
     ("Air Canada", "https://careers.aircanada.com/ca/fr/search-results", "Transport"),
-    ("Metro", "", "Alimentation"), ("CGI", "", "Technologie"),
+    ("Metro", "https://talent.metro.ca/sitemap.xml", "Alimentation"), ("Walmart Canada", WD("walmart.wd504", "WalmartExternal"), "Commerce de détail"),
+    ("CGI", "", "Technologie"),
 ]
-NO_FEED_ATS = {"Metro": "portail propriétaire", "CGI": "Njoyn"}
+NO_FEED_ATS = {"CGI": "Njoyn"}
 UNSUPPORTED = {"taleo.net": "Taleo", "phenompeople": "Phenom", "avature": "Avature", "njoyn": "Njoyn", "silkroad": "SilkRoad",
                "jobvite": "Jobvite"}
 ATS = [
     (r"https?://[a-z0-9-]+\.wd\d+\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?[A-Za-z0-9_-]+", None),
     (r"https?://[a-z0-9.-]+\.oraclecloud\.com/hcmUI/CandidateExperience/[a-zA-Z-]+/sites/[A-Za-z0-9_]+", None),
-    (r"https?://[a-z0-9-]+\.icims\.com", None), (r"https?://[a-z0-9-]+\.taleo\.net/careersection/[a-z0-9_]+/", None),
-    (r"https?://[a-z0-9.-]+/(?:[a-z]{2}_[A-Z]{2}/)?[A-Za-z0-9_-]+/SearchJobs", None), (r"https?://recruiting\d*\.ultipro\.(?:com|ca)/[A-Za-z0-9]+/JobBoard/[0-9a-f-]{36}", None), (r"https?://(?:boards|job-boards)\.greenhouse\.io/[a-z0-9_-]+", None),
+    (r"https?://(?!www\.|cdn\d*\.|images\.)[a-z0-9-]+\.icims\.com", None), (r"https?://[a-z0-9-]+\.taleo\.net/careersection/[a-z0-9_]+/", None),
+    (r"https?://[a-z0-9.-]+/(?:[a-z]{2}_[A-Z]{2}/)?[A-Za-z0-9_-]+/SearchJobs", None),
+    (r"https?://[a-z0-9]+\.tbe\.taleo\.net/[a-z0-9]+/ats/careers/v2/[A-Za-z]+\?[^\s\"'<>\\]+", None), (r"https?://recruiting\d*\.ultipro\.(?:com|ca)/[A-Za-z0-9]+/JobBoard/[0-9a-f-]{36}", None), (r"https?://(?:boards|job-boards)\.greenhouse\.io/[a-z0-9_-]+", None),
     (r"https?://jobs\.lever\.co/[a-z0-9_-]+", None), (r"https?://jobs\.ashbyhq\.com/[a-z0-9_.-]+", None),
     (r"https?://(?:jobs|careers)\.smartrecruiters\.com/[A-Za-z0-9_-]+", None),
 ]
@@ -90,6 +92,17 @@ async def verify(client, kind: str, slug: str, name: str) -> dict:
         return {"ok": False, "count": 0, "message": f"Portail {KIND_LABEL.get(kind, kind)} détecté mais illisible ({(str(e) or type(e).__name__)[:70]}) : Jooble reste utilisé en repli."}
 
 
+async def _sitemap(client, host: str) -> str:
+    _, robots = await _get(client, f"https://{host}/robots.txt")
+    for sm in re.findall(r"(?im)^sitemap:\s*(\S+)", robots)[:4] or [f"https://{host}/sitemap.xml"]:
+        try:
+            if await S.sitemap_jobs(client, sm):
+                return sm
+        except Exception:  # noqa: BLE001
+            continue
+    return ""
+
+
 async def _get(client, url):
     try:
         r = await client.get(url, headers=S.UA, timeout=8)
@@ -119,7 +132,7 @@ def _scan(url: str, text: str, found: dict, unsupported: set):
         if h:
             found.setdefault(("successfactors", h), SF(h))
     for k, label in UNSUPPORTED.items():
-        if k in text.lower():
+        if re.search(rf"https?://[^\"'\s<>]*{re.escape(k)}", text, re.I):  # a real link to the platform, not a mere mention
             unsupported.add(label)
 
 
@@ -135,8 +148,8 @@ async def discover(name: str, website: str = "") -> dict:
         vs = _variants(name)
         hosts = [re.sub(r"^https?://", "", website.strip(), flags=re.I)] if website else []
         for v in vs[:2]:
-            hosts += [f"{v}.com", f"{v}.ca", f"careers.{v}.com", f"jobs.{v}.com"]
-        hosts = list(dict.fromkeys(h for h in hosts if h))[:8]
+            hosts += [f"{v}.com", f"{v}.ca", f"careers.{v}.com", f"careers.{v}.ca", f"jobs.{v}.com"]
+        hosts = list(dict.fromkeys(h for h in hosts if h))[:10]
         pages = await asyncio.gather(*(_get(c, f"https://{h}") for h in hosts))
         extra = []
         for url, text in pages:
@@ -145,9 +158,16 @@ async def discover(name: str, website: str = "") -> dict:
                 links = list(dict.fromkeys(re.findall(r'href="([^"#]*(?:carri|career|emploi|jobs)[^"#]*)"', text, re.I)))
                 for l in links[:4]:
                     extra.append(l if l.startswith("http") else f"https://{S.host_of(url)}/{l.lstrip('/')}")
+        visited = [u for u, t in pages if t]
         for url, text in await asyncio.gather(*(_get(c, u) for u in list(dict.fromkeys(extra))[:8])):
             if text:
                 _scan(url, text, found, unsupported)
+                visited.append(url)
+        if not found:  # custom career site: public sitemap + schema.org JobPosting
+            career = [S.host_of(u) for u in visited if re.search(r"carri|career|emploi|jobs|talent", u, re.I)]
+            for sm in await asyncio.gather(*(_sitemap(c, h) for h in list(dict.fromkeys(career))[:3])):
+                if sm:
+                    found.setdefault(S.parse_portal(sm), sm)
         for key in found:
             origin.setdefault(key, "site")
         guesses = []
@@ -161,7 +181,7 @@ async def discover(name: str, website: str = "") -> dict:
             if v["ok"] and v["count"]:
                 found[(k, s)], origin[(k, s)] = "", "devinette"
         results = await asyncio.gather(*(verify(c, k, s, name) for k, s in found))
-    unsupported -= {KIND_LABEL[k] for k, _ in found}
+    unsupported -= {KIND_LABEL[k] for k, _ in found} | ({"Taleo"} if any(k == "taleobe" for k, _ in found) else set())
     out = []
     for ((k, s), url), v in zip(found.items(), results):
         if origin[(k, s)] == "devinette" or not url:

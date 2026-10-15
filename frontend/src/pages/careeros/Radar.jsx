@@ -6,7 +6,16 @@ import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { RadarSettingsDialog } from "@/components/careeros/RadarSettings";
 import { MoreMenu } from "@/components/careeros/guide/MoreMenu";
-import { ConceptRow } from "@/components/careeros/guide/InfoTip";
+import { ConceptRow, InfoTip } from "@/components/careeros/guide/InfoTip";
+import { PageTour, TourButton, usePageTour } from "@/components/careeros/guide/PageTour";
+
+const RADAR_STEPS = [
+  { target: "radar-settings-btn", title: "Réglages", text: "Postes visés, ville, sources et entreprises suivies. C'est ici que vous associez les portails employeurs." },
+  { target: "radar-run-btn", title: "Rechercher maintenant", text: "Lance un passage immédiat. Le Radar tourne aussi automatiquement chaque matin." },
+  { target: "radar-stats", title: "Compteurs", text: "Cliquez un chiffre pour filtrer la liste : analysées aujourd'hui, nouvelles, déjà connues, priorité A." },
+  { target: "radar-source-status", title: "Sources", text: "Offres trouvées par source au dernier passage : Jooble, Workday, autres sites carrières, Adzuna." },
+  { target: "radar-portal-health", title: "Portails employeurs", text: "Lecture de chaque portail : fiable, fragile, bloquée (403) ou repli Jooble. Survolez une ligne pour voir le détail." },
+];
 import { SourceStatus } from "@/components/careeros/SourceStatus";
 import { PortalHealth } from "@/components/careeros/PortalHealth";
 import { RadarHistory, TodayMarker } from "@/components/careeros/RadarHistory";
@@ -63,6 +72,7 @@ export default function Radar() {
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState(false);
+  const tour = usePageTour("radarTourDone");
   const load = useCallback(() => radar.dashboard().then(setD).catch((e) => toast.error(e.message)), []);
   const running = d?.last_run?.status === "running";
   const [runs, setRuns] = useState(null);
@@ -99,15 +109,17 @@ export default function Radar() {
           <p className="mt-2 max-w-xl text-sm text-slate-400">CareerOS cherche chaque jour pour vous, pré-analyse chaque offre par règles (sans IA), fait confirmer par l'IA les 5 meilleures du jour, et classe les offres par IPS Radar (provisoire, sur les critères évaluables avant candidature). L'IPS officiel est recalculé dans le pack complet, qui n'est généré que si vous le demandez.</p>
           <ConceptRow keys={["ips_radar", "priorite", "regles", "deep", "extrait"]} />
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setSettings(true)} data-testid="radar-settings-btn" className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-slate-300 hover:text-white"><Settings2 className="h-4 w-4" />Réglages</button>
+        <div className="flex flex-wrap gap-2">
+          <TourButton onClick={tour.open} testid="radar-tour-btn" />
+          <button onClick={() => { tour.close(); setSettings(true); }} data-testid="radar-settings-btn" className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-slate-300 hover:text-white"><Settings2 className="h-4 w-4" />Réglages</button>
           <button onClick={runNow} disabled={running} data-testid="radar-run-btn" className="flex items-center gap-2 rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <RadarIcon className="h-4 w-4" />}{running ? "Recherche en cours…" : "Rechercher maintenant"}</button>
         </div>
       </div>
       {!d ? <Loader2 className="h-5 w-5 animate-spin text-indigo-400" /> : (
         <div className="space-y-8">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="relative grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="radar-stats">
+            <span className="absolute -top-5 right-0"><InfoTip k="compteurs" /></span>
             <StatFilter label="Analysées aujourd'hui (règles · IA)" value={`${d.analyzed_today} · ${d.ai_today ?? 0}/${d.deep_limit ?? 0}`} testid="radar-stat-analyzed" active={f === "analyzed"} onClick={() => pick("analyzed")} />
             <StatFilter label="Nouvelles (dernier passage)" value={lr?.new ?? 0} testid="radar-stat-new" active={f === "new"} onClick={() => pick("new")} />
             <StatFilter label="Déjà connues" value={lr?.known ?? 0} testid="radar-stat-known" active={f === "known"} onClick={() => pick("known")} />
@@ -128,6 +140,7 @@ export default function Radar() {
           <RadarHistory runs={runs} />
         </div>
       )}
+      {d && !settings && <PageTour tour={tour} steps={RADAR_STEPS} label="Visite du Radar" testid="radar-tour" />}
       {settings && <RadarSettingsDialog onClose={() => { setSettings(false); load(); }} />}
     </Shell>
   );
