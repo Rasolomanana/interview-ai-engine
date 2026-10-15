@@ -412,10 +412,10 @@ async def adzuna(client, what: str, where: str, company: str = "", max_days: int
 JOOBLE_HOST = os.environ.get("JOOBLE_HOST") or "ca.jooble.org"  # keys are country-specific: ca.jooble.org = Canada
 
 
-async def jooble(client, what: str, where: str, company: str = ""):
+async def jooble(client, what: str, where: str, company: str = "", page: int = 1):
     if not configured()["jooble"]:
         return []
-    body = {"keywords": company or what, "location": where, "page": 1, "ResultOnPage": 50}
+    body = {"keywords": company or what, "location": where, "page": page, "ResultOnPage": 50}
     if company:
         body["companysearch"] = True
     r = await client.post(f"https://{JOOBLE_HOST}/api/{os.environ['JOOBLE_API_KEY']}", json=body)

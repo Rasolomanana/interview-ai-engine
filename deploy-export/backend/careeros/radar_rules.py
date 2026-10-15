@@ -252,3 +252,34 @@ def requirements(offer: dict, cv: str, profile: dict) -> list:
     if offer.get("location"):
         out.append({"label": f"Lieu : {offer['location'][:60]}", "status": "missing" if loc_msg else "ok", "evidence": loc_msg or "Compatible avec votre localisation"})
     return [{**r, "source": "regles"} for r in out[:16]]
+
+
+FAMILIES_SEARCH = [  # role family -> bilingual titles searched on Jooble when "recherche élargie" is on
+    (r"supervis|superviseur|chef|gestionnaire|manager|contremaitre|encadrement|operation|logisti|distribution|entrepot|warehouse|transport|expedition",
+     ["superviseur des opérations", "operations supervisor", "chef des opérations", "superviseur centre de distribution",
+      "warehouse supervisor", "superviseur logistique", "logistics manager", "gestionnaire des opérations", "superviseur entrepôt", "distribution supervisor"]),
+    (r"analys|donnees|data|bi\b|business intelligence|reporting",
+     ["analyste de données", "data analyst", "analyste d'affaires", "business analyst", "analyste BI", "business intelligence analyst"]),
+    (r"projet|project|programme|program",
+     ["chargé de projet", "project manager", "gestionnaire de projet", "coordonnateur de projet", "project coordinator"]),
+    (r"approvisionn|achat|procurement|supply|purchas|acheteur|buyer",
+     ["acheteur", "buyer", "planificateur approvisionnement", "supply chain planner", "analyste approvisionnement", "procurement specialist"]),
+]
+
+
+def expand_terms(keywords: list, limit: int = 8) -> list:
+    """Member keywords first, then titles of the same role family (FR + EN), without duplicates."""
+    base = [k.strip() for k in keywords if k and k.strip()]
+    hay = norm(" ".join(base))
+    extra = [t for pat, titles in FAMILIES_SEARCH if re.search(pat, hay) for t in titles]
+    seen, out = set(), []
+    for t in base + extra:
+        if norm(t) not in seen:
+            seen.add(norm(t))
+            out.append(t)
+    return out[:max(limit, len(base[:3]))]
+
+
+def title_relevance(title: str, roles: list) -> float:
+    tw = _words(title)
+    return max((len(tw & _words(r)) / max(1, len(_words(r))) for r in roles if r), default=0)

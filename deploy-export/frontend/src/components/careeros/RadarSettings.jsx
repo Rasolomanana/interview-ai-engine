@@ -32,8 +32,8 @@ export const RadarSettingsDialog = ({ onClose }) => {
   const save = async () => {
     setBusy(true);
     try {
-      const { enabled, keywords, location, companies, sources } = s;
-      const r = await radar.saveSettings({ enabled, keywords, location, companies: companies.filter((c) => c.name.trim()), sources });
+      const { enabled, keywords, location, companies, sources, expand } = s;
+      const r = await radar.saveSettings({ enabled, keywords, location, companies: companies.filter((c) => c.name.trim()), sources, expand: expand !== false });
       const n = (f) => r.companies.filter((c) => c.enabled && f(c)).length;
       const bad = r.companies.filter((c) => c.portal_url && !c.kind).map((c) => c.name);
       toast.success(`Réglages enregistrés : ${n((c) => c.kind === "workday")} portail(s) Workday, ${n((c) => c.kind && c.kind !== "workday")} autre(s) portail(s) employeur, ${n((c) => !c.kind)} entreprise(s) via Jooble.`);
@@ -51,6 +51,12 @@ export const RadarSettingsDialog = ({ onClose }) => {
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 text-xs sm:px-6" data-testid="radar-settings-body">
             <label className="flex items-center gap-2 text-slate-300"><input type="checkbox" className="accent-indigo-500" checked={s.enabled} onChange={(e) => setS({ ...s, enabled: e.target.checked })} data-testid="radar-enabled-checkbox" />Recherche quotidienne automatique</label>
             <label className="block text-slate-400">Mots-clés / postes visés (virgules)<input defaultValue={csv(s.keywords)} onBlur={(e) => setS({ ...s, keywords: list(e.target.value) })} className={`${inputCls} mt-1`} data-testid="radar-keywords-input" /></label>
+            <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3" data-testid="radar-expand-box">
+              <label className="flex items-center gap-2 text-slate-300"><input type="checkbox" className="accent-indigo-500" checked={s.expand !== false} onChange={(e) => setS({ ...s, expand: e.target.checked })} data-testid="radar-expand-checkbox" />
+                Recherche élargie : titres équivalents en français et en anglais (jusqu'à 8 recherches Jooble, 2 pages chacune)</label>
+              {s.expand !== false && s.expanded?.length > 0 && <p className="mt-2 flex flex-wrap gap-1" data-testid="radar-expanded-terms">{s.expanded.map((t) => <span key={t} className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-slate-300">{t}</span>)}</p>}
+              <p className="mt-1 text-[11px] text-slate-500">Calculé à partir de vos mots-clés enregistrés. Seules les 50 offres aux titres les plus proches de vos postes visés sont analysées chaque jour.</p>
+            </div>
             <label className="block text-slate-400">Localisation<input value={s.location} onChange={(e) => setS({ ...s, location: e.target.value })} className={`${inputCls} mt-1`} data-testid="radar-location-input" /></label>
             <div className="flex flex-wrap gap-2" data-testid="radar-sources">
               {SOURCES.map(([k, l]) => {

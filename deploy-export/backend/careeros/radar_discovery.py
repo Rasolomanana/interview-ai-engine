@@ -28,11 +28,11 @@ DIRECTORY = [
     ("Ubisoft", "https://careers.smartrecruiters.com/Ubisoft2", "Jeux vidéo"), ("Amazon", "https://www.amazon.jobs/fr", "Technologie"),
     ("Banque Nationale", "https://emplois.bnc.ca/fr_CA/careers/SearchJobs", "Finance"), ("Bell", "https://jobs.bell.ca/ca/fr/search-results", "Télécommunications"),
     ("Air Canada", "https://careers.aircanada.com/ca/fr/search-results", "Transport"),
-    ("Metro", "https://talent.metro.ca/sitemap.xml", "Alimentation"), ("Walmart Canada", WD("walmart.wd504", "WalmartExternal"), "Commerce de détail"),
+    ("Metro", "https://talent.metro.ca/sitemap.xml", "Alimentation"), ("Airbus", WD("ag.wd3", "Airbus"), "Aéronautique"), ("Walmart Canada", WD("walmart.wd504", "WalmartExternal"), "Commerce de détail"),
     ("CGI", "", "Technologie"),
 ]
 NO_FEED_ATS = {"CGI": "Njoyn"}
-UNSUPPORTED = {"taleo.net": "Taleo", "phenompeople": "Phenom", "avature": "Avature", "njoyn": "Njoyn", "silkroad": "SilkRoad",
+UNSUPPORTED = {"taleo.net": "Taleo", "phenompeople": "Phenom", "avature": "Avature", "njoyn": "Njoyn", "silkroad": "SilkRoad", "dayforcehcm": "Dayforce (API protégée)",
                "jobvite": "Jobvite"}
 ATS = [
     (r"https?://[a-z0-9-]+\.wd\d+\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?[A-Za-z0-9_-]+", None),
@@ -113,6 +113,8 @@ async def _get(client, url):
 
 def _scan(url: str, text: str, found: dict, unsupported: set):
     text = text.replace("\\/", "/")
+    if len(text) < 3000 and re.search(r"incapsula|_Incapsula_Resource|cf-chl|challenge-platform|Just a moment", text, re.I):
+        unsupported.add("site protégé (anti-robot)")
     for pat, _ in ATS:
         for m in re.findall(pat, f"{url} {text}", re.I):
             kind, slug = S.parse_portal(m)
@@ -181,6 +183,8 @@ async def discover(name: str, website: str = "") -> dict:
             if v["ok"] and v["count"]:
                 found[(k, s)], origin[(k, s)] = "", "devinette"
         results = await asyncio.gather(*(verify(c, k, s, name) for k, s in found))
+    if found:
+        unsupported.discard("site protégé (anti-robot)")
     unsupported -= {KIND_LABEL[k] for k, _ in found} | ({"Taleo"} if any(k == "taleobe" for k, _ in found) else set())
     out = []
     for ((k, s), url), v in zip(found.items(), results):

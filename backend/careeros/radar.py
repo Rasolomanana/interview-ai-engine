@@ -63,6 +63,7 @@ class RadarSettings(BaseModel):
     location: str = "Québec"
     companies: List[Company] = Field(default=[], max_length=100)
     sources: List[str] = DEFAULT_SOURCES
+    expand: bool = True  # recherche élargie : famille de titres FR/EN générée à partir des mots-clés
 
     @field_validator("companies", mode="before")
     @classmethod
@@ -156,7 +157,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
     async def _fetch(st: dict) -> tuple:
         offers, errors = [], {}
         kw = st.get("keywords") or []
-        terms = kw[:3] or ["analyste"]  # one Jooble query per keyword (joined keywords = AND search)
+        terms = (RR.expand_terms(kw) if st.get("expand", True) else kw[:3]) or ["analyste"]  # one Jooble query per term (joined = AND search)
         srcs, comps = _active_sources(st), [c for c in st["companies"] if c.get("enabled", True)]
         comps.sort(key=lambda co: bool(co.get("kind") and co.get("slug")))  # Jooble fallback first for companies without a readable portal
         sem = asyncio.Semaphore(6)
@@ -170,7 +171,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 tasks += [("adzuna", None, S.adzuna(c, " ".join(terms[:2]), st["location"]))]
                 tasks += [(f"adzuna:{co['name']}", co["name"], S.adzuna(c, " ".join(terms[:2]), st["location"], co["name"])) for co in comps[:JOOBLE_COMPANY_LIMIT]]
             if "jooble" in srcs:
-                tasks += [(f"jooble:{t}", None, S.jooble(c, t, st["location"])) for t in terms]
+                tasks += [(f"jooble:{t}#{pg}", None, S.jooble(c, t, st["location"], page=pg)) for t in terms for pg in (1, 2)]
                 tasks += [(f"jooble:{co['name']}", co["name"], S.jooble(c, "", st["location"], co["name"])) for co in comps[:JOOBLE_COMPANY_LIMIT]]
             for co in comps:
                 if co.get("kind") and co.get("slug") and ("workday" if co["kind"] == "workday" else "boards") in srcs:
@@ -194,7 +195,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             for o in r:
                 if company and not S.company_match(o, company):
                     continue
-                if (company or o["source"] in ("greenhouse", "lever", "ashby", "icims", "taleo", "avature", "phenom", "schema", "taleobe")) and not S.matches(o, kw):
+                if (company or o["source"] in ("greenhouse", "lever", "ashby", "icims", "taleo", "avature", "phenom", "schema", "taleobe")) and not S.matches(o, terms if st.get("expand", True) else kw):
                     continue
                 offers.append(o)
         if jooble_ok and not jooble_raw:
@@ -271,7 +272,9 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             fresh_ids = {d["id"] for d in fresh}
             backlog = [d async for d in db.radar_offers.find({"user_id": user_id, "ips": None, "status": "nouvelle"}, {"_id": 0}).sort("first_seen", -1).limit(DAILY_LIMIT * 4)
                        if d["id"] not in fresh_ids]  # offers deferred by an earlier daily limit
-            queue = sorted(fresh, key=_source_rank) + sorted(backlog, key=_source_rank)  # full descriptions first
+            roles = (st.get("keywords") or []) + [r for r in re.split(r"[,;/\n]", profile.get("target_roles") or "") if r.strip()]
+            rank = lambda d: (-round(RR.title_relevance(d.get("title", ""), roles), 1), _source_rank(d))  # noqa: E731 - closest titles analysed first
+            queue = sorted(fresh, key=rank) + sorted(backlog, key=rank)
             todo, run["skipped_limit"] = queue[:budget], max(0, len(queue) - budget)
             run["budget"] = budget
             if queue and not budget:
@@ -309,7 +312,66 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
     @router.get("/settings")
     async def get_settings(user: dict = Depends(current_user)):
         profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
-        return {**await _settings(user["id"], profile), "configured": S.configured(), "daily_limit": DAILY_LIMIT}
+        st = await _settings(user["id"], profile)
+        return {**st, "configured": S.configured(), "daily_limit": DAILY_LIMIT, "expanded": RR.expand_terms(st.get("keywords") or [])}
+
+    class CompareBody(BaseModel):
+        lines: str = Field(max_length=4000)
+
+    @router.post("/compare")
+    async def compare(body: CompareBody, user: dict = Depends(current_user)):
+        """Compare offers seen elsewhere (e.g. LinkedIn, typed by the member) with what the Radar found and scored."""
+        items = []
+        for ln in [x.strip() for x in body.lines.splitlines() if x.strip()][:12]:
+            parts = [p.strip(" -–—|:•") for p in re.split(r"\s+[-–—|:]\s+|\t", ln, maxsplit=1)]
+            items.append({"company": parts[0], "title": parts[1] if len(parts) > 1 else ""})
+        if not items:
+            raise HTTPException(status_code=422, detail="Indiquez une offre par ligne : « Entreprise – Titre ».")
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+        st = await _settings(user["id"], profile)
+        terms = RR.expand_terms(st.get("keywords") or []) if st.get("expand", True) else (st.get("keywords") or [])[:3]
+        since = (_now() - timedelta(days=45)).isoformat()
+        offers = [o async for o in db.radar_offers.find({"user_id": user["id"], "last_seen": {"$gte": since}}, {"_id": 0, "description": 0, "dedupe_key": 0, "user_id": 0})]
+        def cn(x):
+            return set(re.findall(r"[a-z0-9]+", RR.norm(re.sub(r"(?i)\b(inc|lt[ée]e|ltd|limited|canada|express|group|groupe|corporation|corp|the)\b\.?", "", x or ""))))
+
+        def same(a, b):
+            return bool(a and b and (a <= b or b <= a))
+
+        async def one(it):
+            co = cn(it["company"])
+            follow = next((c for c in st["companies"] if same(co, cn(c["name"]))), None)
+            cover = ({"state": "portail", "label": f"Suivie · portail {D.KIND_LABEL.get(follow['kind'], follow['kind'])}"} if follow and follow.get("kind")
+                     else {"state": "jooble", "label": "Suivie · via Jooble" + (f" ({follow['detected']})" if follow.get("detected") else "")} if follow
+                     else {"state": "aucune", "label": "Non suivie : couverte seulement par les recherches Jooble générales"})
+            cands = [o for o in offers if same(co, cn(o.get("company")))]
+            best = max(cands, key=lambda o: RR.title_relevance(o["title"], [it["title"]]) if it["title"] else 1, default=None)
+            if best and it["title"] and RR.title_relevance(best["title"], [it["title"]]) < 0.4:
+                best = None
+            res = {**it, "coverage": cover, "in_terms": bool(it["title"]) and RR.title_relevance(it["title"], terms) >= 0.5}
+            if best:
+                ips = best.get("ips") or {}
+                total = sum(r["weight"] for r in ips.get("criteria", [])) or 1
+                lost = sorted(ips.get("criteria", []), key=lambda r: r["points"] - r["weight"])[:3]
+                status = ("pack" if best["status"] == "pack" else "ignoree" if best["status"] == "ignoree" else "reportee" if not ips
+                          else "eliminee" if ips.get("knockout") else f"priorite_{ips.get('priority', 'C').lower()}")
+                return {**res, "found": True, "status": status, "offer": {k: best.get(k) for k in ("id", "title", "company", "location", "source", "method", "first_seen")},
+                        "ips": ips.get("score"), "priority": ips.get("priority"), "knockout": ips.get("knockout_detail") if ips.get("knockout") else "",
+                        "losses": [{"label": r["label"], "lost": round((r["weight"] - r["points"]) * 100 / total, 1), "why": r["justification"]} for r in lost]}
+            jooble = None
+            if S.configured()["jooble"] and it["title"]:
+                try:
+                    async with httpx.AsyncClient(timeout=S.TIMEOUT) as c:
+                        hits = await S.jooble(c, it["title"], st["location"])
+                    jooble = any(same(co, cn(h["company"])) for h in hits)
+                except Exception:  # noqa: BLE001
+                    jooble = None
+            why = ("Présente sur Jooble pour ce titre, mais le titre n'est pas dans vos recherches Radar : ajoutez-le aux mots-clés ou activez la recherche élargie." if jooble and not res["in_terms"]
+                   else "Présente sur Jooble et couverte par vos recherches : elle devrait apparaître au prochain passage (nouvelle offre ou au-delà des 100 premiers résultats)." if jooble
+                   else "Absente de Jooble pour votre ville : seule la source employeur (ou LinkedIn) la publie. Suivez l'entreprise et cherchez son portail avec la loupe." if jooble is False
+                   else "Jooble non vérifié (non configuré ou indisponible).")
+            return {**res, "found": False, "status": "non_trouvee", "jooble": jooble, "why": why}
+        return {"items": list(await asyncio.gather(*(one(it) for it in items))), "terms": terms, "location": st["location"]}
 
     @router.put("/settings")
     async def put_settings(body: RadarSettings, user: dict = Depends(current_user)):

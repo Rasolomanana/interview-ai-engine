@@ -88,6 +88,7 @@ export const radar = {
   deep: (id) => call(`/careeros/radar/offers/${id}/deep`, { method: "POST" }),
   explain: (id) => call(`/careeros/radar/offers/${id}/explain`),
   external: (b) => call("/careeros/radar/external", { method: "POST", body: b }),
+  compare: (lines) => call("/careeros/radar/compare", { method: "POST", body: { lines } }),
   detectPortal: (b) => call("/careeros/radar/portal/detect", { method: "POST", body: b }),
   discoverPortal: (b) => call("/careeros/radar/portal/discover", { method: "POST", body: b }),
   directory: () => call("/careeros/radar/directory"),

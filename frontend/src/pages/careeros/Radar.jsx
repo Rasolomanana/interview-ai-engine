@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardPaste, ExternalLink, EyeOff, ListChecks, Loader2, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
+import { ClipboardPaste, ExternalLink, GitCompare, EyeOff, ListChecks, Loader2, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
@@ -24,6 +24,7 @@ import { radar } from "@/lib/careeros";
 import { FilterBanner, StatFilter } from "@/components/careeros/StatFilter";
 import { ScoreExplain } from "@/components/careeros/explain/ScoreExplain";
 import { ExternalOffer } from "@/components/careeros/explain/ExternalOffer";
+import { CompareDialog } from "@/components/careeros/explain/CompareDialog";
 
 const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, deepId, busy }) => (
   <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4 min-w-0 break-words" data-testid={`radar-offer-${o.id}`}>
@@ -79,6 +80,7 @@ export default function Radar() {
   const tour = usePageTour("radarTourDone");
   const [explainId, setExplainId] = useState(null);
   const [ext, setExt] = useState(false);
+  const [cmp, setCmp] = useState(false);
   const load = useCallback(() => radar.dashboard().then(setD).catch((e) => toast.error(e.message)), []);
   const running = d?.last_run?.status === "running";
   const [runs, setRuns] = useState(null);
@@ -126,6 +128,7 @@ export default function Radar() {
         <div className="flex flex-wrap gap-2">
           <TourButton onClick={tour.open} testid="radar-tour-btn" />
           <button type="button" onClick={() => { tour.close(); setExt(true); }} className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs text-slate-300 hover:text-white" data-testid="radar-external-btn"><ClipboardPaste className="h-3.5 w-3.5" />Analyser une offre externe</button>
+          <button type="button" onClick={() => { tour.close(); setCmp(true); }} className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs text-slate-300 hover:text-white" data-testid="radar-compare-btn"><GitCompare className="h-3.5 w-3.5" />Comparer avec LinkedIn</button>
           <button onClick={() => { tour.close(); setSettings(true); }} data-testid="radar-settings-btn" className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-slate-300 hover:text-white"><Settings2 className="h-4 w-4" />Réglages</button>
           <button onClick={runNow} disabled={running} data-testid="radar-run-btn" className="flex items-center gap-2 rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <RadarIcon className="h-4 w-4" />}{running ? "Recherche en cours…" : "Rechercher maintenant"}</button>
@@ -157,6 +160,7 @@ export default function Radar() {
       )}
       {d && !settings && <PageTour tour={tour} steps={RADAR_STEPS} label="Visite du Radar" testid="radar-tour" />}
       <ScoreExplain id={explainId} onClose={() => { setExplainId(null); load(); }} onDeep={load} />
+      <CompareDialog open={cmp} onClose={() => setCmp(false)} onExplain={(id) => { setCmp(false); setExplainId(id); }} />
       <ExternalOffer open={ext} onClose={() => setExt(false)} onDone={(o) => { setExt(false); load(); setExplainId(o.id); }} />
       {settings && <RadarSettingsDialog onClose={() => { setSettings(false); load(); }} />}
     </Shell>
