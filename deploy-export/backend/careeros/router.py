@@ -46,6 +46,9 @@ class ProfileBody(BaseModel):
     full_name: str = ""
     headline: str = ""
     location: str = ""
+    country: str = Field(default="", max_length=60)
+    province: str = Field(default="", max_length=60)
+    city: str = Field(default="", max_length=80)
     cv_text: str = Field(default="", max_length=60000)
     goals: List[str] = []
     target_roles: str = ""
@@ -168,7 +171,11 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
     @router.get("/profile")
     async def get_profile(user: dict = Depends(current_user)):
         p = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0, "career_score": 0})
-        return {**ProfileBody().model_dump(), "skills_detected": [], **(p or {}), "user_id": user["id"]}
+        out = {**ProfileBody().model_dump(), "skills_detected": [], **(p or {}), "user_id": user["id"]}
+        if not (out["country"] or out["province"] or out["city"]):  # older profiles: pre-filled from the location, editable
+            from .geo import member_geo
+            out.update(member_geo(out))
+        return out
 
     @router.put("/profile")
     async def put_profile(body: ProfileBody, user: dict = Depends(current_user)):

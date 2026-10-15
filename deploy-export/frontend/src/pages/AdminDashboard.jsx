@@ -4,7 +4,12 @@ import {
   Lock, Users, PlayCircle, FileSearch, FileText, Mail, Cpu, Download,
   RefreshCw, LogOut, ShieldCheck,
 } from "lucide-react";
-import { adminLogin, adminStats, adminExport } from "@/lib/api";
+import { adminLogin, adminStats, adminExport, adminMe, isMemberAdmin } from "@/lib/api";
+import { tokens } from "@/lib/careeros";
+import { Overview } from "@/components/admin/insights/Overview";
+import { Geography } from "@/components/admin/insights/Geography";
+import { Business } from "@/components/admin/insights/Business";
+import { Roles, ROLE_LABEL } from "@/components/admin/insights/Roles";
 import { SimulationsTable } from "@/components/admin/SimulationsTable";
 import { LlmHealth } from "@/components/admin/LlmHealth";
 import { CreditCard } from "@/components/admin/CreditCard";
@@ -77,14 +82,16 @@ export default function AdminDashboard() {
   const load = async (password) => {
     setLoading(true);
     try {
-      const d = await adminStats(password);
-      setStats(d);
+      const m = await adminMe(password);
+      setMe(m);
+      setStats(m.sections.includes("activite") ? await adminStats(password) : null);
       setAuthed(true);
-      sessionStorage.setItem("adminPwd", password);
+      if (!isMemberAdmin()) sessionStorage.setItem("adminPwd", password);
     } catch (e) {
       setErr(friendlyErr(e));
       setAuthed(false);
       sessionStorage.removeItem("adminPwd");
+      sessionStorage.removeItem("adminMode");
     } finally {
       setLoading(false);
     }
@@ -92,7 +99,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const saved = sessionStorage.getItem("adminPwd");
-    if (saved) load(saved);
+    if (isMemberAdmin()) load("");
+    else if (saved) load(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -108,8 +116,15 @@ export default function AdminDashboard() {
     await load(pwd);
   };
 
+  const memberLogin = () => {
+    if (!tokens.get()?.access_token) { window.location.href = "/connexion?next=/admin"; return; }
+    setErr("");
+    sessionStorage.setItem("adminMode", "member");
+    load("");
+  };
   const logout = () => {
     sessionStorage.removeItem("adminPwd");
+    sessionStorage.removeItem("adminMode");
     setAuthed(false);
     setStats(null);
     setPwd("");
@@ -144,12 +159,21 @@ export default function AdminDashboard() {
           <button type="submit" disabled={loading || !pwd} data-testid="admin-login-btn" className="w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-amber-400 disabled:opacity-50">
             {loading ? "Connexion…" : "Se connecter"}
           </button>
+          <div className="my-4 flex items-center gap-2 text-[10px] uppercase tracking-widest text-slate-600"><span className="h-px flex-1 bg-white/10" />ou<span className="h-px flex-1 bg-white/10" /></div>
+          <button type="button" onClick={memberLogin} disabled={loading} data-testid="admin-member-login-btn" className="w-full rounded-xl border border-indigo-400/40 px-4 py-2.5 text-sm font-semibold text-indigo-200 hover:bg-indigo-500/10 disabled:opacity-50">
+            Se connecter avec mon compte CareerOS
+          </button>
+          <p className="mt-2 text-center text-[11px] text-slate-500">L'accès s'ouvre selon les rôles attribués par le Super Admin.</p>
           <a href="/careeros" className="mt-4 block text-center text-xs text-slate-500 hover:text-slate-300">← Retour à l'application</a>
         </form>
       </div>
     );
   }
 
+  const has = (sec) => (me?.sections || []).includes(sec);
+  const tabs = [["overview", "Tableau de bord", "overview", "overview"], ["geo", "Géographie", "geo", "geo"], ["business", "Analyse métier", "business", "business"],
+    ["activite", "Activité", "activity", "activite"], ["rentabilite", "Rentabilité CareerOS", "finance", "finance"], ["connecteurs", "Connecteurs", "connectors", "connecteurs"],
+    ["base", "Base commune", "knowledge", "connecteurs"], ["roles", "Rôles", "roles", "roles"]].filter((x) => has(x[3]));
   const t = stats?.totals || {};
   const llm = stats?.llm || { calls: 0, tokens_in: 0, tokens_out: 0, cost: 0, by_provider: {} };
   const byDay = (key, title) => setDetail({ title: `${title} · détail par jour (30 j)`, cols: [["day", "Jour"], ["v", title]],
@@ -166,35 +190,38 @@ export default function AdminDashboard() {
             <ShieldCheck className="h-6 w-6 text-emerald-400" />
             <h1 className="text-xl font-bold text-white">Tableau de bord administrateur</h1>
             <span className="rounded-md border border-white/10 bg-black/30 px-2 py-0.5 font-mono text-[10px] text-slate-400">rétention {stats?.retention_days ?? 90} j</span>
+            <span className="rounded-md border border-emerald-400/30 px-2 py-0.5 text-[10px] text-emerald-300" data-testid="admin-current-roles">{me?.name} · {(me?.roles || []).map((r) => ROLE_LABEL[r] || r).join(", ")}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ThemeToggle />
             <button onClick={() => load(sessionStorage.getItem("adminPwd"))} data-testid="admin-refresh-btn" className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs hover:border-white/20">
               <RefreshCw className="h-3.5 w-3.5" /> Rafraîchir
             </button>
+            {has("activite") && <>
             <button onClick={() => doExport("csv")} data-testid="admin-export-csv" className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-1.5 text-xs text-emerald-200 hover:border-emerald-400/50">
               <Download className="h-3.5 w-3.5" /> CSV
             </button>
             <button onClick={() => doExport("xlsx")} data-testid="admin-export-xlsx" className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-1.5 text-xs text-emerald-200 hover:border-emerald-400/50">
               <Download className="h-3.5 w-3.5" /> Excel
-            </button>
+            </button></>}
             <button onClick={logout} data-testid="admin-logout-btn" className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs hover:border-white/20">
               <LogOut className="h-3.5 w-3.5" /> Quitter
             </button>
           </div>
         </header>
 
-        <Tabs defaultValue="activite">
-        <TabsList className="mb-4 border border-white/10 bg-slate-900" data-testid="admin-tabs">
-          <TabsTrigger value="activite" data-testid="admin-tab-activity">Activité</TabsTrigger>
-          <TabsTrigger value="rentabilite" data-testid="admin-tab-finance">Rentabilité CareerOS</TabsTrigger>
-          <TabsTrigger value="connecteurs" data-testid="admin-tab-connectors">Connecteurs</TabsTrigger>
-          <TabsTrigger value="base" data-testid="admin-tab-knowledge">Base commune</TabsTrigger>
+        <Tabs defaultValue={tabs[0]?.[0]}>
+        <TabsList className="mb-4 h-auto flex-wrap border border-white/10 bg-slate-900" data-testid="admin-tabs">
+          {tabs.map(([v, label, id]) => <TabsTrigger key={v} value={v} data-testid={`admin-tab-${id}`}>{label}</TabsTrigger>)}
         </TabsList>
-        <TabsContent value="base"><KnowledgeBase /></TabsContent>
-        <TabsContent value="connecteurs"><Connectors /></TabsContent>
-        <TabsContent value="rentabilite"><FinanceDashboard /></TabsContent>
-        <TabsContent value="activite">
+        {has("overview") && <TabsContent value="overview"><Overview /></TabsContent>}
+        {has("geo") && <TabsContent value="geo"><Geography /></TabsContent>}
+        {has("business") && <TabsContent value="business"><Business /></TabsContent>}
+        {has("roles") && <TabsContent value="roles"><Roles /></TabsContent>}
+        {has("connecteurs") && <TabsContent value="base"><KnowledgeBase /></TabsContent>}
+        {has("connecteurs") && <TabsContent value="connecteurs"><Connectors /></TabsContent>}
+        {has("finance") && <TabsContent value="rentabilite"><FinanceDashboard /></TabsContent>}
+        {has("activite") && <TabsContent value="activite">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard icon={Users} label="Visiteurs" value={num(t.visitors)} accent="text-indigo-400" onClick={() => byDay("visitors", "Visiteurs")} />
           <StatCard icon={PlayCircle} label="Simulations" value={num(t.simulations)} accent="text-emerald-400" onClick={() => byDay("simulations", "Simulations")} />
@@ -203,7 +230,7 @@ export default function AdminDashboard() {
           <StatCard icon={Mail} label="Lettres" value={num(t.cover_letters)} accent="text-amber-400" onClick={() => byDay("cover_letters", "Lettres")} />
         </div>
 
-        <CreditCard />
+        {has("finance") && <CreditCard />}
         <LlmHealth />
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/60 p-5">
@@ -283,7 +310,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        </TabsContent>
+        </TabsContent>}
         </Tabs>
         <a href="/careeros" className="mt-6 block text-center text-xs text-slate-500 hover:text-slate-300">← Retour à l'application</a>
       </div>

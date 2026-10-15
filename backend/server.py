@@ -804,6 +804,13 @@ app.include_router(careeros_router)
 app.include_router(create_radar_router(db, current_member, _generate_text, _parse_json_object, careeros_router))
 app.include_router(create_journey_router(db, current_member))
 app.include_router(create_followup_router(db, current_member, _generate_text, _parse_json_object, careeros_router))
+from careeros.admin_rbac import create_rbac_router, make_rbac_middleware  # noqa: E402
+from careeros.admin_insights import create_insights_router  # noqa: E402
+from careeros.sharing import create_sharing_router  # noqa: E402
+app.include_router(create_rbac_router(db))
+app.include_router(create_insights_router(db))
+app.include_router(create_sharing_router(db, current_member))
+app.middleware("http")(make_rbac_middleware(db))
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,

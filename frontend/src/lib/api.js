@@ -1,6 +1,7 @@
 // Client-side data + generation layer. No backend: state machine runs locally,
 // generation goes directly to Google Gemini, persistence uses chrome.storage/localStorage.
 import * as store from "./storage";
+import { call as memberCall, tokens } from "./careeros";
 import { resolve as resolveState } from "./stateMachine";
 import { buildSystemMessage, buildTurnMessage } from "./promptClient";
 import { streamGemini, describeGeminiError } from "./gemini";
@@ -21,6 +22,9 @@ export function trackEvent(type, sessionId, meta) {
 }
 
 const ADMIN_BASE = () => `${process.env.REACT_APP_BACKEND_URL}/api/admin`;
+// Admin access: shared admin password (Super Admin) or the member's CareerOS account with admin roles.
+export const isMemberAdmin = () => sessionStorage.getItem("adminMode") === "member";
+const adminHeaders = (password) => (isMemberAdmin() ? { Authorization: `Bearer ${tokens.get()?.access_token || ""}` } : { "X-Admin-Password": password });
 
 export async function adminLogin(password) {
   const r = await fetch(`${ADMIN_BASE()}/login`, {
@@ -36,6 +40,7 @@ export async function adminLogin(password) {
 }
 
 async function adminCall(path, password, opts = {}) {
+  if (isMemberAdmin()) return memberCall(`/admin${path}`, { method: opts.method || "GET", body: opts.body ? JSON.parse(opts.body) : undefined });
   const r = await fetch(`${ADMIN_BASE()}${path}`, { ...opts, headers: { "X-Admin-Password": password, "Content-Type": "application/json", ...(opts.headers || {}) } });
   let d = {}; try { d = await r.json(); } catch { /* ignore */ }
   if (!r.ok) throw new Error(d?.detail || `Erreur ${r.status}`);
@@ -59,13 +64,20 @@ export const adminCatalogArchive = (pwd, kind, id, archived) => adminCall(`/fina
 export const adminCatalogDelete = (pwd, kind, id) => adminCall(`/finance-${kind}/${id}`, pwd, { method: "DELETE" });
 export const adminSetPaid = (pwd, id, paid) => adminCall(`/members/${id}/paid`, pwd, { method: "PUT", body: JSON.stringify({ paid }) });
 
+export const adminMe = (pwd) => adminCall("/me", pwd);
+export const adminInsights = (pwd, part, days) => adminCall(`/insights/${part}${days !== undefined ? `?days=${days}` : ""}`, pwd);
+export const adminRoles = (pwd, q = "") => adminCall(`/roles?q=${encodeURIComponent(q)}`, pwd);
+export const adminSetRoles = (pwd, id, roles) => adminCall(`/roles/${id}`, pwd, { method: "PUT", body: JSON.stringify({ roles }) });
+
 export async function adminLlmHealth(password) {
+  if (isMemberAdmin()) return memberCall("/admin/llm-health");
   const r = await fetch(`${ADMIN_BASE()}/llm-health`, { headers: { "X-Admin-Password": password } });
   if (!r.ok) throw new Error(`Erreur ${r.status}`);
   return r.json();
 }
 
 export async function adminStats(password) {
+  if (isMemberAdmin()) return memberCall("/admin/stats");
   const r = await fetch(`${ADMIN_BASE()}/stats`, { headers: { "X-Admin-Password": password } });
   if (!r.ok) {
     let d = ""; try { d = (await r.json())?.detail || ""; } catch { /* ignore */ }
@@ -75,7 +87,7 @@ export async function adminStats(password) {
 }
 
 export async function adminExport(password, fmt) {
-  const r = await fetch(`${ADMIN_BASE()}/export?fmt=${fmt}`, { headers: { "X-Admin-Password": password } });
+  const r = await fetch(`${ADMIN_BASE()}/export?fmt=${fmt}`, { headers: adminHeaders(password) });
   if (!r.ok) throw new Error(`Export échoué (${r.status})`);
   const blob = await r.blob();
   const a = document.createElement("a");

@@ -8,6 +8,7 @@ import os
 import io
 import csv
 import hmac
+import contextvars
 import re
 import logging
 from collections import Counter
@@ -88,7 +89,12 @@ async def record_ats_submission(db, session_id, ip_trunc, consent, score, ats_re
         pass
 
 
+ADMIN_CTX = contextvars.ContextVar("admin_ctx", default=None)  # set by the RBAC middleware for members holding an admin role
+
+
 def _check_admin(pwd):
+    if ADMIN_CTX.get() and not pwd:
+        return
     admin_pwd = _admin_password()
     if not admin_pwd:
         raise HTTPException(status_code=403, detail="Espace admin désactivé (ADMIN_PASSWORD non défini)")

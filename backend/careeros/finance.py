@@ -586,7 +586,9 @@ def create_finance_router(db, check_admin, credits_fn=None):
     @router.put("/members/{user_id}/paid")
     async def set_paid(user_id: str, body: PaidBody, x_admin_password: str = Header(None)):
         check_admin(x_admin_password)
-        r = await db.users.update_one({"id": user_id}, {"$set": {"paid": body.paid}})
+        prev = await db.users.find_one({"id": user_id}, {"_id": 0, "paid": 1, "paid_since": 1}) or {}
+        upd = {"$set": {"paid": True, **({} if prev.get("paid") and prev.get("paid_since") else {"paid_since": datetime.now(timezone.utc).isoformat()})}} if body.paid else {"$set": {"paid": False}, "$unset": {"paid_since": ""}}
+        r = await db.users.update_one({"id": user_id}, upd)
         if not r.matched_count:
             raise HTTPException(status_code=404, detail="Membre introuvable")
         return {"ok": True}

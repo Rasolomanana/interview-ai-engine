@@ -152,7 +152,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         if s:
             return _normalize(s)
         roles = [r.strip() for r in re.split(r"[,;/]", profile.get("target_roles") or "") if r.strip()]
-        return {"user_id": user_id, **RadarSettings(keywords=roles[:5], location=profile.get("location") or "Québec").model_dump()}
+        return {"user_id": user_id, **RadarSettings(keywords=roles[:5], location=profile.get("location") or profile.get("city") or profile.get("province") or "Québec").model_dump()}
 
     def _active_sources(st: dict) -> list:
         conf = S.configured()

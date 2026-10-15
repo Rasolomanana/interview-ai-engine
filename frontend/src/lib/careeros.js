@@ -60,6 +60,13 @@ export const auth = {
   logout: () => tokens.clear(),
 };
 
+export const sharing = {
+  list: () => call("/careeros/sharing"),
+  grant: (b) => call("/careeros/sharing", { method: "POST", body: b }),
+  revoke: (id) => call(`/careeros/sharing/${id}`, { method: "DELETE" }),
+  view: (id) => call(`/careeros/sharing/${id}/view`),
+};
+
 export const careeros = {
   meta: () => call("/careeros/meta", { auth: false }),
   getProfile: () => call("/careeros/profile"),

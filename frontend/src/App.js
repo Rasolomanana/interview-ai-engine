@@ -14,8 +14,18 @@ import PackView from "@/pages/careeros/PackView";
 import Profile from "@/pages/careeros/Profile";
 import { useTheme } from "@/components/careeros/ThemeToggle";
 import Radar from "@/pages/careeros/Radar";
+import { trackEvent } from "@/lib/api";
 
 const member = (el) => <RequireMember>{el}</RequireMember>;
+
+// Anonymous visit ping, once per browser session (conversion funnel: visitors).
+try {
+  if (!sessionStorage.getItem("cos.visit")) {
+    const sid = crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+    sessionStorage.setItem("cos.visit", sid);
+    trackEvent("visit", sid);
+  }
+} catch { /* ignore */ }
 
 function App() {
   const theme = useTheme();
