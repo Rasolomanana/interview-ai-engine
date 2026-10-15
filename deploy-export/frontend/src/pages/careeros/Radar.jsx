@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardPaste, ExternalLink, GitCompare, EyeOff, ListChecks, Loader2, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
+import { ClipboardPaste, ExternalLink, GitCompare, TriangleAlert, Wrench, Zap, EyeOff, ListChecks, Loader2, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
@@ -64,9 +64,32 @@ const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, deepId, busy }) => 
   </article>
 );
 
-const Section = ({ title, items, testid, ...p }) => (
+const TONES = {
+  a: { box: "border-emerald-400/40 bg-emerald-500/10", bar: "bg-emerald-400", text: "text-emerald-200", chip: "bg-emerald-400 text-emerald-950", icon: Zap, cta: "Agir maintenant" },
+  b: { box: "border-amber-400/30 bg-amber-500/[0.07]", bar: "bg-amber-400", text: "text-amber-200", chip: "bg-amber-400 text-amber-950", icon: Wrench, cta: "Optimiser puis postuler" },
+  c: { box: "border-rose-400/25 bg-rose-500/[0.06]", bar: "bg-rose-400", text: "text-rose-200", chip: "bg-rose-400/80 text-rose-950", icon: TriangleAlert, cta: "À éviter" },
+};
+
+const SectionHead = ({ title, n, tone }) => {
+  const t = TONES[tone];
+  const urgent = tone === "a" && n > 0;
+  return (
+    <div className={`relative flex items-center gap-3 overflow-hidden rounded-xl border px-4 py-3 ${t.box} ${urgent ? "radar-urgent" : ""}`} data-testid={`radar-section-head-${tone}`}>
+      <span className={`absolute inset-y-0 left-0 w-1 ${t.bar}`} />
+      <span className="relative flex h-7 w-7 shrink-0 items-center justify-center">
+        {urgent && <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${t.bar} opacity-40`} />}
+        <t.icon className={`relative h-4 w-4 ${t.text}`} />
+      </span>
+      <h2 className={`min-w-0 flex-1 text-sm font-semibold ${t.text}`}>{title}</h2>
+      <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums ${t.chip} ${urgent ? "animate-pulse" : ""}`} data-testid={`radar-section-count-${tone}`}>{n}</span>
+      {n > 0 && <span className={`hidden text-[11px] font-semibold uppercase tracking-wider sm:inline ${t.text}`}>{t.cta}</span>}
+    </div>
+  );
+};
+
+const Section = ({ title, items, testid, tone, ...p }) => (
   <section className="space-y-3" data-testid={testid}>
-    <h2 className="text-sm font-semibold text-slate-200">{title} <span className="text-slate-500">({items.length})</span></h2>
+    {tone ? <SectionHead title={title} n={items.length} tone={tone} /> : <h2 className="text-sm font-semibold text-slate-200">{title} <span className="text-slate-500">({items.length})</span></h2>}
     {items.length === 0 ? <p className="text-xs text-slate-500">Aucune opportunité.</p> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{items.map((o) => <OfferCard key={o.id} o={o} {...p} />)}</div>}
   </section>
 );
@@ -151,9 +174,9 @@ export default function Radar() {
             <FilterBanner label={FILTERS[f][0]} count={FILTERS[f][1].length} onClear={() => setF(null)} testid="radar-filter-banner" />
             <Section title={FILTERS[f][0]} items={FILTERS[f][1]} testid="radar-filtered" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
           </> : <>
-            <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
-            <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
-            <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" tone="a" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" tone="b" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" tone="c" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
           </>}
           <RadarHistory runs={runs} />
         </div>

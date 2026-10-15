@@ -398,3 +398,4 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Limite conservée à 50 analyses par règles/jour (choix utilisateur) ; la file est triée par proximité du titre avec les postes visés.
 - Découverte : Airbus (Workday ag.wd3/Airbus) dans l'annuaire ; pages anti-robot (Incapsula/Cloudflare) signalées ; Dayforce reconnu « API protégée » (403, non contourné) → Jooble.
 - Tests : iteration_33 → backend 11/11, frontend 100 % (preview).
+- 2026-06 : en-têtes de priorité colorés (Radar.jsx SectionHead) : A émeraude avec halo pulsé + pastille animée quand ≥1 offre (« Agir maintenant »), B ambre (« Optimiser puis postuler »), C rose (« À éviter ») ; animation désactivée si prefers-reduced-motion. Vérifié par capture (bureau + mobile).
