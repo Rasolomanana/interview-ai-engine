@@ -110,7 +110,8 @@ Tu es le moteur IPS RADAR de CareerOS (tri rapide). Renvoie UNIQUEMENT un JSON v
  "certifications": {{...}}, "concurrence": {{"score": 0-10, "justification": "10 = faible concurrence"}}, "qualite_cv": {{...}}, "signaux_marche": {{...}}}},
  "knockout": {{"present": true/false, "detail": ""}}, "goal_fit": {{"score": 0-10, "justification": "5 si objectifs non précisés"}},
  "decision_summary": "1-2 phrases : postuler / optimiser / éviter et pourquoi", "reasons_apply": ["max 3"], "reasons_avoid": ["max 3"],
- "ats": {{"keywords_missing": ["max 5"]}}}}
+ "ats": {{"keywords_missing": ["max 5"]}},
+ "requirements": [{{"label": "exigence explicite de l'offre (max 10)", "status": "ok|missing|unknown", "evidence": "preuve tirée du CV ou raison"}}]}}
 Ne donne AUCUN score global ni estimation chiffrée d'IPS : CareerOS calcule l'IPS officiel.{EXCERPT_NOTE if is_excerpt(offer) else ""}"""
 
 
@@ -150,7 +151,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
 
     async def _analyzed_today(user_id: str) -> int:
         start = _day_start()
-        return await db.radar_offers.count_documents({"user_id": user_id, "analyzed_at": {"$gte": start}})
+        return await db.radar_offers.count_documents({"user_id": user_id, "analyzed_at": {"$gte": start}, "source": {"$ne": "externe"}})
 
     async def _fetch(st: dict) -> tuple:
         offers, errors = [], {}
@@ -209,6 +210,9 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         now = _now().isoformat()
         upd = {"ips": ips, "decision_report": report, "excerpt": is_excerpt(doc), "method": method,
                "reasons_apply": (d.get("reasons_apply") or [])[:3], "reasons_avoid": (d.get("reasons_avoid") or [])[:3]}
+        reqs = [{"label": str(r.get("label", ""))[:120], "status": r.get("status") if r.get("status") in ("ok", "missing", "unknown") else "unknown",
+                 "evidence": str(r.get("evidence", ""))[:200], "source": method} for r in (d.get("requirements") or []) if isinstance(r, dict) and r.get("label")][:16]
+        upd["requirements_rules" if method == "regles" else "requirements_ai"] = reqs
         upd["analyzed_at" if method == "regles" else "ai_analyzed_at"] = now
         if not doc.get("analyzed_at"):
             upd["analyzed_at"] = now
@@ -438,6 +442,66 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             logger.warning("radar deep %s failed: %s", offer_id, e)
             raise HTTPException(status_code=503, detail="Service IA temporairement indisponible : réessayez plus tard.")
         return await db.radar_offers.find_one({"id": offer_id}, {"_id": 0})
+
+    @router.get("/offers/{offer_id}/explain")
+    async def explain(offer_id: str, user: dict = Depends(current_user)):
+        """Score detail. Rule-scored offers are re-evaluated with the current rules (free) so score and requirements stay consistent."""
+        o = await db.radar_offers.find_one({"id": offer_id, "user_id": user["id"]}, {"_id": 0})
+        if not o:
+            raise HTTPException(status_code=404, detail="Offre introuvable")
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+        cv = profile.get("cv_text") or ""
+        if o.get("method") != "ia" and len(cv) >= 80:
+            st = await _settings(user["id"], profile)
+            await _rules(o, cv, profile, st.get("keywords") or [])
+        elif not o.get("requirements_rules"):
+            await db.radar_offers.update_one({"id": offer_id}, {"$set": {"requirements_rules": RR.requirements(o, cv, profile)}})
+        o = await db.radar_offers.find_one({"id": offer_id}, {"_id": 0, "description": 0, "dedupe_key": 0, "user_id": 0})
+        return o
+
+    class ExternalBody(BaseModel):
+        text: str = Field(default="", max_length=30000)
+        url: str = Field(default="", max_length=1000)
+        title: str = Field(default="", max_length=200)
+        company: str = Field(default="", max_length=120)
+        location: str = Field(default="", max_length=120)
+
+    @router.post("/external")
+    async def external(body: ExternalBody, user: dict = Depends(current_user)):
+        """Score an offer the member pasted (LinkedIn, etc.). CareerOS never scrapes LinkedIn: the member provides the text."""
+        o = {"title": body.title.strip(), "company": body.company.strip(), "location": body.location.strip(), "description": body.text.strip(), "posted_at": ""}
+        if not o["description"] and body.url:
+            try:
+                async with httpx.AsyncClient(timeout=S.TIMEOUT, follow_redirects=True) as c:
+                    jp = S._jobposting((await c.get(body.url, headers=S.UA)).text)
+            except Exception:  # noqa: BLE001
+                jp = None
+            if not jp:
+                raise HTTPException(status_code=422, detail="Lien illisible (ex. LinkedIn exige une connexion) : copiez-collez le texte de l'offre.")
+            org = jp.get("hiringOrganization")
+            o.update({"title": o["title"] or S._clean(jp.get("title")), "company": o["company"] or (org.get("name") if isinstance(org, dict) else "") or "",
+                      "location": o["location"] or S._jp_location(jp), "description": S._clean(jp.get("description")), "posted_at": str(jp.get("datePosted") or "")[:10]})
+        if len(o["description"]) < 80:
+            raise HTTPException(status_code=422, detail="Collez le texte complet de l'offre (au moins quelques lignes).")
+        if not o["title"]:
+            o["title"] = next((x.strip() for x in o["description"].splitlines() if x.strip()), "Offre externe")[:120]
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+        cv = profile.get("cv_text") or ""
+        if len(cv) < 80:
+            raise HTTPException(status_code=400, detail="Ajoutez votre CV dans la Career Memory pour analyser une offre.")
+        o = {**o, "company": o["company"] or "Entreprise non précisée", "source": "externe", "url": body.url, "external_id": "", "salary": ""}
+        k = _key(o)
+        doc = await db.radar_offers.find_one({"user_id": user["id"], "dedupe_key": k}, {"_id": 0})
+        if doc:
+            await db.radar_offers.update_one({"id": doc["id"]}, {"$set": {"description": o["description"], "status": "nouvelle" if doc["status"] == "ignoree" else doc["status"]}})
+            doc.update(description=o["description"])
+        else:
+            doc = {"id": str(uuid.uuid4()), "user_id": user["id"], "dedupe_key": k, **o, "first_seen": _now().isoformat(), "last_seen": _now().isoformat(),
+                   "run_id": None, "seen_runs": [], "status": "nouvelle", "ips": None, "decision_report": None, "analyzed_at": None, "application_id": None}
+            await db.radar_offers.insert_one(dict(doc))
+        if doc.get("method") != "ia":
+            await _rules(doc, cv, profile, [])
+        return await db.radar_offers.find_one({"id": doc["id"]}, {"_id": 0, "dedupe_key": 0, "user_id": 0})
 
     @router.post("/offers/{offer_id}/pack")
     async def pack(offer_id: str, user: dict = Depends(current_user)):

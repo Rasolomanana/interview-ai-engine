@@ -19,9 +19,10 @@ SKILLS = [
     "inventaire", "inventory", "approvisionnement", "procurement", "achats", "purchasing", "service a la clientele",
     "customer service", "ventes", "sales", "marketing", "communication", "ressources humaines", "human resources", "paie",
     "payroll", "recrutement", "recruiting", "formation", "training", "leadership", "gestion d'equipe", "team management",
-    "negociation", "negotiation", "redaction", "writing", "exigences", "requirements", "analyse d'affaires", "business analysis",
+    "negociation", "negotiation", "redaction", "writing", "gestion des exigences", "requirements gathering", "analyse d'affaires", "business analysis",
     "cybersecurite", "cybersecurity", "reseau", "networking", "support technique", "technical support", "sante et securite",
-    "health and safety", "permis de conduire", "chariot elevateur", "forklift", "cpa", "cfa", "pmi", "cbap", "ccba",
+    "health and safety", "microsoft office", "suite office", "outlook", "reception", "expedition", "preparation de commandes",
+    "order picking", "shipping", "receiving", "permis de conduire", "chariot elevateur", "forklift", "cpa", "cfa", "pmi", "cbap", "ccba",
 ]
 SYNONYMS = {
     "analyste": "analyst", "analyste d'affaires": "business analyst", "gestionnaire": "manager", "directeur": "director",
@@ -33,23 +34,34 @@ SYNONYMS = {
 }
 CERTS = ["pmp", "cpa", "cfa", "cbap", "ccba", "itil", "scrum master", "csm", "psm", "six sigma", "aws certified", "azure",
          "google certified", "cissp", "comptia", "prince2", "lean"]
-SENIOR = re.compile(r"\b(senior|sr\.?|principal|lead|directeur|director|head|chef|vp|vice)\b")
+SENIOR = re.compile(r"\b(senior|sr\.?|principal|lead|directeur|director|head|vp|vice)\b")  # "chef" (chef des opérations, d'équipe) is not senior
+PHRASES = {"directeur adjoint": "encadrement", "directrice adjointe": "encadrement", "chef d'equipe": "encadrement equipe",
+           "chef de quart": "encadrement quart", "team lead": "encadrement equipe", "shift lead": "encadrement quart"}
+LEAD = {"chef", "supervisor", "supervisore", "superviseure", "gestionnaire", "manager", "contremaitre", "foreman", "responsable", "encadrement"}
 JUNIOR = re.compile(r"\b(junior|jr\.?|stagiaire|intern|internship|stage|entry level|debutant|apprenti)\b")
 
 
 def norm(t: str) -> str:
+    t = re.sub(r"[·•]\s?(?:e|ne|se|euse|rice)\b|\((?:e|ne|se|euse|rice)\)", "", t or "")  # inclusive writing: Superviseur·e, (e)
     t = unicodedata.normalize("NFKD", t or "").encode("ascii", "ignore").decode().lower()
     return re.sub(r"\s+", " ", t)
 
 
 def _en(t: str) -> str:
+    for fr, en in PHRASES.items():
+        t = t.replace(fr, en)
     for fr, en in SYNONYMS.items():
         t = t.replace(fr, en)
     return t
 
 
+def _canon(w: str) -> str:
+    w = w[:-1] if len(w) > 4 and w.endswith("s") and not w.endswith("ss") else w  # plurals: chefs, operations
+    return "encadrement" if w in LEAD else w
+
+
 def _words(t: str) -> set:
-    return {w for w in re.findall(r"[a-z0-9#+.]{3,}", _en(norm(t))) if w not in {"and", "the", "des", "les", "pour", "avec", "une", "dans"}}
+    return {_canon(w) for w in re.findall(r"[a-z0-9#+.]{3,}", _en(norm(t))) if w not in {"and", "the", "des", "les", "pour", "avec", "une", "dans"}}
 
 
 def skills_in(t: str) -> set:
@@ -196,4 +208,47 @@ def score_offer(offer: dict, cv: str, profile: dict, keywords: list = None) -> d
         "decision_summary": ("Pré-analyse par règles CareerOS (sans IA) : correspondance entre votre Career Memory et l'offre. "
                              "Lancez l'analyse approfondie pour une évaluation IA."),
         "ats": {"keywords_missing": missing[:8]},
+        "requirements": requirements(offer, cv, profile),
     }
+
+
+LANG = (("Bilinguisme français / anglais", r"bilingue|bilingual|french and english|francais et anglais", r"bilingue|bilingual|anglais|english"),
+        ("Anglais", r"\banglais\b|\benglish\b", r"anglais|english|bilingue|bilingual"))
+DEGREES = (("Diplôme universitaire", r"baccalaureat|bachelor|universit|degree|maitrise|master", r"baccalaureat|bachelor|universit|degree|maitrise|master|mba"),
+           ("DEC / diplôme collégial", r"\bdec\b|collegial|college diploma|technique en", r"\bdec\b|collegial|college|technique|baccalaureat|bachelor|universit"),
+           ("DEP / diplôme professionnel", r"\bdep\b|diplome d'etudes professionnelles", r"\bdep\b|professionnel|\bdec\b|collegial|baccalaureat"))
+CONTEXT = (("Environnement syndiqué", r"syndiqu|unionized|union environment|convention collective", r"syndiqu|union|convention collective"),
+           ("Travail de soir / nuit / quart", r"quart de soir|quart de nuit|de soir|de nuit|evening shift|night shift|shift work|horaire rotatif", r"soir|nuit|quart|shift|rotati"),
+           ("Centre de distribution / entrepôt", r"centre de distribution|distribution cent|entrepot|warehouse|cd ", r"centre de distribution|distribution|entrepot|warehouse"),
+           ("Gestion d'équipe / supervision", r"gestion d'equipe|supervis|encadr|gerer une equipe|team management|lead a team|people management", r"supervis|gestion d'equipe|encadr|equipe de|team|gestionnaire|chef"),
+           ("Santé et sécurité", r"sante et securite|sst|health and safety|cnesst", r"sante et securite|sst|health and safety|cnesst"),
+           ("Permis de conduire", r"permis de conduire|driver'?s licen", r"permis|licen"))
+
+
+def requirements(offer: dict, cv: str, profile: dict) -> list:
+    """Requirements explicitly detected in the offer, checked against the Career Memory (rules, no AI)."""
+    text = norm(f"{offer.get('title', '')} {offer.get('description', '')}")
+    extra = profile.get("skills") if isinstance(profile.get("skills"), list) else []
+    c = norm(cv + " " + " ".join(map(str, extra)))
+    out = []
+    need, have = required_years(text), cv_years(cv)
+    if need:
+        out.append({"label": f"{need} an(s) d'expérience", "status": "unknown" if not have else "ok" if have >= need else "missing",
+                    "evidence": f"CV : {have} an(s) détecté(s)" if have else "Années d'expérience non détectées dans le CV"})
+    for label, pat, mine in LANG + DEGREES + CONTEXT:
+        if re.search(pat, text):
+            ok = bool(re.search(mine, c))
+            out.append({"label": label, "status": "ok" if ok else "unknown", "evidence": "Mentionné dans votre Career Memory" if ok else "Non mentionné dans votre CV : à vérifier"})
+    if any(r["label"].startswith("Bilinguisme") for r in out):
+        out = [r for r in out if r["label"] != "Anglais"]
+    off_sk, cv_sk = skills_in(text), skills_in(c)
+    for sk in sorted(off_sk)[:10]:
+        out.append({"label": f"Compétence : {sk}", "status": "ok" if sk in cv_sk else "missing",
+                    "evidence": "Présente dans votre CV" if sk in cv_sk else "Absente de votre CV"})
+    for cert in [x for x in CERTS if x in text]:
+        out.append({"label": f"Certification : {cert.upper()}", "status": "ok" if cert in c else "missing",
+                    "evidence": "Présente dans votre CV" if cert in c else "Absente de votre CV"})
+    loc_msg, _ = _location_issue(offer, profile)
+    if offer.get("location"):
+        out.append({"label": f"Lieu : {offer['location'][:60]}", "status": "missing" if loc_msg else "ok", "evidence": loc_msg or "Compatible avec votre localisation"})
+    return [{**r, "source": "regles"} for r in out[:16]]

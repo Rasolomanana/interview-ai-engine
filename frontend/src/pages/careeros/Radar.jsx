@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ExternalLink, EyeOff, Loader2, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
+import { ClipboardPaste, ExternalLink, EyeOff, ListChecks, Loader2, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
@@ -22,8 +22,10 @@ import { RadarHistory, TodayMarker } from "@/components/careeros/RadarHistory";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
 import { radar } from "@/lib/careeros";
 import { FilterBanner, StatFilter } from "@/components/careeros/StatFilter";
+import { ScoreExplain } from "@/components/careeros/explain/ScoreExplain";
+import { ExternalOffer } from "@/components/careeros/explain/ExternalOffer";
 
-const OfferCard = ({ o, onPack, onIgnore, onDeep, deepId, busy }) => (
+const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, deepId, busy }) => (
   <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4 min-w-0 break-words" data-testid={`radar-offer-${o.id}`}>
     <div className="flex items-start gap-3">
       <PriorityBadge priority={o.ips?.priority} testid={`radar-priority-${o.id}`} />
@@ -51,6 +53,8 @@ const OfferCard = ({ o, onPack, onIgnore, onDeep, deepId, busy }) => (
           <Sparkles className="h-3.5 w-3.5" />Générer le pack</button>)}
       {o.method !== "ia" && o.status !== "pack" && <button onClick={() => onDeep(o)} disabled={deepId === o.id} data-testid={`radar-deep-btn-${o.id}`} className="flex items-center gap-1.5 rounded-full border border-indigo-400/40 px-3 py-1.5 text-xs text-indigo-200 hover:bg-indigo-500/10 disabled:opacity-60">
         {deepId === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Analyse approfondie</button>}
+      {o.ips && <button onClick={() => onExplain(o)} data-testid={`radar-explain-btn-${o.id}`} className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:border-indigo-400/40 hover:text-white">
+        <ListChecks className="h-3.5 w-3.5" />Pourquoi ce score ?</button>}
       <MoreMenu testid={`radar-more-${o.id}`} items={[
         o.url && { label: "Voir l'offre", icon: ExternalLink, href: o.url, testid: `radar-open-${o.id}` },
         o.status !== "ignoree" && o.status !== "pack" && { label: "Ignorer cette offre", icon: EyeOff, onClick: () => onIgnore(o), danger: true, testid: `radar-ignore-${o.id}` },
@@ -73,6 +77,8 @@ export default function Radar() {
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState(false);
   const tour = usePageTour("radarTourDone");
+  const [explainId, setExplainId] = useState(null);
+  const [ext, setExt] = useState(false);
   const load = useCallback(() => radar.dashboard().then(setD).catch((e) => toast.error(e.message)), []);
   const running = d?.last_run?.status === "running";
   const [runs, setRuns] = useState(null);
@@ -119,6 +125,7 @@ export default function Radar() {
         </div>
         <div className="flex flex-wrap gap-2">
           <TourButton onClick={tour.open} testid="radar-tour-btn" />
+          <button type="button" onClick={() => { tour.close(); setExt(true); }} className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs text-slate-300 hover:text-white" data-testid="radar-external-btn"><ClipboardPaste className="h-3.5 w-3.5" />Analyser une offre externe</button>
           <button onClick={() => { tour.close(); setSettings(true); }} data-testid="radar-settings-btn" className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-slate-300 hover:text-white"><Settings2 className="h-4 w-4" />Réglages</button>
           <button onClick={runNow} disabled={running} data-testid="radar-run-btn" className="flex items-center gap-2 rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <RadarIcon className="h-4 w-4" />}{running ? "Recherche en cours…" : "Rechercher maintenant"}</button>
@@ -139,16 +146,18 @@ export default function Radar() {
           {errs.length > 0 && <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-200" data-testid="radar-errors">{errs.map(([k, v]) => <p key={k}>{k} : {v}</p>)}</div>}
           {f ? <>
             <FilterBanner label={FILTERS[f][0]} count={FILTERS[f][1].length} onClear={() => setF(null)} testid="radar-filter-banner" />
-            <Section title={FILTERS[f][0]} items={FILTERS[f][1]} testid="radar-filtered" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
+            <Section title={FILTERS[f][0]} items={FILTERS[f][1]} testid="radar-filtered" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
           </> : <>
-            <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
-            <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
-            <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} deepId={deepId} busy={busy} />
+            <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
           </>}
           <RadarHistory runs={runs} />
         </div>
       )}
       {d && !settings && <PageTour tour={tour} steps={RADAR_STEPS} label="Visite du Radar" testid="radar-tour" />}
+      <ScoreExplain id={explainId} onClose={() => { setExplainId(null); load(); }} onDeep={load} />
+      <ExternalOffer open={ext} onClose={() => setExt(false)} onDone={(o) => { setExt(false); load(); setExplainId(o.id); }} />
       {settings && <RadarSettingsDialog onClose={() => { setSettings(false); load(); }} />}
     </Shell>
   );
