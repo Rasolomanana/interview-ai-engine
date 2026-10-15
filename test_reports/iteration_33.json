@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 33 — Radar A+B+C+D (Comparer LinkedIn / recherche élargie / 50-queue priorité titre / discovery Airbus+Dayforce). BACKEND: created /app/backend/tests/test_radar_compare_expand.py with 11 tests, 11/11 PASS in 53s. Covers (A) POST /api/careeros/radar/compare with 3-line LinkedIn-style input → items[] each with coverage{state,label}, status ∈ {priorite_a/b/c, eliminee, reportee, ignoree, pack, non_trouvee}, offer+losses(≤3) when found, why+jooble when not found; empty lines → 422; whole-token company matching (RONA ≠ Coronado, inc/ltée/canada/groupe stripped). (B+C) GET /settings returns expand=true + expanded list (member keywords first, max ~10 incl. family titles FR/EN); PUT expand:false persists, GET confirms false, restored to true. (D) radar_discovery.discover('Airbus') returns ag.wd3/Airbus workday candidate with origin=annuaire; discover('Sofina Foods','sofina.com') surfaces 'Dayforce (API protégée)' in unsupported. Unit: expand_terms(['Superviseur des opérations']) includes 'operations supervisor' and 'chef des opérations'; title_relevance('Chefs des opérations (Quart de soir)', ['Superviseur des opérations']) ≈ 0.5+. /api/careeros/radar/run completes with analyzed ≤ 50. FRONTEND (Playwright, authenticated member on desktop 1920 and mobile 390): radar-compare-btn opens compare-dialog, filling compare-input + compare-submit renders compare-results with 3 compare-item-N, each exposing compare-coverage-N, compare-status-N, losses or why per status, and compare-explain-N (for found & non-reportee) opens explain-panel correctly. Settings: radar-expand-box visible, radar-expand-checkbox checked by default, radar-expanded-terms chips visible ('Data, Analyst, Analytics, analyste de données, data analyst, analyste d'affaires, business analyst, analyste BI'); toggling off + radar-settings-save-btn persists (verified by reopen), restored to true. Mobile 390px: body.scrollWidth=390 = window.innerWidth=390, no horizontal overflow in compare dialog. Observed in compare output: item 0 RONA → 'Non suivie / couverte via Jooble' + 'Trouvée · éliminée (exigence)' (externe source — a prior iteration pasted it); item 1 Ubisoft → 'Suivie · portail SmartRecruiters' + priorité B; item 2 Canpar → 'Non trouvée par le Radar' with helpful 'Jooble non vérifié' why text (expected: Jooble key not configured in preview).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "CompareDialog / RadarSettingsDialog", "issues": ["Missing `aria-describedby` / DialogDescription on DialogContent — Radix emits console warning. Low priority a11y hint; not user-visible."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_radar_compare_expand.py",
+    "/app/test_reports/pytest/radar_compare_expand.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "radar.py compare(): company matching uses `same(a,b) = a<=b or b<=a` on whole-token sets with inc/ltée/canada/groupe/corp stripped. Correctly rejects 'RONA' vs 'Coronado' (disjoint tokens) and accepts 'RONA inc.' vs 'RONA Canada'. Note: single-token names like 'RONA' are a 1-token set so any superset of {'rona'} matches — currently fine because the only false-positive risk (substring) is prevented by using token sets, not substring. Good.",
+    "radar.py compare(): best offer selection uses title_relevance >= 0.4 threshold vs the typed line's title — reasonable but a bit low; for very short typed titles the matching could get noisy. Consider documenting the threshold.",
+    "radar.py compare(): Jooble verification runs inside the request even when key is not configured — the `S.configured()['jooble']` guard short-circuits correctly, so no network call is attempted in preview; `jooble: null` + 'Jooble non vérifié' is the expected UX. Confirmed in UI.",
+    "radar_rules.FAMILIES_SEARCH: pattern uses `operation` (unaccented) → norm() strips accents before match, so 'opérations' triggers the ops family. Good coverage.",
+    "radar_rules.expand_terms limit: `max(limit, len(base[:3]))` means a member with 4+ keywords could exceed 8 titles; preview case showed 8 items. Document that cap in RadarSettings UI label (which already says 'jusqu'à 8') — minor wording consistency.",
+    "radar_discovery.discover('Sofina Foods','sofina.com'): correctly surfaces Dayforce via UNSUPPORTED scan on the career page HTML. Depends on network reachability of sofina.com — if the probe times out the detection falls back gracefully.",
+    "CompareDialog.jsx: STATUS table covers all 8 states; priority badge and IPS display render conditionally. compare-explain button correctly hidden for 'reportee' and 'non_trouvee' (no offer id).",
+    "RadarSettings.jsx: expand checkbox uses `s.expand !== false` default — safe against legacy settings without the field. radar-expanded-terms only rendered when expand is on and list non-empty."
+  ],
+  "updated_files": ["/app/backend/tests/test_radar_compare_expand.py (new)"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (compare dialog, 3 items with coverage/status/losses/why/explain, settings expand toggle persists, mobile 390 no overflow)"},
+  "test_credentials": "membre.test@careeros.dev / CareerOS2026!",
+  "seed_data_creation": "None new — reused existing radar_offers from the member's dashboard. One externe 'Chef des opérations' RONA offer from iteration 32 is still present and surfaced in compare item 0 (status eliminee).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Compare uses `S.configured()['jooble']` and returns jooble:null when the key is absent (preview). Don't assert jooble==true/false. Settings PUT body must include enabled/keywords/location/companies/sources even if only toggling expand (model requires them). radarTourDone and radarSettingsTourDone in localStorage avoid tour overlays before clicking radar-compare-btn / radar-settings-btn."
+}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { radar } from "@/lib/careeros";
 
@@ -47,7 +47,7 @@ export const CompareDialog = ({ open, onClose, onExplain }) => {
     <Dialog open={open} onOpenChange={(x) => !x && onClose()}>
       <DialogContent className="max-h-[92vh] overflow-y-auto border-white/10 bg-[#121520] text-slate-100 sm:max-w-3xl" data-testid="compare-dialog">
         <DialogHeader><DialogTitle className="font-display">Comparer avec LinkedIn (ou un autre site)</DialogTitle></DialogHeader>
-        <p className="text-xs text-slate-400">Une offre par ligne, au format « Entreprise – Titre » (10 maximum). CareerOS indique si l'entreprise est couverte, si le Radar a trouvé l'offre, son statut et les critères qui la pénalisent. Aucune donnée n'est lue sur LinkedIn.</p>
+        <DialogDescription className="text-xs text-slate-400">Une offre par ligne, au format « Entreprise – Titre » (10 maximum). CareerOS indique si l'entreprise est couverte, si le Radar a trouvé l'offre, son statut et les critères qui la pénalisent. Aucune donnée n'est lue sur LinkedIn.</DialogDescription>
         <textarea value={lines} onChange={(e) => setLines(e.target.value)} rows={6} placeholder={"RONA – Chef des opérations\nAirbus – Superviseur opérations\nCanpar – Operations Supervisor"}
           className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400/50" data-testid="compare-input" />
         <div className="flex justify-end"><button type="button" onClick={run} disabled={busy || !lines.trim()} className="flex items-center gap-1.5 rounded-full bg-indigo-500 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-400 disabled:opacity-50" data-testid="compare-submit">

@@ -391,3 +391,10 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Prompt IA : renvoie requirements (étiquetées « Confirmé par l'analyse IA ») ; les exigences par règles restent affichées séparément.
 - UI : bouton « Pourquoi ce score ? » (panneau : méthode règles / IA, ce qu'il manque pour la priorité A, critères triés par points perdus, éliminatoires, exigences X/Y, bouton analyse approfondie) ; bouton « Analyser une offre externe ».
 - Tests : iteration_32 → backend 7/7, frontend 100 % (preview).
+
+## 2026-06 — Comparer avec LinkedIn, recherche élargie, priorisation des 50 analyses
+- POST /api/careeros/radar/compare : lignes « Entreprise – Titre » → couverture (portail / Jooble / non suivie), offre trouvée et statut (A/B/C, éliminée, reportée, ignorée, pack) avec 3 critères les plus pénalisants, sinon vérification Jooble en direct et explication. Correspondance d'entreprise par mots entiers.
+- Recherche élargie (settings.expand, défaut vrai) : expand_terms → mots-clés + titres de la même famille FR/EN (opérations/logistique, données, projet, approvisionnement), max 8 requêtes Jooble × 2 pages. Réglages : case à cocher + aperçu des titres.
+- Limite conservée à 50 analyses par règles/jour (choix utilisateur) ; la file est triée par proximité du titre avec les postes visés.
+- Découverte : Airbus (Workday ag.wd3/Airbus) dans l'annuaire ; pages anti-robot (Incapsula/Cloudflare) signalées ; Dayforce reconnu « API protégée » (403, non contourné) → Jooble.
+- Tests : iteration_33 → backend 11/11, frontend 100 % (preview).

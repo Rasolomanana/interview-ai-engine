@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { radar } from "@/lib/careeros";
 
 const F = ({ k, label, v, set, ph }) => (
@@ -21,7 +21,7 @@ export const ExternalOffer = ({ open, onClose, onDone }) => {
     <Dialog open={open} onOpenChange={(x) => !x && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#121520] text-slate-100 sm:max-w-xl" data-testid="external-dialog">
         <DialogHeader><DialogTitle className="font-display">Analyser une offre externe</DialogTitle></DialogHeader>
-        <p className="text-xs text-slate-400">Collez le texte d'une offre vue ailleurs (LinkedIn, Indeed, site employeur…). CareerOS ne lit jamais LinkedIn automatiquement. Analyse par règles gratuite, puis analyse approfondie IA si vous le souhaitez.</p>
+        <DialogDescription className="text-xs text-slate-400">Collez le texte d'une offre vue ailleurs (LinkedIn, Indeed, site employeur…). CareerOS ne lit jamais LinkedIn automatiquement. Analyse par règles gratuite, puis analyse approfondie IA si vous le souhaitez.</DialogDescription>
         <div className="grid gap-3 sm:grid-cols-3">
           <F k="title" label="Titre" v={v} set={setV} ph="Chefs des opérations" />
           <F k="company" label="Entreprise" v={v} set={setV} ph="RONA" />
