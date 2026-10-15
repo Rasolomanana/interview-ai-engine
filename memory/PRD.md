@@ -1,5 +1,12 @@
 # PRD — Copilote Entretien IA / CareerOS
 
+## Fonctionnalité (juin 2026) — Connecteurs à prévoir + UKG + portails bloqués
+- Connecteur UKG (UltiPro) : `radar_sources.ukg` (POST JSON `/JobBoardView/LoadSearchResults`), URL `recruiting*.ultipro.(com|ca)/{TENANT}/JobBoard/{GUID}` → kind `ukg`, slug `host/TENANT/GUID` ; détecté sur les sites carrières.
+- Portails bloqués : `radar_discovery.is_blocked` (403/429/503 + Cloudflare « Just a moment »/captcha) → `blocked: true`, message « bloqué volontairement par l'employeur (403 / protection anti-robot) », label entreprise « Bloqué (anti-robot) : X », 4e groupe du résumé, annuaire et carte Portails (run.portals.blocked). Pas de contournement (choix utilisateur).
+- Admin onglet « Connecteurs » (`careeros/connectors.py`, GET `/api/admin/connectors`) : backlog classé par impact (entreprises, membres, offres Jooble 30 j, exemples, difficulté, score, priorité ; bloqués = « Aucune (protection) ») + connecteurs actifs (entreprises, membres, offres lues/retenues, % lecture, replis Jooble, bloqués).
+- Priorités utilisateur : UKG ✅ → Avature → Taleo → Phenom (ordre final selon le tableau d'impact).
+- Testé : iteration_29 (admin 7/7, UI 100 %) + curl (backlog seedé, UKG, Sobeys bloqué).
+
 ## Amélioration (juin 2026) — Ergonomie Réglages du Radar
 - Dialog en colonne : hauteur max 94vh, largeur 3xl, en-tête et bouton « Enregistrer » fixes, corps défilant (`radar-settings-body`, `radar-settings-footer`). Liste d'entreprises sans défilement imbriqué.
 - Loupe : lance la détection immédiatement + défilement automatique vers le résultat ; résultats dans une zone défilante dédiée (`portal-results-{i}`, max-h-64), compteur « N proposition(s) · M lisible(s) », URL sur ligne propre, bouton Associer toujours visible.

@@ -1,0 +1,21 @@
+{
+  "summary": "Tested the new admin « Connecteurs » dashboard: backend endpoint GET /api/admin/connectors + frontend tab in /admin. Created /app/backend/tests/test_admin_connectors.py with 7 tests covering (1) auth: missing password → 401/403, wrong password → 401/403, (2) response shape: {backlog:[], supported:[]} with correct per-row keys (connector, blocked, companies, members, examples, offers_30d, difficulty, score, priority for backlog; kind, label, companies, members, fetched, matched, success_pct, fallback, blocked for supported), (3) business rules: blocked rows always have priority='Aucune (protection)', success_pct in [0,100] or null, (4) sort ordering: backlog sorted by score desc, supported sorted by companies desc. 7/7 passed. Frontend verified on preview URL (/admin → login admin2026 → Connecteurs tab): admin-connectors panel renders with both connectors-backlog and connectors-supported sections. Backlog is currently empty (connectors-backlog-empty text 'Aucun portail non pris en charge détecté pour l'instant' displayed — expected in preview since no member has logged a non-pris-en-charge company yet). Supported connectors shows 5 live rows: Workday (4 entreprises / 18 membres / 120 offres lues / 120 retenues / 100 % / 0 repli), amazon.jobs (1/6/78/78/100 %/0), Oracle Recruiting (1/1/2/2/100 %/0), SmartRecruiters (1/1/28/28/100 %/0), SuccessFactors (1/1/0/0/0 %/1 repli Jooble) — SuccessFactors low success is correctly highlighted in amber. Sort order and all data-testid attributes (admin-tab-connectors, admin-connectors, connectors-backlog, connectors-supported, connectors-backlog-empty, connector-active-{kind}, connector-row-{slug}) are present. No console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_admin_connectors.py", "/app/test_reports/pytest/admin_connectors_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/careeros/connectors.py (78 lines) is clean and well-scoped: single endpoint, async Mongo iteration, no _id leakage, admin-gated via injected check_admin, no hardcoded secrets. Good.",
+    "DIFFICULTY table hardcodes known ATS → labels/weights; unknown ATS falls back to ('À évaluer', 0.5) which is sensible. Priority bucketing (>=66% of top → Élevée, >=33% → Moyenne) is simple and deterministic.",
+    "The Jooble 30-day aggregation uses an ISO string compare against first_seen — relies on first_seen being stored as ISO strings. Current data confirms this works, just worth noting.",
+    "Supported connectors derive stats from last run per member via an aggregation pipeline — this correctly reflects the member's most recent portal reads without inflating historical data.",
+    "Frontend Connectors.jsx (49 lines) has proper data-testid coverage, loading state (Loader2), error toast, and empty-state message. No issues."
+  ],
+  "updated_files": ["/app/backend/tests/test_admin_connectors.py (new)"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (Connecteurs tab renders, both panels visible, 5 active connectors, empty-backlog state shown correctly)"},
+  "test_credentials": "Admin: admin2026 (header X-Admin-Password). Member: membre.test@careeros.dev / CareerOS2026!",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The admin /connectors endpoint is live and stable. Backlog is currently empty in preview because no stored company has detected='Non pris en charge : …' or 'Bloqué (anti-robot) : …' prefix — to exercise non-empty backlog, trigger a member's 'Tout détecter' on a portail propriétaire company. Supported connectors come from last radar_run per member; if you reset radar_runs the supported table will go empty. Previous iteration_28 context about radar directory/discover still valid."
+}
