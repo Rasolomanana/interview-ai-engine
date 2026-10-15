@@ -96,7 +96,15 @@ export default function Radar() {
     known: ["Déjà connues (dernier passage)", d.known_last_run || []],
     a: ["Priorité A", d.top_a],
   } : {};
-  const pick = (k) => setF((cur) => (cur === k ? null : k));
+  const lastOffers = d ? [...new Map([...(d.new_today || []), ...(d.known_last_run || [])].map((o) => [o.id, o])).values()] : [];
+  const SRC = { jooble: "Jooble", workday: "Workday", boards: "Sites carrières", adzuna: "Adzuna" };
+  const srcOf = (o) => (["jooble", "workday", "adzuna"].includes(o.source) ? o.source : "boards");
+  if (f?.startsWith("src:")) FILTERS[f] = [`Source : ${SRC[f.slice(4)]} (dernier passage)`, lastOffers.filter((o) => srcOf(o) === f.slice(4))];
+  if (f?.startsWith("co:")) FILTERS[f] = [`Entreprise : ${f.slice(3)} (dernier passage)`, lastOffers.filter((o) => (o.company || "").toLowerCase() === f.slice(3).toLowerCase())];
+  const pick = (k) => {
+    setF((cur) => (cur === k ? null : k));
+    if (k.includes(":")) setTimeout(() => document.querySelector('[data-testid="radar-filter-banner"]')?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
   const errs = Object.entries(lr?.errors || {});
 
   return (
@@ -125,8 +133,8 @@ export default function Radar() {
             <StatFilter label="Déjà connues" value={lr?.known ?? 0} testid="radar-stat-known" active={f === "known"} onClick={() => pick("known")} />
             <StatFilter label="Priorité A" value={d.top_a.length} testid="radar-stat-a" active={f === "a"} onClick={() => pick("a")} />
           </div>
-          <SourceStatus status={d.sources_status} run={lr} />
-          <PortalHealth status={d.sources_status} run={lr} />
+          <SourceStatus status={d.sources_status} run={lr} active={f?.startsWith("src:") ? f.slice(4) : null} onPick={(k) => pick(`src:${k}`)} />
+          <PortalHealth status={d.sources_status} run={lr} active={f?.startsWith("co:") ? f.slice(3) : null} onPick={(n) => pick(`co:${n}`)} />
           {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
           {errs.length > 0 && <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-200" data-testid="radar-errors">{errs.map(([k, v]) => <p key={k}>{k} : {v}</p>)}</div>}
           {f ? <>
