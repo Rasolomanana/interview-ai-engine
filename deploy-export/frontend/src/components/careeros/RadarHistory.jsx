@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { radar } from "@/lib/careeros";
 import { CalendarClock, CheckCircle2, ChevronDown, CircleAlert, Clock } from "lucide-react";
 import { RunOffersDialog } from "./RunOffersDialog";
 
@@ -10,19 +11,24 @@ const isAuto = (r) => r.trigger !== "manuel";
 const STATUS = { done: "Terminée", running: "En cours", interrompue: "Interrompue", error: "Erreur" };
 
 export const TodayMarker = ({ runs, running }) => {
+  const [cs, setCs] = useState(null);
+  useEffect(() => { radar.cronStatus().then(setCs).catch(() => {}); }, []);
   if (!runs) return null;
   const today = runs.filter((r) => dayKey(r.at) === dayKey(new Date().toISOString()));
   const auto = today.find(isAuto);
   const manual = today.filter((r) => !isAuto(r)).length;
   const ok = today.length > 0;
-  return (
+  return (<>
     <div className={`mt-3 inline-flex flex-wrap items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${ok ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border-amber-400/30 bg-amber-500/10 text-amber-200"}`} data-testid="radar-today-marker">
       {running ? <Clock className="h-3.5 w-3.5" /> : ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
       {running ? "Recherche en cours…" : ok ? "Recherche effectuée aujourd'hui" : "Aucune recherche aujourd'hui"}
       <span className="text-slate-400" data-testid="radar-today-detail">
         · Automatique : {auto ? `faite à ${hour(auto.at)}` : "pas encore (prévue à 6 h, heure de l'Est)"}{manual ? ` · ${manual} manuelle(s)` : ""}</span>
     </div>
-  );
+    {cs && <p className={`mt-2 text-[11px] ${cs.included ? "text-slate-500" : "text-rose-300"}`} data-testid="radar-cron-status">
+      {cs.included ? "Votre compte est inclus dans le passage automatique de 6 h." : `Votre compte n'est pas inclus dans le passage automatique : ${cs.reason}`}
+      {cs.last_auto ? ` Dernier passage automatique : ${day(cs.last_auto.at)} à ${hour(cs.last_auto.at)}.` : " Aucun passage automatique enregistré pour votre compte."}</p>}
+  </>);
 };
 
 export const Num = ({ n, onClick, testid }) => (n ? (

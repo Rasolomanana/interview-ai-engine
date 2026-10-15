@@ -682,7 +682,20 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         except Exception:  # noqa: BLE001
             logger.exception("credit alert check failed")
         logger.info("radar cron started: %s member(s), log %s", len(todo), log["id"])
-        return {"started": True, "members": len(todo), "log_id": log["id"]}
+        return {"started": True, "members": len(todo), "log_id": log["id"], "skipped_disabled": len(set(users) & disabled), "skipped_inactive": log["inactive_skipped"]}
+
+    @router.get("/cron-status")
+    async def cron_status(user: dict = Depends(current_user)):
+        """Is this member included in the daily 06:00 run? (same rules as /cron)"""
+        st = await db.radar_settings.find_one({"user_id": user["id"]}, {"_id": 0, "enabled": 1}) or {}
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0, "cv_text": 1}) or {}
+        u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "last_seen_at": 1}) or {}
+        since = (_now() - timedelta(days=ACTIVE_DAYS)).isoformat()
+        last = await db.radar_runs.find_one({"user_id": user["id"], "trigger": "quotidien"}, {"_id": 0, "at": 1, "status": 1}, sort=[("at", -1)])
+        reason = ("Désactivé : cochez « Recherche quotidienne automatique » dans les Réglages." if st.get("enabled") is False
+                  else "Ajoutez votre CV dans la Career Memory." if len((profile.get("cv_text") or "").strip()) < 80
+                  else f"Inactif depuis plus de {ACTIVE_DAYS} jours." if (u.get("last_seen_at") or "") < since else "")
+        return {"included": not reason, "reason": reason, "last_auto": last}
 
     return router
 

@@ -92,6 +92,7 @@ export const radar = {
   suggestions: () => call("/careeros/radar/suggestions"),
   follow: (name) => call("/careeros/radar/companies/follow", { method: "POST", body: { name } }),
   notices: () => call("/careeros/radar/notices"),
+  cronStatus: () => call("/careeros/radar/cron-status"),
   ackNotice: (id) => call(`/careeros/radar/notices/${id}/ack`, { method: "POST" }),
   undoNotice: (id) => call(`/careeros/radar/notices/${id}/undo`, { method: "POST" }),
   detectPortal: (b) => call("/careeros/radar/portal/detect", { method: "POST", body: b }),
