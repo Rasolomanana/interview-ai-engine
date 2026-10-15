@@ -38,6 +38,9 @@ def _source_rank(o: dict) -> int:
 JOOBLE_COMPANY_LIMIT = 20
 
 
+_BG = set()
+
+
 def _day_start() -> str:
     """Midnight America/Toronto (the member's day), as a UTC ISO string."""
     from zoneinfo import ZoneInfo
@@ -640,30 +643,46 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         if not secret or x_cron_secret != secret:
             raise HTTPException(status_code=401, detail="Non autorisé")
         since = (_now() - timedelta(days=ACTIVE_DAYS)).isoformat()
-        active = {u["id"] async for u in db.users.find({"last_seen_at": {"$gte": since}}, {"id": 1})}
+        active = {u["id"]: u.get("last_seen_at") or "" async for u in db.users.find({"last_seen_at": {"$gte": since}}, {"id": 1, "last_seen_at": 1})}
         users = [s["user_id"] async for s in db.radar_settings.find({"enabled": True}, {"user_id": 1})]
         users += [p["user_id"] async for p in db.career_profiles.find({"cv_text": {"$nin": ["", None]}}, {"user_id": 1}) if p["user_id"] not in users]
+        candidates = list(users)
         users = [u for u in users if u in active]  # only members active in the last 7 days
         disabled = {s["user_id"] async for s in db.radar_settings.find({"enabled": False}, {"user_id": 1})}
+        todo = sorted(dict.fromkeys(u for u in users if u not in disabled), key=lambda u: active[u], reverse=True)  # most recently active first
+        log = {"id": str(uuid.uuid4()), "at": _now().isoformat(), "status": "started", "members": len(todo), "inactive_skipped": len(set(candidates) - set(active)), "steps": []}
+        await db.radar_cron_log.insert_one(dict(log))
+
+        async def step(**kw):
+            await db.radar_cron_log.update_one({"id": log["id"]}, {"$push": {"steps": {**kw, "at": _now().isoformat()}}})
 
         async def all_runs():
-            for uid in users:
-                if uid not in disabled:
-                    try:
-                        await AU.auto_detect(db, uid, None, limit=3)  # daily re-detection of companies still on Jooble
-                    except Exception:  # noqa: BLE001
-                        logger.exception("radar auto-detect user %s", uid)
-                    try:
-                        await run_for_user(uid, "quotidien")
-                    except Exception:  # noqa: BLE001
-                        logger.exception("radar cron user %s", uid)
-        asyncio.create_task(all_runs())
+            for uid in todo:  # history first: the daily run never waits for portal discovery
+                try:
+                    r = await asyncio.wait_for(run_for_user(uid, "quotidien"), timeout=900)
+                    await step(member=uid[:8], step="radar", ok=True, fetched=r.get("fetched"), new=r.get("new"), analyzed=r.get("analyzed"), run_id=r.get("id"))
+                except Exception as e:  # noqa: BLE001
+                    logger.exception("radar cron user %s", uid)
+                    await step(member=uid[:8], step="radar", ok=False, error=f"{type(e).__name__}: {e}"[:300])
+            for uid in todo:
+                try:
+                    res = await asyncio.wait_for(AU.auto_detect(db, uid, None, limit=3), timeout=240)
+                    await step(member=uid[:8], step="detection", ok=True, associated=[x["name"] for x in res if x.get("associated")], checked=len(res))
+                except Exception as e:  # noqa: BLE001
+                    logger.exception("radar auto-detect user %s", uid)
+                    await step(member=uid[:8], step="detection", ok=False, error=f"{type(e).__name__}: {e}"[:300])
+            await db.radar_cron_log.update_one({"id": log["id"]}, {"$set": {"status": "done", "ended_at": _now().isoformat()}})
+
+        task = asyncio.create_task(all_runs())
+        _BG.add(task)  # keep a strong reference so the job is never garbage-collected mid-run
+        task.add_done_callback(_BG.discard)
         from . import ai_credits as AC
         try:
             await AC.check_alert(db)  # daily low-credit check
         except Exception:  # noqa: BLE001
             logger.exception("credit alert check failed")
-        return {"started": True, "members": len([u for u in users if u not in disabled])}
+        logger.info("radar cron started: %s member(s), log %s", len(todo), log["id"])
+        return {"started": True, "members": len(todo), "log_id": log["id"]}
 
     return router
 
@@ -675,6 +694,7 @@ async def ensure_radar_indexes(db):
     await db.portal_directory.create_index("key")
     await db.radar_notices.create_index([("user_id", 1), ("status", 1), ("at", -1)])
     await db.radar_runs.create_index([("user_id", 1), ("at", -1)])
+    await db.radar_cron_log.create_index("at")
     await db.radar_settings.create_index("user_id", unique=True)
     await db.radar_runs.update_many({"status": "running"}, {"$set": {"status": "interrompue"}})
     async for o in db.radar_offers.find({"ips": {"$ne": None}, "ips.stage": {"$ne": "radar"}}, {"_id": 0}):

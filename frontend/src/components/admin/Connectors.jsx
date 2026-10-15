@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2, PlugZap, Puzzle } from "lucide-react";
 import { toast } from "sonner";
 import { adminConnectors } from "@/lib/api";
+import { CronLog } from "./CronLog";
 
 const panel = "min-w-0 rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:p-5";
 const PRIO = { "Élevée": "text-rose-300", Moyenne: "text-amber-300", Faible: "text-slate-400", "Aucune (protection)": "text-slate-500" };
@@ -14,6 +15,7 @@ export const Connectors = () => {
   if (!d) return <Loader2 className="h-5 w-5 animate-spin text-emerald-400" />;
   return (
     <div className="space-y-4" data-testid="admin-connectors">
+      <CronLog />
       <section className={panel} data-testid="connectors-backlog">
         <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-200"><Puzzle className="h-4 w-4 text-emerald-400" />Connecteurs à prévoir (classés par impact)</h3>
         <p className="mb-3 text-[11px] text-slate-500">Agrégé de façon anonyme sur les entreprises suivies par tous les membres. Offres = offres Jooble des 30 derniers jours pour ces entreprises (potentiellement récupérables à la source).</p>

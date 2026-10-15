@@ -85,4 +85,15 @@ def create_connectors_router(db, check_admin):
         supported.sort(key=lambda x: -x["companies"])
         return {"backlog": rows, "supported": supported, "redetect": {k: len(v) for k, v in redetect.items()}}
 
+    @router.get("/radar-cron-log")
+    async def cron_log(x_admin_password: str = Header(None)):
+        """Daily Radar job journal: received, per-member steps, interrupted if the process stopped before the end."""
+        check_admin(x_admin_password)
+        old = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        rows = [r async for r in db.radar_cron_log.find({}, {"_id": 0}).sort("at", -1).limit(14)]
+        for r in rows:
+            if r["status"] == "started" and r["at"] < old:
+                r["status"] = "interrompu"
+        return {"items": rows}
+
     return router

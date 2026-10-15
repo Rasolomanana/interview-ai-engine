@@ -406,3 +406,10 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Annuaire statique : +15 employeurs vérifiés (Agropur, Molson Coors, Cascades, Purolator, Alstom, Kuehne+Nagel, Domtar, Home Depot Canada, Dollarama, Vidéotron, TD, BMO, Thales, Colabor, Cogeco).
 - Frontend : AutoNotices, CompanySuggestions (« Entreprises qui recrutent pour vos postes »), badge « auto », toast de détection ; ScoreExplain : Fond clair (défaut) / Fond sombre / A+ (reading-light.css), critères lisibles sur mobile.
 - Tests : iteration_34 → backend 11/11, frontend 100 % ; notifications dédupliquées et débordement mobile des suggestions corrigés ensuite (vérifié par capture).
+
+## 2026-06 — Incident cron 06:00 sans ligne d'historique (15 oct.)
+- Constat : cron-job.org a bien appelé à 06:00:22, mais aucune exécution « quotidien » n'est enregistrée. Les journaux Render ne sont pas accessibles à l'agent.
+- Cause la plus probable (code) : la tâche de fond traitait les membres un par un et lançait d'abord la détection de portails (jusqu'à environ 150 s par membre) ; le membre réel pouvait passer après les comptes de test. De plus, la tâche asyncio n'était pas référencée : un arrêt ou un redémarrage du processus pouvait la perdre sans trace.
+- Correctifs : journal radar_cron_log (écrit dès la réception, avec chaque étape par membre et les erreurs ; statut « interrompu » si le processus s'arrête) ; Radar de tous les membres d'abord, détection ensuite ; membres les plus récemment actifs en premier ; délais max (900 s Radar, 240 s détection) ; référence forte à la tâche ; réponse du cron {started, members, log_id}.
+- Admin → Connecteurs → « Journal du passage quotidien ». Vérifié en preview : appel manuel du cron → 11 membres traités, journal complet (done).
+- À valider : prochain 06:00 en production (journal + ligne Automatique).
