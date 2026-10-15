@@ -25,13 +25,13 @@ export const SourceStatus = ({ status, run, active, onPick }) => (
                 <td className="py-2 pr-3"><span className="flex items-center gap-2 font-medium text-slate-200"><span className={`h-2.5 w-2.5 rounded-full ${s.dot}`} />{l}</span></td>
                 <td className="pr-3 text-slate-400">{s.label}</td>
                 <td className="pr-3 text-right"><Num n={n?.fetched || 0} onClick={() => onPick?.(k)} testid={`radar-source-count-${k}`} /></td>
-                <td className="text-right text-slate-300">{n?.analyzed || 0}</td>
+                <td className="text-right"><Num n={n?.analyzed || 0} onClick={() => onPick?.(`a_${k}`)} testid={`radar-source-analyzed-${k}`} /></td>
               </tr>);
           })}
         </tbody>
       </table>
     </div>
     {run && <p className="mt-2 border-t border-white/[0.06] pt-2 text-xs text-slate-300" data-testid="radar-source-total">
-      Total : <b>{run.analyzed ?? 0}</b> offres analysées sur {run.fetched ?? 0} trouvées · cliquez un chiffre pour afficher les offres</p>}
+      Total : <Num n={run.analyzed ?? 0} onClick={() => onPick?.("a_all")} testid="radar-source-total-analyzed" /> offres analysées sur <Num n={run.fetched ?? 0} onClick={() => onPick?.("all")} testid="radar-source-total-found" /> trouvées · cliquez un chiffre pour afficher les offres</p>}
   </section>
 );

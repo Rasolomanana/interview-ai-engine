@@ -499,14 +499,23 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         return [r async for r in db.radar_runs.find({"user_id": user["id"], "at": {"$gte": since}}, proj).sort("at", -1).limit(300)]
 
     @router.get("/runs/{run_id}/offers")
-    async def run_offers(run_id: str, kind: str = Query("found", pattern="^(found|new)$"), user: dict = Depends(current_user)):
-        run = await db.radar_runs.find_one({"id": run_id, "user_id": user["id"]}, {"_id": 0, "tracked": 1})
+    async def run_offers(run_id: str, kind: str = Query("found", pattern="^(found|new|analyzed|skipped|src_jooble|src_workday|src_boards|src_adzuna)$"),
+                         user: dict = Depends(current_user)):
+        run = await db.radar_runs.find_one({"id": run_id, "user_id": user["id"]}, {"_id": 0, "tracked": 1, "at": 1, "finished_at": 1})
         if run is None:
             raise HTTPException(status_code=404, detail="Recherche introuvable")
-        q = {"user_id": user["id"], "run_id": run_id} if kind == "new" else {"user_id": user["id"], "$or": [{"run_id": run_id}, {"seen_runs": run_id}]}
+        in_run = {"$or": [{"run_id": run_id}, {"seen_runs": run_id}]}
+        q = {"user_id": user["id"], **({"run_id": run_id} if kind == "new" else in_run)}
+        if kind == "analyzed":  # analysed during this run (rules or AI)
+            end = run.get("finished_at") or (datetime.fromisoformat(run["at"]) + timedelta(minutes=30)).isoformat()
+            q = {"user_id": user["id"], "analyzed_at": {"$gte": run["at"], "$lte": end}, "source": {"$ne": "externe"}}
+        elif kind == "skipped":
+            q["ips"] = None
         proj = {"_id": 0, "description": 0, "dedupe_key": 0, "user_id": 0, "seen_runs": 0}
-        offers = [o async for o in db.radar_offers.find(q, proj).sort("first_seen", -1).limit(300)]
-        return {"offers": offers, "complete": kind == "new" or bool(run.get("tracked"))}
+        offers = [o async for o in db.radar_offers.find(q, proj).sort("first_seen", -1).limit(500)]
+        if kind.startswith("src_"):
+            offers = [o for o in offers if S.group(o["source"]) == kind[4:]]
+        return {"offers": offers, "complete": kind in ("new", "analyzed") or bool(run.get("tracked"))}
 
     @router.get("/dashboard")
     async def dashboard(user: dict = Depends(current_user)):

@@ -36,7 +36,8 @@ const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, deepId, busy }) => 
         <p className="truncate text-sm font-semibold text-white">{o.title}</p>
         <p className="truncate text-xs text-slate-500">{o.company} · {o.location} · {o.source}{o.posted_at ? ` · ${o.posted_at}` : ""}</p>
       </div>
-      <span className="whitespace-nowrap font-mono text-xs text-slate-300" title="IPS Radar provisoire : 8 critères évaluables avant candidature. L'IPS officiel est recalculé dans le pack." data-testid={`radar-ips-${o.id}`}>IPS Radar {o.ips?.score ?? "—"}</span>
+      {o.ips ? <button type="button" onClick={() => onExplain(o)} className="whitespace-nowrap rounded-md px-1 font-mono text-xs text-indigo-300 underline decoration-indigo-400/40 underline-offset-2 hover:bg-indigo-500/10" title="IPS Radar provisoire : cliquez pour le détail du score" data-testid={`radar-ips-${o.id}`}>IPS Radar {o.ips.score}</button>
+        : <span className="whitespace-nowrap font-mono text-xs text-slate-300" data-testid={`radar-ips-${o.id}`}>IPS Radar —</span>}
     </div>
     <div className="mt-2 flex flex-wrap gap-1.5">
       <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] ${o.method === "ia" ? "border-indigo-400/30 bg-indigo-500/10 text-indigo-200" : "border-white/10 bg-white/5 text-slate-300"}`}
@@ -132,7 +133,11 @@ export default function Radar() {
   const lastOffers = d ? [...new Map([...(d.new_today || []), ...(d.known_last_run || [])].map((o) => [o.id, o])).values()] : [];
   const SRC = { jooble: "Jooble", workday: "Workday", boards: "Sites carrières", adzuna: "Adzuna" };
   const srcOf = (o) => (["jooble", "workday", "adzuna"].includes(o.source) ? o.source : "boards");
-  if (f?.startsWith("src:")) FILTERS[f] = [`Source : ${SRC[f.slice(4)]} (dernier passage)`, lastOffers.filter((o) => srcOf(o) === f.slice(4))];
+  if (f?.startsWith("src:")) {
+    const k = f.slice(4), an = k.startsWith("a_"), g = an ? k.slice(2) : k;
+    FILTERS[f] = [`${an ? "Analysées" : "Trouvées"} · ${g === "all" ? "toutes sources" : `source ${SRC[g]}`} (dernier passage)`,
+      lastOffers.filter((o) => (g === "all" || srcOf(o) === g) && (!an || o.ips))];
+  }
   if (f?.startsWith("co:")) FILTERS[f] = [`Entreprise : ${f.slice(3)} (dernier passage)`, lastOffers.filter((o) => (o.company || "").toLowerCase() === f.slice(3).toLowerCase())];
   const pick = (k) => {
     setF((cur) => (cur === k ? null : k));
@@ -168,7 +173,7 @@ export default function Radar() {
             <StatFilter label="Déjà connues" value={lr?.known ?? 0} testid="radar-stat-known" active={f === "known"} onClick={() => pick("known")} />
             <StatFilter label="Priorité A" value={d.top_a.length} testid="radar-stat-a" active={f === "a"} onClick={() => pick("a")} />
           </div>
-          <SourceStatus status={d.sources_status} run={lr} active={f?.startsWith("src:") ? f.slice(4) : null} onPick={(k) => pick(`src:${k}`)} />
+          <SourceStatus status={d.sources_status} run={lr} active={f?.startsWith("src:") ? f.slice(4).replace(/^a_/, "") : null} onPick={(k) => pick(`src:${k}`)} />
           <AutoNotices refreshKey={lr?.id} onChange={load} onEdit={() => setSettings(true)} />
           <PortalHealth status={d.sources_status} run={lr} active={f?.startsWith("co:") ? f.slice(3) : null} onPick={(n) => pick(`co:${n}`)} />
           <CompanySuggestions refreshKey={lr?.id} onFollowed={load} />

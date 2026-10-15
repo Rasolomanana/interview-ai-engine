@@ -3,6 +3,9 @@ import { Loader2, PlugZap, Puzzle } from "lucide-react";
 import { toast } from "sonner";
 import { adminConnectors } from "@/lib/api";
 import { CronLog } from "./CronLog";
+import { ClickNum, DetailDialog } from "./DetailDialog";
+
+const Q = { fiable: "Fiable", fragile: "Fragile", bloquee: "Bloquée", repli: "Repli Jooble" };
 
 const panel = "min-w-0 rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:p-5";
 const PRIO = { "Élevée": "text-rose-300", Moyenne: "text-amber-300", Faible: "text-slate-400", "Aucune (protection)": "text-slate-500" };
@@ -11,10 +14,16 @@ const Td = ({ children, left, className = "" }) => <td className={`border-b bord
 
 export const Connectors = () => {
   const [d, setD] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const names = (title, list) => setDetail({ title, cols: [["n", "Entreprise"]], rows: (list || []).map((n) => ({ n })), note: "Agrégé de façon anonyme : aucun membre identifiable." });
+  const portals = (r, what, q) => setDetail({ title: `${r.label} · ${what} (dernier passage de chaque membre)`,
+    cols: [["name", "Entreprise"], ["q", "Qualité"], ["fetched", "Lues"], ["matched", "Retenues"], ["error", "Erreur"]],
+    rows: (r.portals || []).filter((p) => !q || p.quality === q).map((p) => ({ ...p, q: Q[p.quality] || p.quality, error: p.error || "—" })) });
   useEffect(() => { adminConnectors(sessionStorage.getItem("adminPwd")).then(setD).catch((e) => toast.error(e.message)); }, []);
   if (!d) return <Loader2 className="h-5 w-5 animate-spin text-emerald-400" />;
   return (
     <div className="space-y-4" data-testid="admin-connectors">
+      <DetailDialog detail={detail} onClose={() => setDetail(null)} />
       <CronLog />
       <section className={panel} data-testid="connectors-backlog">
         <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-200"><Puzzle className="h-4 w-4 text-emerald-400" />Connecteurs à prévoir (classés par impact)</h3>
@@ -23,9 +32,11 @@ export const Connectors = () => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-[12px]">
               <thead className="text-slate-500"><tr className="border-b border-white/10"><Th left>Portail</Th><Th>Entreprises</Th><Th>Membres</Th><Th>Offres (30 j)</Th><Th left>Exemples</Th><Th left>Difficulté</Th><Th left>Priorité</Th></tr></thead>
-              <tbody>{d.backlog.map((r) => (
+              <tbody>{d.backlog.map((r, i) => (
                 <tr key={r.connector} data-testid={`connector-row-${r.connector.replace(/[^a-z0-9]/gi, "-")}`}>
-                  <Td left className="font-semibold text-white">{r.connector}</Td><Td>{r.companies}</Td><Td>{r.members}</Td><Td>{r.offers_30d}</Td>
+                  <Td left className="font-semibold text-white">{r.connector}</Td><Td><ClickNum onClick={() => names(`${r.connector} · entreprises`, r.names)} testid={`backlog-companies-${i}`}>{r.companies}</ClickNum></Td>
+                  <Td><ClickNum onClick={() => names(`${r.connector} · entreprises (${r.members} membre(s), anonymes)`, r.names)} testid={`backlog-members-${i}`}>{r.members}</ClickNum></Td>
+                  <Td><ClickNum onClick={() => names(`${r.connector} · ${r.offers_30d} offres Jooble (30 j) pour ces entreprises`, r.names)} testid={`backlog-offers-${i}`}>{r.offers_30d}</ClickNum></Td>
                   <Td left className="text-slate-400">{r.examples.join(", ")}</Td><Td left>{r.difficulty}</Td><Td left className={`font-semibold ${PRIO[r.priority] || ""}`}>{r.priority}</Td>
                 </tr>))}</tbody>
             </table>
@@ -38,10 +49,14 @@ export const Connectors = () => {
             <thead className="text-slate-500"><tr className="border-b border-white/10"><Th left>Portail</Th><Th>Entreprises</Th><Th>Membres</Th><Th>Offres lues</Th><Th>Retenues</Th><Th>Lecture réussie</Th><Th>Fiable</Th><Th>Fragile</Th><Th>Bloquée</Th><Th>Repli Jooble</Th></tr></thead>
             <tbody>{d.supported.map((r) => (
               <tr key={r.kind} data-testid={`connector-active-${r.kind}`}>
-                <Td left className="font-semibold text-white">{r.label}{r.fragile_kind && <span className="ml-1.5 rounded-full border border-sky-400/30 px-1.5 text-[10px] font-normal text-sky-300" data-testid={`connector-fragile-${r.kind}`}>au mieux</span>}</Td><Td>{r.companies}</Td><Td>{r.members}</Td><Td>{r.fetched}</Td><Td>{r.matched}</Td>
-                <Td className={r.success_pct !== null && r.success_pct < 100 ? "text-amber-300" : ""}>{r.success_pct === null ? "—" : `${r.success_pct} %`}</Td>
-                <Td className="text-emerald-300">{r.reliable}</Td><Td className="text-sky-300">{r.fragile}</Td><Td className="text-rose-300">{r.blocked}</Td>
-                <Td className="text-amber-300">{r.fallback - r.blocked}</Td>
+                <Td left className="font-semibold text-white">{r.label}{r.fragile_kind && <span className="ml-1.5 rounded-full border border-sky-400/30 px-1.5 text-[10px] font-normal text-sky-300" data-testid={`connector-fragile-${r.kind}`}>au mieux</span>}</Td><Td><ClickNum onClick={() => names(`${r.label} · entreprises associées`, r.names)} testid={`supported-companies-${r.kind}`}>{r.companies}</ClickNum></Td>
+                <Td><ClickNum onClick={() => names(`${r.label} · entreprises (${r.members} membre(s), anonymes)`, r.names)} testid={`supported-members-${r.kind}`}>{r.members}</ClickNum></Td>
+                <Td><ClickNum onClick={() => portals(r, "Lues")} testid={`supported-fetched-${r.kind}`}>{r.fetched}</ClickNum></Td><Td><ClickNum onClick={() => portals(r, "Retenues")} testid={`supported-matched-${r.kind}`}>{r.matched}</ClickNum></Td>
+                <Td className={r.success_pct !== null && r.success_pct < 100 ? "text-amber-300" : ""}><ClickNum onClick={() => portals(r, "Lectures")} testid={`supported-success-${r.kind}`}>{r.success_pct === null ? "—" : `${r.success_pct} %`}</ClickNum></Td>
+                <Td className="text-emerald-300"><ClickNum onClick={() => portals(r, "Fiable", "fiable")} testid={`supported-reliable-${r.kind}`}>{r.reliable}</ClickNum></Td>
+                <Td className="text-sky-300"><ClickNum onClick={() => portals(r, "Fragile", "fragile")} testid={`supported-fragile-${r.kind}`}>{r.fragile}</ClickNum></Td>
+                <Td className="text-rose-300"><ClickNum onClick={() => portals(r, "Bloquée", "bloquee")} testid={`supported-blocked-${r.kind}`}>{r.blocked}</ClickNum></Td>
+                <Td className="text-amber-300"><ClickNum onClick={() => portals(r, "Repli Jooble", "repli")} testid={`supported-fallback-${r.kind}`}>{r.fallback - r.blocked}</ClickNum></Td>
               </tr>))}</tbody>
           </table>
         </div>

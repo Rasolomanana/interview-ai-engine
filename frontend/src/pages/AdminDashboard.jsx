@@ -11,19 +11,20 @@ import { CreditCard } from "@/components/admin/CreditCard";
 import { ThemeToggle, usePageTitle } from "@/components/careeros/ThemeToggle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FinanceDashboard } from "@/components/admin/finance/FinanceDashboard";
+import { ClickNum, DetailDialog } from "@/components/admin/DetailDialog";
 import { Connectors } from "@/components/admin/Connectors";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(4)}`;
 const num = (n) => (Number(n) || 0).toLocaleString();
 
-function StatCard({ icon: Icon, label, value, accent }) {
+function StatCard({ icon: Icon, label, value, accent, onClick }) {
   return (
-    <div data-testid={`stat-${label}`} className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
+    <div data-testid={`stat-${label}`} onClick={onClick} className="cursor-pointer rounded-2xl border border-white/10 bg-slate-900/60 p-5 transition-colors hover:border-white/25" title="Afficher le détail par jour">
       <div className="flex items-center gap-2 text-slate-400">
         <Icon className={`h-4 w-4 ${accent}`} />
         <span className="text-[11px] font-mono uppercase tracking-widest">{label}</span>
       </div>
-      <div className="mt-2 text-3xl font-bold text-white">{value}</div>
+      <div className="mt-2 text-3xl font-bold text-white underline decoration-white/20 underline-offset-4">{value}</div>
     </div>
   );
 }
@@ -65,6 +66,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
   const [err, setErr] = useState("");
+  const [detail, setDetail] = useState(null);
 
   const friendlyErr = (e) =>
     e?.name === "TypeError" || /failed to fetch|networkerror|load failed/i.test(String(e?.message))
@@ -149,6 +151,11 @@ export default function AdminDashboard() {
 
   const t = stats?.totals || {};
   const llm = stats?.llm || { calls: 0, tokens_in: 0, tokens_out: 0, cost: 0, by_provider: {} };
+  const byDay = (key, title) => setDetail({ title: `${title} · détail par jour (30 j)`, cols: [["day", "Jour"], ["v", title]],
+    rows: (stats?.by_day || []).filter((d) => key in d).map((d) => ({ day: d.bucket, v: num(d[key]) })).reverse(),
+    note: key in ((stats?.by_day || [])[0] || {}) ? undefined : "Pas de série quotidienne pour cet indicateur : total cumulé uniquement." });
+  const providers = (title) => setDetail({ title: `${title} · par fournisseur`, cols: [["p", "Fournisseur"], ["calls", "Appels"], ["tin", "Tokens entrée"], ["tout", "Tokens sortie"], ["cost", "Coût"]],
+    rows: Object.entries(llm.by_provider || {}).map(([p, v]) => ({ p, calls: num(v.calls), tin: num(v.tokens_in), tout: num(v.tokens_out), cost: money(v.cost) })) });
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-6 text-slate-200" data-testid="admin-dashboard">
@@ -186,11 +193,11 @@ export default function AdminDashboard() {
         <TabsContent value="rentabilite"><FinanceDashboard /></TabsContent>
         <TabsContent value="activite">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard icon={Users} label="Visiteurs" value={num(t.visitors)} accent="text-indigo-400" />
-          <StatCard icon={PlayCircle} label="Simulations" value={num(t.simulations)} accent="text-emerald-400" />
-          <StatCard icon={FileSearch} label="Analyses ATS" value={num(t.ats_analyses)} accent="text-sky-400" />
-          <StatCard icon={FileText} label="CV analysés" value={num(t.cvs_analyzed)} accent="text-cyan-400" />
-          <StatCard icon={Mail} label="Lettres" value={num(t.cover_letters)} accent="text-amber-400" />
+          <StatCard icon={Users} label="Visiteurs" value={num(t.visitors)} accent="text-indigo-400" onClick={() => byDay("visitors", "Visiteurs")} />
+          <StatCard icon={PlayCircle} label="Simulations" value={num(t.simulations)} accent="text-emerald-400" onClick={() => byDay("simulations", "Simulations")} />
+          <StatCard icon={FileSearch} label="Analyses ATS" value={num(t.ats_analyses)} accent="text-sky-400" onClick={() => byDay("ats", "Analyses ATS")} />
+          <StatCard icon={FileText} label="CV analysés" value={num(t.cvs_analyzed)} accent="text-cyan-400" onClick={() => byDay("ats", "CV analysés (via analyses ATS)")} />
+          <StatCard icon={Mail} label="Lettres" value={num(t.cover_letters)} accent="text-amber-400" onClick={() => byDay("cover_letters", "Lettres")} />
         </div>
 
         <CreditCard />
@@ -203,20 +210,20 @@ export default function AdminDashboard() {
             <span className="text-[10px] text-slate-500">(reportée par le client — couvre Gemini & Serveur)</span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div><div className="text-[10px] uppercase text-slate-500">Appels</div><div className="text-xl font-bold text-white">{num(llm.calls)}</div></div>
-            <div><div className="text-[10px] uppercase text-slate-500">Tokens entrée</div><div className="text-xl font-bold text-white">{num(llm.tokens_in)}</div></div>
-            <div><div className="text-[10px] uppercase text-slate-500">Tokens sortie</div><div className="text-xl font-bold text-white">{num(llm.tokens_out)}</div></div>
-            <div><div className="text-[10px] uppercase text-slate-500">Coût estimé</div><div className="text-xl font-bold text-amber-300">{money(llm.cost)}</div></div>
+            <div><div className="text-[10px] uppercase text-slate-500">Appels</div><ClickNum onClick={() => providers("Appels")} testid="admin-llm-calls" className="text-xl font-bold text-white">{num(llm.calls)}</ClickNum></div>
+            <div><div className="text-[10px] uppercase text-slate-500">Tokens entrée</div><ClickNum onClick={() => providers("Tokens entrée")} testid="admin-llm-tin" className="text-xl font-bold text-white">{num(llm.tokens_in)}</ClickNum></div>
+            <div><div className="text-[10px] uppercase text-slate-500">Tokens sortie</div><ClickNum onClick={() => providers("Tokens sortie")} testid="admin-llm-tout" className="text-xl font-bold text-white">{num(llm.tokens_out)}</ClickNum></div>
+            <div><div className="text-[10px] uppercase text-slate-500">Coût estimé</div><ClickNum onClick={() => providers("Coût estimé")} testid="admin-llm-cost" className="text-xl font-bold text-amber-300">{money(llm.cost)}</ClickNum></div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3" data-testid="admin-llm-split">
             <div data-testid="admin-gemini-calls" className="rounded-xl border border-sky-500/20 bg-sky-950/20 p-3">
               <div className="text-[10px] uppercase text-sky-300">Appels Gemini (navigateur)</div>
-              <div className="text-2xl font-bold text-white">{num(llm.gemini_calls)}</div>
+              <ClickNum onClick={() => providers("Appels Gemini")} testid="admin-gemini-num" className="text-2xl font-bold text-white">{num(llm.gemini_calls)}</ClickNum>
               <div className="text-[11px] text-slate-400">{money(llm.gemini_cost)}</div>
             </div>
             <div data-testid="admin-server-calls" className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-950/20 p-3">
               <div className="text-[10px] uppercase text-fuchsia-300">Appels Serveur (OpenRouter gratuit/payant, Anthropic)</div>
-              <div className="text-2xl font-bold text-white">{num(llm.server_calls)}</div>
+              <ClickNum onClick={() => providers("Appels serveur")} testid="admin-server-num" className="text-2xl font-bold text-white">{num(llm.server_calls)}</ClickNum>
               <div className="text-[11px] text-slate-400">{money(llm.server_cost)}</div>
             </div>
           </div>
@@ -277,6 +284,7 @@ export default function AdminDashboard() {
         </Tabs>
         <a href="/careeros" className="mt-6 block text-center text-xs text-slate-500 hover:text-slate-300">← Retour à l'application</a>
       </div>
+      <DetailDialog detail={detail} onClose={() => setDetail(null)} />
     </div>
   );
 }

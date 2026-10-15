@@ -34,8 +34,8 @@ def create_connectors_router(db, check_admin):
                 if not c.get("enabled", True):
                     continue
                 if c.get("kind"):
-                    a = active.setdefault(c["kind"], {"companies": set(), "members": set()})
-                    a["companies"].add(norm(c["name"])); a["members"].add(st["user_id"])
+                    a = active.setdefault(c["kind"], {"companies": set(), "members": set(), "names": {}})
+                    a["companies"].add(norm(c["name"])); a["members"].add(st["user_id"]); a["names"][norm(c["name"])] = c["name"]
                     continue
                 kind, ats = _classify(c.get("detected", ""))
                 for name in ats:
@@ -58,7 +58,7 @@ def create_connectors_router(db, check_admin):
             score = round((len(b["members"]) * 3 + len(b["companies"]) * 2 + offers / 10) * factor, 1)
             ex = sorted(b["companies"].values(), key=lambda x: -len(x["members"]))[:4]
             rows.append({"connector": key, "blocked": b["blocked"], "companies": len(b["companies"]), "members": len(b["members"]),
-                         "examples": [x["name"] for x in ex], "offers_30d": offers, "difficulty": diff, "score": score})
+                         "examples": [x["name"] for x in ex], "names": sorted(x["name"] for x in b["companies"].values()), "offers_30d": offers, "difficulty": diff, "score": score})
         rows.sort(key=lambda r: -r["score"])
         top = rows[0]["score"] if rows and rows[0]["score"] else 0
         for r in rows:
@@ -68,7 +68,9 @@ def create_connectors_router(db, check_admin):
         async for run in db.radar_runs.aggregate([{"$match": {"portals": {"$exists": True}}}, {"$sort": {"at": -1}},
                                                   {"$group": {"_id": "$user_id", "portals": {"$first": "$portals"}}}]):
             for name, p in (run.get("portals") or {}).items():
-                s = stats.setdefault(p["kind"], {"reads": 0, "ok": 0, "fetched": 0, "matched": 0, "fallback": 0, "blocked": 0, "fiable": 0, "fragile": 0})
+                s = stats.setdefault(p["kind"], {"reads": 0, "ok": 0, "fetched": 0, "matched": 0, "fallback": 0, "blocked": 0, "fiable": 0, "fragile": 0, "portals": []})
+                s["portals"].append({"name": name, "ok": bool(p.get("ok")), "blocked": bool(p.get("blocked")), "fetched": p.get("fetched", 0), "matched": p.get("matched", 0) or 0,
+                                     "quality": p.get("quality") or S.quality(p["kind"], bool(p.get("ok")), bool(p.get("blocked"))), "error": (p.get("error") or "")[:160]})
                 s["reads"] += 1; s["ok"] += int(bool(p.get("ok"))); s["fetched"] += p.get("fetched", 0); s["matched"] += p.get("matched", 0) or 0
                 s["fallback"] += int(not p.get("ok")); s["blocked"] += int(bool(p.get("blocked")))
                 q = p.get("quality") or S.quality(p["kind"], bool(p.get("ok")), bool(p.get("blocked")))
@@ -81,7 +83,7 @@ def create_connectors_router(db, check_admin):
                               "fetched": s.get("fetched", 0), "matched": s.get("matched", 0),
                               "success_pct": round(s["ok"] * 100 / s["reads"], 1) if s.get("reads") else None,
                               "fallback": s.get("fallback", 0), "blocked": s.get("blocked", 0), "reliable": s.get("fiable", 0), "fragile": s.get("fragile", 0),
-                              "fragile_kind": kind in S.FRAGILE})
+                              "fragile_kind": kind in S.FRAGILE, "names": sorted(a.get("names", {}).values()), "portals": s.get("portals", [])})
         supported.sort(key=lambda x: -x["companies"])
         return {"backlog": rows, "supported": supported, "redetect": {k: len(v) for k, v in redetect.items()}}
 
