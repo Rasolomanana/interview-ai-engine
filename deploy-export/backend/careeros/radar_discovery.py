@@ -9,7 +9,8 @@ import httpx
 from . import radar_sources as S
 
 KIND_LABEL = {"workday": "Workday", "successfactors": "SuccessFactors", "oracle": "Oracle Recruiting", "icims": "iCIMS",
-              "greenhouse": "Greenhouse", "lever": "Lever", "ashby": "Ashby", "smartrecruiters": "SmartRecruiters", "amazon": "amazon.jobs", "ukg": "UKG (UltiPro)"}
+              "greenhouse": "Greenhouse", "lever": "Lever", "ashby": "Ashby", "smartrecruiters": "SmartRecruiters", "amazon": "amazon.jobs", "ukg": "UKG (UltiPro)",
+              "taleo": "Taleo", "avature": "Avature", "phenom": "Phenom"}
 WD = lambda host, site: f"https://{host}.myworkdayjobs.com/fr-CA/{site}"  # noqa: E731
 SF = lambda host: f"https://{host}/services/rss/job/"  # noqa: E731
 # Portals checked live before being proposed. url "" = no public feed → followed via Jooble.
@@ -25,16 +26,18 @@ DIRECTORY = [
     ("CN", SF("careers.cn.ca"), "Transport"), ("CPKC", SF("careers.cpr.ca"), "Transport"), ("Sobeys", SF("jobs.sobeyscareers.com"), "Alimentation"),
     ("Ville de Montréal", "https://fa-exyq-saasfaprod1.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/fr-CA/sites/ExperienceCandidatVdM/jobs", "Secteur public"),
     ("Ubisoft", "https://careers.smartrecruiters.com/Ubisoft2", "Jeux vidéo"), ("Amazon", "https://www.amazon.jobs/fr", "Technologie"),
-    ("Banque Nationale", "", "Finance"), ("Bell", "", "Télécommunications"), ("Air Canada", "", "Transport"),
+    ("Banque Nationale", "https://emplois.bnc.ca/fr_CA/careers/SearchJobs", "Finance"), ("Bell", "https://jobs.bell.ca/ca/fr/search-results", "Télécommunications"),
+    ("Air Canada", "https://careers.aircanada.com/ca/fr/search-results", "Transport"),
     ("Metro", "", "Alimentation"), ("CGI", "", "Technologie"),
 ]
-NO_FEED_ATS = {"Banque Nationale": "Avature", "Bell": "Phenom", "Air Canada": "Phenom", "Metro": "portail propriétaire", "CGI": "Njoyn"}
+NO_FEED_ATS = {"Metro": "portail propriétaire", "CGI": "Njoyn"}
 UNSUPPORTED = {"taleo.net": "Taleo", "phenompeople": "Phenom", "avature": "Avature", "njoyn": "Njoyn", "silkroad": "SilkRoad",
                "jobvite": "Jobvite"}
 ATS = [
     (r"https?://[a-z0-9-]+\.wd\d+\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?[A-Za-z0-9_-]+", None),
     (r"https?://[a-z0-9.-]+\.oraclecloud\.com/hcmUI/CandidateExperience/[a-zA-Z-]+/sites/[A-Za-z0-9_]+", None),
-    (r"https?://[a-z0-9-]+\.icims\.com", None), (r"https?://recruiting\d*\.ultipro\.(?:com|ca)/[A-Za-z0-9]+/JobBoard/[0-9a-f-]{36}", None), (r"https?://(?:boards|job-boards)\.greenhouse\.io/[a-z0-9_-]+", None),
+    (r"https?://[a-z0-9-]+\.icims\.com", None), (r"https?://[a-z0-9-]+\.taleo\.net/careersection/[a-z0-9_]+/", None),
+    (r"https?://[a-z0-9.-]+/(?:[a-z]{2}_[A-Z]{2}/)?[A-Za-z0-9_-]+/SearchJobs", None), (r"https?://recruiting\d*\.ultipro\.(?:com|ca)/[A-Za-z0-9]+/JobBoard/[0-9a-f-]{36}", None), (r"https?://(?:boards|job-boards)\.greenhouse\.io/[a-z0-9_-]+", None),
     (r"https?://jobs\.lever\.co/[a-z0-9_-]+", None), (r"https?://jobs\.ashbyhq\.com/[a-z0-9_.-]+", None),
     (r"https?://(?:jobs|careers)\.smartrecruiters\.com/[A-Za-z0-9_-]+", None),
 ]
@@ -76,7 +79,10 @@ async def verify(client, kind: str, slug: str, name: str) -> dict:
             offers = await S.workday(client, slug, name, [], max_details=0)
         else:
             offers = await S.board(client, kind, slug, name, [])
-        return {"ok": True, "count": len(offers), "message": f"Portail {KIND_LABEL[kind]} vérifié : {len(offers)} offre(s) visibles."}
+        fragile = kind in S.FRAGILE
+        return {"ok": True, "count": len(offers), "quality": "fragile" if fragile else "fiable",
+                "message": f"Portail {KIND_LABEL[kind]} vérifié : {len(offers)} offre(s) visibles." +
+                (" Lecture « au mieux » (page web sans API publique) : résultats possiblement partiels, repli Jooble en cas d'échec." if fragile else "")}
     except Exception as e:  # noqa: BLE001
         if is_blocked(e):
             return {"ok": False, "blocked": True, "count": 0,
@@ -95,10 +101,19 @@ async def _get(client, url):
 def _scan(url: str, text: str, found: dict, unsupported: set):
     text = text.replace("\\/", "/")
     for pat, _ in ATS:
-        for m in re.findall(pat, text, re.I):
+        for m in re.findall(pat, f"{url} {text}", re.I):
             kind, slug = S.parse_portal(m)
             if kind:
                 found.setdefault((kind, slug), m)
+    if "phApp.ddo" in text:  # Phenom site: base = host/country/lang
+        loc = re.search(r'"locale"\s*:\s*"([a-z]{2})_([a-z]{2})"', text)
+        h = S.host_of(url)
+        if h and loc:
+            found.setdefault(("phenom", f"{h}/{loc.group(2)}/{loc.group(1)}"), f"https://{h}/{loc.group(2)}/{loc.group(1)}/search-results")
+    if "avature" in text.lower():
+        k, slug = S.parse_portal(url + "/SearchJobs") if not re.search(r"/(SearchJobs|JobDetail)", url) else S.parse_portal(url)
+        if k == "avature" and re.search(r"/careers?$|/[a-z]{2}_[A-Z]{2}/[A-Za-z0-9_-]+$", slug):
+            found.setdefault(("avature", slug), f"https://{slug}/SearchJobs")
     if "rmkcdn.successfactors.com" in text or "/services/rss/job" in text:
         h = S.host_of(url)
         if h:
@@ -118,7 +133,7 @@ async def discover(name: str, website: str = "") -> dict:
             k, s = S.parse_portal(d[1])
             found[(k, s)], origin[(k, s)] = d[1], "annuaire"
         vs = _variants(name)
-        hosts = [S.host_of(website) or website.strip().lower()] if website else []
+        hosts = [re.sub(r"^https?://", "", website.strip(), flags=re.I)] if website else []
         for v in vs[:2]:
             hosts += [f"{v}.com", f"{v}.ca", f"careers.{v}.com", f"jobs.{v}.com"]
         hosts = list(dict.fromkeys(h for h in hosts if h))[:8]
@@ -146,6 +161,7 @@ async def discover(name: str, website: str = "") -> dict:
             if v["ok"] and v["count"]:
                 found[(k, s)], origin[(k, s)] = "", "devinette"
         results = await asyncio.gather(*(verify(c, k, s, name) for k, s in found))
+    unsupported -= {KIND_LABEL[k] for k, _ in found}
     out = []
     for ((k, s), url), v in zip(found.items(), results):
         if origin[(k, s)] == "devinette" or not url:

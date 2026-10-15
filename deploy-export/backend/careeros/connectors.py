@@ -3,7 +3,10 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Header
 
+from . import radar_sources as S
 from .radar_discovery import KIND_LABEL, norm
+
+NOW_SUPPORTED = {"UKG", "Avature", "Taleo", "Phenom"}  # older detections to re-run (loupe / « Tout détecter »)
 
 DIFFICULTY = {"UKG": ("Simple", 1.0), "Jobvite": ("Simple", 1.0), "Avature": ("Moyenne", 0.7), "Taleo": ("Moyenne", 0.7),
               "Njoyn": ("Moyenne", 0.7), "SilkRoad": ("Moyenne", 0.7), "Phenom": ("Difficile", 0.4), "portail propriétaire": ("Difficile", 0.3)}
@@ -25,7 +28,7 @@ def create_connectors_router(db, check_admin):
     @router.get("/connectors")
     async def connectors(x_admin_password: str = Header(None)):
         check_admin(x_admin_password)
-        backlog, active = {}, {}
+        backlog, active, redetect = {}, {}, {}
         async for st in db.radar_settings.find({}, {"_id": 0, "user_id": 1, "companies": 1}):
             for c in st.get("companies") or []:
                 if not c.get("enabled", True):
@@ -36,6 +39,9 @@ def create_connectors_router(db, check_admin):
                     continue
                 kind, ats = _classify(c.get("detected", ""))
                 for name in ats:
+                    if kind == "unsupported" and name in NOW_SUPPORTED:
+                        redetect.setdefault(name, set()).add(norm(c["name"]))
+                        continue
                     key = f"{name} (bloqué anti-robot)" if kind == "blocked" else name
                     b = backlog.setdefault(key, {"ats": name, "blocked": kind == "blocked", "companies": {}, "members": set()})
                     b["companies"].setdefault(norm(c["name"]), {"name": c["name"], "members": set()})["members"].add(st["user_id"])
@@ -62,17 +68,21 @@ def create_connectors_router(db, check_admin):
         async for run in db.radar_runs.aggregate([{"$match": {"portals": {"$exists": True}}}, {"$sort": {"at": -1}},
                                                   {"$group": {"_id": "$user_id", "portals": {"$first": "$portals"}}}]):
             for name, p in (run.get("portals") or {}).items():
-                s = stats.setdefault(p["kind"], {"reads": 0, "ok": 0, "fetched": 0, "matched": 0, "fallback": 0, "blocked": 0})
+                s = stats.setdefault(p["kind"], {"reads": 0, "ok": 0, "fetched": 0, "matched": 0, "fallback": 0, "blocked": 0, "fiable": 0, "fragile": 0})
                 s["reads"] += 1; s["ok"] += int(bool(p.get("ok"))); s["fetched"] += p.get("fetched", 0); s["matched"] += p.get("matched", 0) or 0
                 s["fallback"] += int(not p.get("ok")); s["blocked"] += int(bool(p.get("blocked")))
+                q = p.get("quality") or S.quality(p["kind"], bool(p.get("ok")), bool(p.get("blocked")))
+                if q in ("fiable", "fragile"):
+                    s[q] += 1
         supported = []
         for kind, a in active.items():
             s = stats.get(kind, {})
             supported.append({"kind": kind, "label": KIND_LABEL.get(kind, kind), "companies": len(a["companies"]), "members": len(a["members"]),
                               "fetched": s.get("fetched", 0), "matched": s.get("matched", 0),
                               "success_pct": round(s["ok"] * 100 / s["reads"], 1) if s.get("reads") else None,
-                              "fallback": s.get("fallback", 0), "blocked": s.get("blocked", 0)})
+                              "fallback": s.get("fallback", 0), "blocked": s.get("blocked", 0), "reliable": s.get("fiable", 0), "fragile": s.get("fragile", 0),
+                              "fragile_kind": kind in S.FRAGILE})
         supported.sort(key=lambda x: -x["companies"])
-        return {"backlog": rows, "supported": supported}
+        return {"backlog": rows, "supported": supported, "redetect": {k: len(v) for k, v in redetect.items()}}
 
     return router

@@ -1,7 +1,8 @@
+import { KIND_LABEL } from "@/lib/portals";
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 
-const KIND = { workday: "Workday", successfactors: "SuccessFactors", oracle: "Oracle", icims: "iCIMS", greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", smartrecruiters: "SmartRecruiters", amazon: "amazon.jobs", ukg: "UKG" };
+const KIND = KIND_LABEL;
 
 export const detectedLabel = (r) => {
   if (r?.candidates?.some((p) => p.ok)) return "";

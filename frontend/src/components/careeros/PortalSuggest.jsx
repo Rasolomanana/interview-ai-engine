@@ -60,6 +60,7 @@ const SuggestBox = ({ c, i, result, onResult, onPick, onClose, auto }) => {
             {p.ok ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
             <span className="min-w-0 flex-1"><b className="text-slate-100">{p.kind_label}</b> <span className="text-slate-500">· {ORIGIN[p.origin]}</span>
               <span className="block text-slate-400">{p.ok ? `${p.count} offre(s) visibles` : p.message}</span>
+              {p.ok && p.quality === "fragile" && <span className="block text-sky-300" data-testid={`portal-fragile-${i}-${p.kind}${k ? `-${k}` : ""}`}>Lecture fragile (page web sans API publique) : résultats possiblement partiels, repli Jooble en cas d'échec.</span>}
               <span className="block break-all text-slate-500">{p.portal_url}</span></span>
             {p.ok && <button type="button" onClick={() => onPick({ portal_url: p.portal_url, kind: p.kind, slug: p.slug, website: site })} className="flex shrink-0 items-center gap-1 rounded-full border border-emerald-400/40 px-2.5 py-1 text-emerald-300 hover:bg-emerald-500/10" data-testid={`portal-associate-${i}-${p.kind}${k ? `-${k}` : ""}`}><Link2 className="h-3 w-3" />Associer</button>}
           </div>))}

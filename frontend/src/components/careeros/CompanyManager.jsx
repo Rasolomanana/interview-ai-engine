@@ -1,3 +1,4 @@
+import { KIND_LABEL } from "@/lib/portals";
 import { useState } from "react";
 import { Building2, CheckCircle2, Loader2, Plus, Search, Trash2, Upload, Wand2 } from "lucide-react";
 import { toast } from "sonner";
@@ -7,7 +8,7 @@ import { EmployerDirectory } from "@/components/careeros/EmployerDirectory";
 import { CompanySummary, detectedLabel } from "@/components/careeros/CompanySummary";
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400/60";
-const KIND = { workday: "Workday", successfactors: "SuccessFactors", oracle: "Oracle", icims: "iCIMS", greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", smartrecruiters: "SmartRecruiters", amazon: "amazon.jobs", ukg: "UKG" };
+const KIND = KIND_LABEL;
 
 export const parseImport = (text) => text.split("\n").flatMap((l) => (/https?:|\|/.test(l) ? [l] : l.split(","))).map((l) => l.trim()).filter(Boolean).map((l) => {
   const [name, url = ""] = l.split(/\s*[|\t;]\s*/);
@@ -100,7 +101,7 @@ export const CompanyManager = ({ companies, setCompanies }) => {
           <button type="button" onClick={() => setImporting(!importing)} className="flex items-center gap-1 text-indigo-300" data-testid="radar-import-toggle"><Upload className="h-3.5 w-3.5" />Importer une liste</button>
         </div>
       </div>
-      <p className="text-[11px] text-slate-500">Ajoutez simplement le nom : la loupe propose le portail compatible (Workday, SuccessFactors, Oracle Recruiting, iCIMS, Greenhouse, Lever, SmartRecruiters…). Sans portail lisible, l'entreprise reste suivie via Jooble.</p>
+      <p className="text-[11px] text-slate-500">Ajoutez simplement le nom : la loupe propose le portail compatible (Workday, SuccessFactors, Oracle Recruiting, iCIMS, UKG, Taleo, Avature, Phenom, SmartRecruiters, Greenhouse, Lever…). Sans portail lisible, l'entreprise reste suivie via Jooble.</p>
       <CompanySummary companies={companies} />
       {dir && <EmployerDirectory companies={companies} onAdd={addFromDirectory} />}
       {importing && (

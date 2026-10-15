@@ -1,8 +1,9 @@
 """CareerOS Radar sources — official/legal only: Jooble API, optional Adzuna API, public career portals
-(Workday, SuccessFactors, Oracle Recruiting, iCIMS, Greenhouse, Lever, Ashby, SmartRecruiters, amazon.jobs). Each fetcher returns normalized offers:
+(Workday, SuccessFactors, Oracle Recruiting, iCIMS, UKG, Taleo, Avature, Phenom, Greenhouse, Lever, Ashby, SmartRecruiters, amazon.jobs). Each fetcher returns normalized offers:
 {source, external_id, title, company, location, url, description, posted_at, salary}."""
 import asyncio
 import html
+import json
 import os
 import re
 from datetime import datetime, timezone
@@ -19,7 +20,12 @@ def _clean(text: str) -> str:
 
 
 WORKDAY_CANADA = "a30a87ed25634629aa6c3958aa2b91ea"  # Workday's global country id for Canada
-PORTAL_KINDS = ("workday", "successfactors", "oracle", "icims", "ukg", "greenhouse", "lever", "ashby", "smartrecruiters", "amazon")
+PORTAL_KINDS = ("workday", "successfactors", "oracle", "icims", "ukg", "taleo", "avature", "phenom", "greenhouse", "lever", "ashby", "smartrecruiters", "amazon")
+FRAGILE = {"icims", "avature", "phenom"}  # read from HTML pages (no public API): best effort
+
+
+def quality(kind: str, ok: bool, blocked: bool) -> str:
+    return "bloquee" if blocked else "repli" if not ok else "fragile" if kind in FRAGILE else "fiable"
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"}
 SOURCE_GROUP = {"jooble": "jooble", "adzuna": "adzuna", "workday": "workday"}  # anything else → "boards"
 
@@ -46,6 +52,13 @@ def parse_portal(url: str) -> tuple:
     m = re.search(r"https?://(recruiting\d*\.ultipro\.(?:com|ca))/([A-Za-z0-9]+)/JobBoard/([0-9a-f-]{36})", u, re.I)
     if m:
         return "ukg", f"{m.group(1).lower()}/{m.group(2)}/{m.group(3).lower()}"
+    m = re.search(r"https?://([a-z0-9-]+\.taleo\.net)/careersection/(?!rest/)([a-z0-9_]+)/", u, re.I)
+    if m:
+        return "taleo", f"{m.group(1).lower()}/{m.group(2)}"
+    m = re.search(r"https?://([a-z0-9.-]+)/((?:[a-z]{2}_[A-Z]{2}/)?[A-Za-z0-9_-]+)/(?:SearchJobs|JobDetail)", u) or \
+        re.search(r"https?://([a-z0-9-]+\.avature\.net)/((?:[a-z]{2}_[A-Z]{2}/)?[A-Za-z0-9_-]+)", u, re.I)
+    if m:
+        return "avature", f"{m.group(1).lower()}/{m.group(2)}"
     m = re.search(r"https?://([a-z0-9-]+\.icims\.com)", u, re.I)
     if m:
         return "icims", m.group(1).lower()
@@ -59,6 +72,9 @@ def parse_portal(url: str) -> tuple:
     m = re.search(r"https?://([a-z0-9.-]+)/services/rss/job", u, re.I)
     if m:
         return "successfactors", m.group(1).lower()
+    m = re.search(r"https?://([a-z0-9.-]+)/([a-z]{2})/([a-z]{2})/(?:search-results|job/)", u, re.I)
+    if m:
+        return "phenom", f"{m.group(1).lower()}/{m.group(2).lower()}/{m.group(3).lower()}"
     return "", ""
 
 
@@ -129,6 +145,105 @@ async def ukg(client, slug: str, company: str, keywords: list):
                             "location": ", ".join(x for x in (loc.get("City"), (loc.get("State") or {}).get("Code"), (loc.get("Country") or {}).get("Code")) if x),
                             "url": f"{base}/OpportunityDetail?opportunityId={j['Id']}", "description": _clean(j.get("BriefDescription") or ""),
                             "posted_at": (j.get("PostedDate") or "")[:10], "salary": ""}
+    return list(out.values())
+
+
+def _taleo_date(v: str) -> str:
+    for f in ("%b %d, %Y", "%d %b %Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(v.strip(), f).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return ""
+
+
+async def taleo(client, slug: str, company: str, keywords: list):
+    """Oracle Taleo Enterprise career sections: public JSON search used by the career site itself."""
+    host, section = slug.split("/", 1)
+    page = await client.get(f"https://{host}/careersection/{section}/jobsearch.ftl", params={"lang": "fr"}, headers=UA)
+    page.raise_for_status()
+    portal = re.search(r"portal=(\d+)|portalNo\W+(\d+)", page.text)
+    if not portal:
+        raise RuntimeError("Section carrières Taleo illisible (identifiant de portail introuvable)")
+    out = {}
+    for lang, text in [(lg, t) for lg in ("fr", "en") for t in (keywords[:3] or [""])]:  # postings are language-specific
+        for no in (1, 2):
+            body = {"multilineEnabled": False, "sortingSelection": {"sortBySelectionParam": "3", "ascendingSortingOrder": "false"},
+                    "fieldData": {"fields": {"KEYWORD": text, "LOCATION": ""}, "valid": True},
+                    "filterSelectionParam": {"searchFilterSelections": []}, "advancedSearchFiltersSelectionParam": {"searchFilterSelections": []}, "pageNo": no}
+            r = await client.post(f"https://{host}/careersection/rest/jobboard/searchjobs", params={"lang": lang, "portal": portal.group(1) or portal.group(2)},
+                                  json=body, headers={**UA, "tz": "GMT-04:00", "tzname": "America/Toronto", "Accept": "application/json"})
+            r.raise_for_status()
+            reqs = r.json().get("requisitionList") or []
+            for j in reqs:
+                col = j.get("column") or []
+                title = col[j.get("linkedColumn") or 0] if col else ""
+                loc = col[(j.get("locationsColumns") or [1])[0]] if len(col) > 1 else ""
+                try:
+                    loc = ", ".join(json.loads(loc)) if loc.startswith("[") else loc
+                except ValueError:
+                    pass
+                posted = next((d for d in (_taleo_date(x) for x in col[::-1] if isinstance(x, str)) if d), "")
+                out.setdefault(j["jobId"], {"source": "taleo", "external_id": str(j["jobId"]), "title": _clean(title), "company": company, "location": loc,
+                                   "url": f"https://{host}/careersection/{section}/jobdetail.ftl?job={j.get('contestNo') or j['jobId']}&lang={lang}",
+                                   "description": "", "posted_at": posted, "salary": ""})
+            if len(reqs) < 25:
+                break
+    return list(out.values())
+
+
+async def avature(client, slug: str, company: str, keywords: list):
+    """Avature career sites: best-effort read of the public search pages (HTML, no public API)."""
+    base = f"https://{slug}"
+    out = {}
+    for text in (keywords[:3] or [""]):
+        offset = 0
+        for _ in range(3):
+            r = await client.get(f"{base}/SearchJobs/", params={"search": text, "jobOffset": offset, "jobRecordsPerPage": 50}, headers=UA)
+            r.raise_for_status()
+            links = list(re.finditer(r'<a\b[^>]*href="(https?://[^"]*/JobDetail/[^"]*?/(\d+))"[^>]*>(.*?)</a>', r.text, re.S))
+            if not links and "avature" not in r.text.lower():
+                raise RuntimeError("Page Avature illisible")
+            page = set()
+            for k, m in enumerate(links):
+                jid = m.group(2)
+                title = _clean(m.group(3)) or _clean((re.search(r'title="([^"]+)"', m.group(0)) or [None, ""])[1])
+                if jid in page or not title or len(title) < 3:
+                    continue
+                page.add(jid)
+                nxt = links[k + 1].start() if k + 1 < len(links) else m.end() + 600
+                loc = _clean(re.sub(r"<[^>]*$", "", r.text[m.end():min(nxt, m.end() + 600)]))[:100]
+                out.setdefault(jid, {"source": "avature", "external_id": jid, "title": title, "company": company, "location": loc,
+                                     "url": html.unescape(m.group(1)), "description": "", "posted_at": "", "salary": ""})
+            if not page:
+                break
+            offset += len(page)
+    return list(out.values())
+
+
+def _phenom_ddo(text: str) -> dict:
+    i = text.find("phApp.ddo")
+    if i < 0:
+        raise RuntimeError("Page Phenom illisible (données de recherche absentes)")
+    return json.JSONDecoder().raw_decode(text, text.index("{", i))[0]
+
+
+async def phenom(client, slug: str, company: str, keywords: list):
+    """Phenom career sites: best-effort read of the search data embedded in the public search page."""
+    out = {}
+    for text in (keywords[:3] or [""]):
+        for start in ((0, 10) if text else (0, 10, 20)):
+            r = await client.get(f"https://{slug}/search-results", params={"keywords": text, "from": start, "s": 1}, headers=UA)
+            r.raise_for_status()
+            jobs = ((_phenom_ddo(r.text).get("eagerLoadRefineSearch") or {}).get("data") or {}).get("jobs") or []
+            for j in jobs:
+                jid = str(j.get("jobId") or j.get("reqId"))
+                out[jid] = {"source": "phenom", "external_id": jid, "title": j.get("title", ""), "company": company,
+                            "location": j.get("cityStateCountry") or j.get("location") or "", "url": f"https://{slug}/job/{jid}",
+                            "description": _clean(j.get("description") or j.get("descriptionTeaser") or "")[:4000],
+                            "posted_at": (j.get("postedDate") or "")[:10], "salary": ""}
+            if len(jobs) < 10:
+                break
     return list(out.values())
 
 
@@ -271,6 +386,8 @@ async def board(client, kind: str, slug: str, company: str, keywords: list = Non
         return await ukg(client, slug, company, keywords or [])
     if kind == "icims":
         return await icims(client, slug, company, keywords or [])
+    if kind in ("taleo", "avature", "phenom"):
+        return await {"taleo": taleo, "avature": avature, "phenom": phenom}[kind](client, slug, company, keywords or [])
     if kind == "smartrecruiters":
         return await smartrecruiters(client, slug, company, keywords or [])
     if kind == "greenhouse":
