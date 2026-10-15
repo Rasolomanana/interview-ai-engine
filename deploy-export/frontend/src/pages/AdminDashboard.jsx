@@ -68,6 +68,7 @@ function Bars({ title, data, keys }) {
 export default function AdminDashboard() {
   usePageTitle("Administration");
   const [pwd, setPwd] = useState("");
+  const [me, setMe] = useState(null);
   const [authed, setAuthed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
@@ -197,7 +198,7 @@ export default function AdminDashboard() {
             <button onClick={() => load(sessionStorage.getItem("adminPwd"))} data-testid="admin-refresh-btn" className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs hover:border-white/20">
               <RefreshCw className="h-3.5 w-3.5" /> Rafraîchir
             </button>
-            {has("activite") && <>
+            {me?.super && <>
             <button onClick={() => doExport("csv")} data-testid="admin-export-csv" className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-1.5 text-xs text-emerald-200 hover:border-emerald-400/50">
               <Download className="h-3.5 w-3.5" /> CSV
             </button>
@@ -231,7 +232,7 @@ export default function AdminDashboard() {
         </div>
 
         {has("finance") && <CreditCard />}
-        <LlmHealth />
+        {me?.super && <LlmHealth />}
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/60 p-5">
           <div className="mb-3 flex items-center gap-2">

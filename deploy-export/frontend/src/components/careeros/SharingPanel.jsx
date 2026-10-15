@@ -7,6 +7,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 const SCOPES = { cv: "CV", memory: "Career Memory", applications: "Candidatures" };
 const REL = { conseiller: "Conseiller carrière", proche: "Proche" };
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400/60";
+const FIELD = { full_name: "Nom complet", headline: "Titre professionnel", location: "Localisation", country: "Pays", province: "Province / région", city: "Ville", goals: "Objectifs",
+  target_roles: "Postes visés", sectors: "Secteurs visés", salary_expectation: "Attentes salariales", skills: "Compétences", certifications: "Certifications", education: "Formations",
+  languages: "Langues", achievements: "Réalisations clés" };
+const STATUS = { a_postuler: "À postuler", postule: "Postulé", entrevue: "Entrevue", offre: "Offre", refuse: "Refusé", abandonne: "Abandonné" };
 const date = (s) => (s ? new Date(s).toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" }) : "jamais");
 
 const SharedView = ({ id, onClose }) => {
@@ -14,16 +18,16 @@ const SharedView = ({ id, onClose }) => {
   useEffect(() => { if (id) sharing.view(id).then(setD).catch((e) => { toast.error(e.message); onClose(); }); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Dialog open={!!id} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto" data-testid="shared-view-dialog">
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto border-white/10 bg-slate-900 text-slate-100" data-testid="shared-view-dialog">
         <DialogHeader><DialogTitle>{d ? `Partagé par ${d.owner_name || d.owner_email}` : "Chargement…"}</DialogTitle></DialogHeader>
         {!d ? <Loader2 className="h-5 w-5 animate-spin" /> : (
           <div className="space-y-4 text-sm">
             <p className="text-[11px] text-slate-500">Lecture seule, autorisée explicitement par le membre et révocable à tout moment.</p>
             {d.memory && <section data-testid="shared-view-memory"><h4 className="mb-1 font-semibold">Career Memory</h4>
-              <dl className="grid gap-1 text-xs sm:grid-cols-2">{Object.entries(d.memory).map(([k, v]) => <div key={k}><dt className="text-slate-500">{k}</dt><dd>{Array.isArray(v) ? v.join(", ") : String(v)}</dd></div>)}</dl></section>}
+              <dl className="grid gap-1 text-xs sm:grid-cols-2">{Object.entries(d.memory).map(([k, v]) => <div key={k}><dt className="text-slate-500">{FIELD[k] || k}</dt><dd>{Array.isArray(v) ? v.join(", ") : String(v)}</dd></div>)}</dl></section>}
             {d.cv_text !== undefined && <section data-testid="shared-view-cv"><h4 className="mb-1 font-semibold">CV</h4><pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 font-mono text-[11px]">{d.cv_text || "Aucun CV."}</pre></section>}
             {d.applications && <section data-testid="shared-view-apps"><h4 className="mb-1 font-semibold">Candidatures ({d.applications.length})</h4>
-              <ul className="space-y-1 text-xs">{d.applications.map((a) => <li key={a.id} className="rounded border border-white/10 px-2 py-1">{a.poste || "Poste"} · {a.entreprise || "—"} · IPS {a.ips ?? "—"} ({a.priority || "—"}) · {a.pipeline_status}</li>)}</ul></section>}
+              <ul className="space-y-1 text-xs">{d.applications.map((a) => <li key={a.id} className="rounded border border-white/10 px-2 py-1">{a.poste || "Poste"} · {a.entreprise || "—"} · IPS {a.ips ?? "—"} ({a.priority || "—"}) · {STATUS[a.pipeline_status] || a.pipeline_status}</li>)}</ul></section>}
           </div>)}
       </DialogContent>
     </Dialog>

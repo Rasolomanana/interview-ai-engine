@@ -38,7 +38,7 @@ export const Overview = () => {
         </div>
         <div className="mx-auto max-w-xl space-y-1">{d.funnel.map((f, i) => (
           <div key={f.step}>
-            {i > 0 && <p className="flex items-center justify-center gap-1 text-[11px] text-slate-500"><ArrowDown className="h-3 w-3" />{f.rate} %</p>}
+            {i > 0 && <p className="flex items-center justify-center gap-1 text-[11px] text-slate-500"><ArrowDown className="h-3 w-3" />{f.rate === null ? "taux non significatif" : `${f.rate} %`}</p>}
             <button type="button" onClick={() => setDetail({ title: `${f.step} · ${fmt(f.count)}`, cols: [["k", "Élément"], ["v", "Valeur"]], rows: [{ k: "Définition", v: f.note }, { k: "Taux vs étape précédente", v: f.rate === null ? "—" : `${f.rate} %` }] })}
               className="flex w-full items-center justify-between rounded-xl border border-emerald-400/20 bg-emerald-500/5 px-4 py-2 text-left hover:border-emerald-400/50"
               style={{ width: `${100 - i * 8}%`, marginInline: "auto" }} data-testid={`ov-funnel-${i}`}>

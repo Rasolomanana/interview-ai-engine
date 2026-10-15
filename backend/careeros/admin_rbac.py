@@ -12,7 +12,7 @@ ROLES = {"super_admin": "Super Admin", "support": "Support", "marketing": "Marke
 SECTIONS = ("overview", "geo", "business", "activite", "connecteurs", "finance", "roles")
 ROLE_SECTIONS = {"super_admin": set(SECTIONS), "marketing": {"overview", "geo", "business", "activite"},
                  "support": {"overview", "activite", "connecteurs"}, "conseiller": {"business"}}
-PATHS = [("/api/admin/stats", "activite"), ("/api/admin/export", "activite"), ("/api/admin/llm-health", "activite"),
+PATHS = [("/api/admin/stats", "activite"),  # export (ATS data) and llm-health (paid test calls) stay Super Admin only
          ("/api/admin/insights/overview", "overview"), ("/api/admin/insights/geo", "geo"), ("/api/admin/insights/business", "business"),
          ("/api/admin/connectors", "connecteurs"), ("/api/admin/radar-cron-log", "connecteurs"), ("/api/admin/knowledge", "connecteurs")]
 OPEN = ("/api/admin/login", "/api/admin/me")

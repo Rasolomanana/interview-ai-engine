@@ -1,0 +1,45 @@
+{
+  "summary": "Tested the Admin module end to end: RBAC (/me, enforcement of sections, roles PUT), insights (overview/geo/business), profile geo fields, member sharing (backend + UI), the /admin UI with the password (all 8 tabs, KPIs, funnel, periods, geo, business, Roles tab) and the /admin UI as a member (marketing). I found and fixed one CRITICAL frontend bug: AdminDashboard.jsx called setMe but never declared the `me` state, so every admin login (password and member) failed with 'setMe is not defined'. After the one-line fix, all requested flows pass. 41/41 backend pytest pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/insights/overview", "issue": "Funnel 'Visiteurs' = max(distinct sessions, cohort). Activité shows 3 visitors but the funnel shows Visiteurs 54 = Inscrits 54 (100 %). So the first conversion rate is always 100 % and does not tell anything. Show the real visitor count, or label the step as an estimate."},
+      {"endpoint": "/api/admin/export", "issue": "Mapped to the 'activite' section, so Marketing/Support can download the CSV/XLSX of ATS analyses. Its 'entreprise' column holds generated report text (company culture, interview questions). This is not a CV, but check it fits the privacy promise."},
+      {"endpoint": "/api/admin/llm-health", "issue": "Open to Marketing/Support. The 'Tester les fournisseurs IA' button triggers real paid LLM calls. Consider limiting it to super_admin."},
+      {"endpoint": "/api/admin/insights/business", "issue": "Role normalisation only changes case: 'Analyste' and 'Analyst' are counted as separate roles. The 'Analysées (total)' detail reuses the 30 j title 'Offres analysées par source (30 j)'."},
+      {"endpoint": "geo.deduce", "issue": "'London' always maps to Ontario, Canada, even for 'London, UK'. If a member clears Pays/Province/Ville, GET /profile deduces them again, so the member cannot leave them empty."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AdminDashboard", "issue": "FIXED by testing agent: `const [me, setMe] = useState(null)` was missing. Admin login (password and member) always showed the error 'setMe is not defined' and the dashboard never loaded.", "selector": "[data-testid='admin-login-error']", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Career Memory > shared-view-dialog (light theme)", "issues": ["Field labels are raw keys (headline, goals, certifications, education, languages) instead of French labels.", "The dialog looks translucent and low-contrast: page inputs show through behind the text."]},
+      {"screen": "Admin DetailDialog", "issues": ["During the close animation the dialog flashes '0 ligne(s)' (detail set to null before the dialog finishes closing)."]},
+      {"screen": "Admin Roles legend", "issues": ["Sections are listed alphabetically by key (Activité · Analyse métier · Connecteurs…), not in tab order."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_admin_rbac_insights_sharing.py", "/app/test_reports/pytest/pytest_rbac.xml"],
+  "action_items": [
+    "Review the setMe fix in AdminDashboard.jsx (line 71) and run lint/ESLint no-undef before handoff.",
+    "Make the funnel 'Visiteurs' step meaningful (do not use max with the cohort, or label it).",
+    "Decide whether /api/admin/export and /api/admin/llm-health (paid LLM test) should be limited to super_admin.",
+    "Use French labels in the SharingPanel shared view and fix the dialog's background contrast in the light theme.",
+    "Keep the last detail in DetailDialog while it closes, to avoid the '0 ligne(s)' flash."
+  ],
+  "critical_code_review_comments": [
+    "AdminDashboard.jsx used an undeclared state (me/setMe). This should have been caught by ESLint no-undef or a smoke test.",
+    "Roles.jsx toggle uses the `local` state captured at click time. Rapid consecutive toggles on different rows can overwrite each other (use a functional setState).",
+    "RBAC middleware: members with a role but an expired access token get 401 (fine). The ContextVar is set before call_next, so it propagates correctly (verified: super_admin-role member can PUT roles and read finance).",
+    "Geo merge (<3) is applied correctly for non-super roles. Insights payloads contain no '@' and no cv_text (verified)."
+  ],
+  "updated_files": ["/app/frontend/src/pages/AdminDashboard.jsx", "/app/backend/tests/test_admin_rbac_insights_sharing.py"],
+  "success_rate": {"backend": "100% (41/41)", "frontend": "100% after the setMe fix (0% before: admin login fully blocked)"},
+  "seed_data_creation": "None persistent. Test sharing grants were created and revoked (0 active grants remain). Roles restored: membre.test=['marketing'], conseiller.test=['conseiller']. The conseiller.test profile geo was set temporarily and then restored.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=... pytest tests/test_admin_rbac_insights_sharing.py (pytest.ini adds -n xdist). In the UI, accept privacy-banner (privacy-accept-btn). conseiller.test gets a guided tour dialog on /careeros/memoire: click tour-skip first. Revoking sharing uses window.confirm (accept the dialog).",
+  "rca of the issue": "Admin login failure: load() calls setMe(m), but the useState declaration for `me` was missing in AdminDashboard. This throws a ReferenceError, which the catch block shows as the login error and then resets authed. Mitigation: added `const [me, setMe] = useState(null);`."
+}

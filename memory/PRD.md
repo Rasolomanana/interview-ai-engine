@@ -431,3 +431,12 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Alimentée par : passages Radar (portails lus avec offres, 403), loupe/discover (origines officielles). Utilisée par detect_one (association auto si fiable + confiance élevée/moyenne, annulable), ajout entreprise (frontend), /radar/knowledge/match.
 - Réglages Radar : associées masquées par défaut + bouton Afficher/Masquer, bouton « Associer » 1 clic (base commune puis loupe), badge bloqué 403.
 - Admin : onglet « Base commune » (GET /api/admin/knowledge). Tests iteration_36 + tests/test_knowledge_base.py (6/6).
+
+## 2026-10-15 — Module Admin complet (RBAC, insights, géographie, partage membre)
+- careeros/admin_rbac.py : rôles super_admin/support/marketing/conseiller (users.admin_roles), middleware RBAC (Bearer membre -> sections), /api/admin/me, /api/admin/roles. ADMIN_PASSWORD = Super Admin sans restriction. Export + llm-health = Super Admin.
+- careeros/admin_insights.py : /insights/overview (membres, entonnoir Visiteurs>Inscrits>Actifs>Payants>Renouvellement, Radar), /geo (pays/province/ville, groupes <3 fusionnés hors super), /business (postes, entreprises, portails, offres, priorités A/B/C). Agrégats uniquement.
+- careeros/geo.py : déduction pays/province/ville ; champs country/province/city dans Career Memory (pré-remplis, modifiables) ; Radar utilise la ville par défaut.
+- careeros/sharing.py : autorisations explicites membre -> e-mail (conseiller/proche), par périmètre CV/Career Memory/Candidatures, révocables, compteur de consultations.
+- users.paid_since suivi (renouvellement). Événement anonyme « visit » par session (entonnoir).
+- Frontend : onglets Admin filtrés par rôle, connexion Admin avec compte CareerOS, Overview/Geography/Business/Roles, SharingPanel dans Career Memory.
+- Tests : iteration_37 + tests/test_admin_rbac_insights_sharing.py (41/41).

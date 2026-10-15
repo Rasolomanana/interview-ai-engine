@@ -56,8 +56,10 @@ def create_insights_router(db):
         active = [u for u in cohort if seen(u, a30)]
         paid = [u for u in active if u.get("paid")]
         renewed = [u for u in paid if u.get("paid_since") and u["paid_since"] <= a30]
-        funnel = [{"step": "Visiteurs", "count": max(visitors, len(cohort)), "rate": None, "note": "Sessions anonymes distinctes (visites et simulations)."},
-                  {"step": "Inscrits", "count": len(cohort), "rate": _pct(len(cohort), max(visitors, len(cohort))), "note": "Comptes créés sur la période."},
+        reliable = visitors >= len(cohort)
+        funnel = [{"step": "Visiteurs", "count": visitors, "rate": None, "note": "Sessions anonymes distinctes (visites et simulations)." +
+                   ("" if reliable else " Suivi des visites récent : moins de visiteurs enregistrés que d'inscrits, taux d'inscription non significatif pour l'instant.")},
+                  {"step": "Inscrits", "count": len(cohort), "rate": _pct(len(cohort), visitors) if reliable else None, "note": "Comptes créés sur la période."},
                   {"step": "Actifs", "count": len(active), "rate": _pct(len(active), len(cohort)), "note": "Inscrits connectés dans les 30 derniers jours."},
                   {"step": "Payants", "count": len(paid), "rate": _pct(len(paid), len(active)), "note": "Actifs marqués « payant » (Rentabilité)."},
                   {"step": "Renouvellement", "count": len(renewed), "rate": _pct(len(renewed), len(paid)),

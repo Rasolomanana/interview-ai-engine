@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const ClickNum = ({ children, onClick, testid, className = "" }) => (
@@ -5,8 +6,12 @@ export const ClickNum = ({ children, onClick, testid, className = "" }) => (
     className={`rounded-md text-left underline decoration-current/30 underline-offset-4 transition-colors hover:bg-white/5 hover:decoration-current ${className}`}>{children}</button>
 );
 
-export const DetailDialog = ({ detail, onClose }) => (
-  <Dialog open={!!detail} onOpenChange={(o) => !o && onClose()}>
+export const DetailDialog = ({ detail: current, onClose }) => {
+  const [last, setLast] = useState(current);
+  useEffect(() => { if (current) setLast(current); }, [current]);
+  const detail = current || last;  // keep content while the close animation runs
+  return (
+  <Dialog open={!!current} onOpenChange={(o) => !o && onClose()}>
     <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto border-white/10 bg-slate-900 text-slate-100" data-testid="admin-detail-dialog">
       <DialogHeader><DialogTitle data-testid="admin-detail-title">{detail?.title}</DialogTitle>
         <DialogDescription className="text-slate-400">{detail?.note || `${detail?.rows.length ?? 0} ligne(s)`}</DialogDescription></DialogHeader>
@@ -17,4 +22,5 @@ export const DetailDialog = ({ detail, onClose }) => (
         </table></div>))}
     </DialogContent>
   </Dialog>
-);
+  );
+};
