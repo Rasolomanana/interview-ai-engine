@@ -377,3 +377,8 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Guides : PageTour générique (guide/PageTour.jsx) ; visite Radar 5 étapes + visite Réglages 5 étapes (auto en mode Débutant, relançables) ; InfoTips sources, portails, qualité, compteurs, couverture, loupe, détection, associer.
 - Indeed / LinkedIn : pas d'API publique d'offres, et leurs conditions interdisent l'extraction automatisée, donc rien n'a été intégré.
 - Tests : iteration_31 → backend 14/14, frontend 100 % (preview). Validation production en attente.
+
+## 2026-06 — Sources et Portails cliquables
+- SourceStatus : Jooble / Workday / Sites carrières sont des boutons filtrant la liste d'offres du dernier passage (FilterBanner « Source : X », 2e clic = retrait).
+- PortalHealth : tableau triable (Entreprise, Plateforme, Qualité, Lues, Retenues, État) trié par Retenues décroissant ; pastilles qualité = filtre du tableau ; clic ligne = filtre offres « Entreprise : X » ; cartes sur mobile ; note explicative si 0 lue / 0 retenue / échec / bloqué.
+- Vérifié par capture Playwright (bureau + 390 px) en preview ; testing agent non concluant (erreur de script de connexion, aucune anomalie applicative).
