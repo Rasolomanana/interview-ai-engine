@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field, field_validator
 from . import radar_rules as RR
 from . import radar_sources as S
 from . import radar_discovery as D
+from . import radar_auto as AU
 from .decision_report import build_decision_report
 from .ips import compute_ips
 from .prompts import SYSTEM
@@ -55,6 +56,9 @@ class Company(BaseModel):
     slug: str = Field(default="", max_length=200)
     website: str = Field(default="", max_length=200)
     detected: str = Field(default="", max_length=160)
+    auto: bool = False
+    auto_block: List[str] = []
+    checked_at: str = ""
 
 
 class RadarSettings(BaseModel):
@@ -378,9 +382,13 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         data = body.model_dump()
         conf = S.configured()
         data["sources"] = [x for x in data["sources"] if x != "adzuna" or conf["adzuna"]]  # Adzuna needs a key
+        prev = {c["name"]: c for c in ((await db.radar_settings.find_one({"user_id": user["id"]}, {"_id": 0, "companies": 1})) or {}).get("companies") or [] if isinstance(c, dict)}
         seen, comps = set(), []
         for co in data["companies"]:
             co["name"] = co["name"].strip()
+            old = prev.get(co["name"]) or {}
+            if old.get("kind") and not co["kind"] and old["kind"] not in co["auto_block"]:
+                co["auto_block"].append(old["kind"])  # portal removed by the member: never re-associate it automatically
             if co["portal_url"] and not co["kind"]:
                 co["kind"], co["slug"] = S.parse_portal(co["portal_url"])
             if co["name"] and co["name"].lower() not in seen:
@@ -388,7 +396,49 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 comps.append(co)
         data["companies"] = comps
         await db.radar_settings.update_one({"user_id": user["id"]}, {"$set": {**data, "updated_at": _now().isoformat()}, "$unset": {"boards": ""}}, upsert=True)
-        return await get_settings(user)
+        await AU.share(db, user["id"], comps)
+        todo = [c["name"] for c in comps if c["enabled"] and not c["kind"] and not c.get("checked_at")]
+        if todo:  # new companies: automatic discovery in the background
+            asyncio.create_task(AU.auto_detect(db, user["id"], todo, limit=10))
+        return {**await get_settings(user), "auto_detecting": todo[:10]}
+
+    class FollowBody(BaseModel):
+        name: str = Field(min_length=1, max_length=80)
+
+    @router.post("/companies/follow")
+    async def follow(body: FollowBody, user: dict = Depends(current_user)):
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+        st = await _settings(user["id"], profile)
+        name = body.name.strip()
+        if not any(AU.same_company(name, c["name"]) for c in st["companies"]):
+            if len(st["companies"]) >= 100:
+                raise HTTPException(status_code=400, detail="Maximum 100 entreprises suivies.")
+            st["companies"].append(Company(name=name).model_dump())
+            await db.radar_settings.update_one({"user_id": user["id"]}, {"$set": {k: v for k, v in st.items() if k != "user_id"}}, upsert=True)
+        asyncio.create_task(AU.auto_detect(db, user["id"], [name], limit=1))
+        return {"ok": True, "name": name}
+
+    @router.get("/suggestions")
+    async def company_suggestions(user: dict = Depends(current_user)):
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+        st = await _settings(user["id"], profile)
+        roles = (st.get("keywords") or []) + [r for r in re.split(r"[,;/\n]", profile.get("target_roles") or "") if r.strip()]
+        return {"items": await AU.suggestions(db, user["id"], roles, [c["name"] for c in st["companies"]])}
+
+    @router.get("/notices")
+    async def notices(user: dict = Depends(current_user)):
+        return {"items": [n async for n in db.radar_notices.find({"user_id": user["id"], "status": "new"}, {"_id": 0, "user_id": 0}).sort("at", -1).limit(20)]}
+
+    @router.post("/notices/{notice_id}/ack")
+    async def ack_notice(notice_id: str, user: dict = Depends(current_user)):
+        await db.radar_notices.update_one({"id": notice_id, "user_id": user["id"]}, {"$set": {"status": "seen"}})
+        return {"ok": True}
+
+    @router.post("/notices/{notice_id}/undo")
+    async def undo_notice(notice_id: str, user: dict = Depends(current_user)):
+        if not await AU.undo(db, user["id"], notice_id):
+            raise HTTPException(status_code=404, detail="Notification introuvable")
+        return {"ok": True}
 
     class PortalBody(BaseModel):
         url: str = Field(min_length=8, max_length=400)
@@ -600,6 +650,10 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             for uid in users:
                 if uid not in disabled:
                     try:
+                        await AU.auto_detect(db, uid, None, limit=3)  # daily re-detection of companies still on Jooble
+                    except Exception:  # noqa: BLE001
+                        logger.exception("radar auto-detect user %s", uid)
+                    try:
                         await run_for_user(uid, "quotidien")
                     except Exception:  # noqa: BLE001
                         logger.exception("radar cron user %s", uid)
@@ -618,6 +672,8 @@ async def ensure_radar_indexes(db):
     await db.radar_offers.create_index([("user_id", 1), ("dedupe_key", 1)], unique=True)
     await db.radar_offers.create_index([("user_id", 1), ("first_seen", -1)])
     await db.radar_offers.create_index("id", unique=True)
+    await db.portal_directory.create_index("key")
+    await db.radar_notices.create_index([("user_id", 1), ("status", 1), ("at", -1)])
     await db.radar_runs.create_index([("user_id", 1), ("at", -1)])
     await db.radar_settings.create_index("user_id", unique=True)
     await db.radar_runs.update_many({"status": "running"}, {"$set": {"status": "interrompue"}})

@@ -25,6 +25,8 @@ const GapToA = ({ ips }) => {
 export const ScoreExplain = ({ id, onClose, onDeep }) => {
   const [o, setO] = useState(null);
   const [deep, setDeep] = useState(false);
+  const [read, setRead] = useState(() => { try { return JSON.parse(localStorage.getItem("explainReading")) || { light: true, big: false }; } catch { return { light: true, big: false }; } });
+  const setReading = (v) => { setRead(v); try { localStorage.setItem("explainReading", JSON.stringify(v)); } catch { /* ignore */ } };
   useEffect(() => { if (id) { setO(null); radar.explain(id).then(setO).catch((e) => toast.error(e.message)); } }, [id]);
   const runDeep = async () => {
     setDeep(true);
@@ -33,8 +35,14 @@ export const ScoreExplain = ({ id, onClose, onDeep }) => {
   const ia = o?.method === "ia";
   return (
     <Sheet open={!!id} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="w-full overflow-y-auto border-white/10 bg-[#0d0f16] text-slate-100 sm:!max-w-2xl" data-testid="explain-panel">
+      <SheetContent side="right" className={`w-full overflow-y-auto border-white/10 bg-[#121520] text-slate-100 sm:!max-w-2xl ${read.light ? "reading-light" : ""}`} style={read.big ? { zoom: 1.15 } : undefined} data-testid="explain-panel">
         <SheetHeader><SheetTitle className="pr-6 text-left font-display text-white">Pourquoi ce score ?</SheetTitle></SheetHeader>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]" data-testid="explain-reading">
+          <span className="text-slate-500">Lecture :</span>
+          {[[true, "Fond clair"], [false, "Fond sombre"]].map(([v, l]) => (
+            <button key={l} type="button" onClick={() => setReading({ ...read, light: v })} className={`rounded-full border px-2.5 py-1 ${read.light === v ? "border-indigo-400 bg-indigo-500/15 font-semibold text-indigo-300" : "border-white/10 text-slate-400"}`} data-testid={`explain-reading-${v ? "light" : "dark"}`}>{l}</button>))}
+          <button type="button" onClick={() => setReading({ ...read, big: !read.big })} className={`rounded-full border px-2.5 py-1 ${read.big ? "border-indigo-400 bg-indigo-500/15 font-semibold text-indigo-300" : "border-white/10 text-slate-400"}`} data-testid="explain-reading-big">A+ Texte agrandi</button>
+        </div>
         {!o ? <Loader2 className="mx-auto mt-10 h-5 w-5 animate-spin text-slate-500" /> : (
           <div className="mt-4 space-y-5">
             <div className="flex items-start gap-3">

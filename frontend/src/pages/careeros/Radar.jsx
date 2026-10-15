@@ -25,6 +25,8 @@ import { FilterBanner, StatFilter } from "@/components/careeros/StatFilter";
 import { ScoreExplain } from "@/components/careeros/explain/ScoreExplain";
 import { ExternalOffer } from "@/components/careeros/explain/ExternalOffer";
 import { CompareDialog } from "@/components/careeros/explain/CompareDialog";
+import { AutoNotices } from "@/components/careeros/AutoNotices";
+import { CompanySuggestions } from "@/components/careeros/CompanySuggestions";
 
 const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, deepId, busy }) => (
   <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4 min-w-0 break-words" data-testid={`radar-offer-${o.id}`}>
@@ -167,7 +169,9 @@ export default function Radar() {
             <StatFilter label="Priorité A" value={d.top_a.length} testid="radar-stat-a" active={f === "a"} onClick={() => pick("a")} />
           </div>
           <SourceStatus status={d.sources_status} run={lr} active={f?.startsWith("src:") ? f.slice(4) : null} onPick={(k) => pick(`src:${k}`)} />
+          <AutoNotices refreshKey={lr?.id} onChange={load} onEdit={() => setSettings(true)} />
           <PortalHealth status={d.sources_status} run={lr} active={f?.startsWith("co:") ? f.slice(3) : null} onPick={(n) => pick(`co:${n}`)} />
+          <CompanySuggestions refreshKey={lr?.id} onFollowed={load} />
           {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
           {errs.length > 0 && <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-200" data-testid="radar-errors">{errs.map(([k, v]) => <p key={k}>{k} : {v}</p>)}</div>}
           {f ? <>

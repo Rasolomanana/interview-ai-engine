@@ -1,0 +1,69 @@
+/* Reading mode for dense panels (Pourquoi ce score ?): same remap as the light theme, scoped. */
+/* CareerOS light theme — remaps the dark utility palette (WCAG AA on #fff / #f6f7f9). */
+
+
+.reading-light .glass{background:rgba(255,255,255,.85);border-color:rgba(15,23,42,.1)}
+.reading-light .command-bg{background:#f6f7f9}
+.reading-light .command-bg::before{opacity:.35}
+.reading-light ::selection{background:rgba(79,70,229,.2);color:#0f172a}
+.reading-light ::-webkit-scrollbar-thumb{background:rgba(71,85,105,.3)}
+.reading-light .bg-\[\#090a0f\],.reading-light .bg-slate-950{background-color:#f6f7f9}
+.reading-light .bg-\[\#090a0f\]\/80,.reading-light .bg-slate-950\/95{background-color:rgba(246,247,249,.9)}
+.reading-light .bg-\[\#121520\],.reading-light .bg-\[\#121520\]\/80,.reading-light .bg-\[\#121520\]\/60,.reading-light .bg-\[\#12151f\]\/60,.reading-light .bg-\[\#1a1e2e\],.reading-light .bg-\[\#1a1e2e\]\/70,.reading-light .bg-slate-900,.reading-light .bg-slate-900\/60,.reading-light .bg-slate-900\/70,.reading-light .bg-slate-800\/80{background-color:#ffffff}
+.reading-light .bg-slate-800\/30,.reading-light .bg-black\/30,.reading-light .bg-black\/50{background-color:#f1f3f6}
+.reading-light .bg-black\/40{background-color:#ffffff}
+.reading-light .bg-black\/20{background-color:#f6f7f9}
+.reading-light .bg-black\/60,.reading-light .bg-black\/70,.reading-light .bg-black\/80{background-color:rgba(15,23,42,.45)}
+.reading-light .bg-white\/\[0\.02\]{background-color:rgba(15,23,42,0.025)}
+.reading-light .bg-white\/\[0\.03\]{background-color:rgba(15,23,42,0.035)}
+.reading-light .bg-white\/5{background-color:rgba(15,23,42,0.045)}
+.reading-light .bg-white\/\[0\.06\]{background-color:rgba(15,23,42,0.055)}
+.reading-light .bg-white\/10{background-color:rgba(15,23,42,0.08)}
+.reading-light .hover\:bg-white\/5:hover{background-color:rgba(15,23,42,0.05)}
+.reading-light .hover\:bg-white\/\[0\.02\]:hover{background-color:rgba(15,23,42,0.03)}
+.reading-light .hover\:bg-white\/\[0\.03\]:hover{background-color:rgba(15,23,42,0.04)}
+.reading-light .hover\:bg-white\/10:hover{background-color:rgba(15,23,42,0.08)}
+.reading-light .text-white,.reading-light .text-slate-100{color:#0f172a}
+.reading-light .text-slate-200{color:#1e293b}
+.reading-light .text-slate-300{color:#334155}
+.reading-light .text-slate-400{color:#475569}
+.reading-light .text-slate-500{color:#556070}
+.reading-light .text-slate-600{color:#4b5563}
+.reading-light .hover\:text-white:hover,.reading-light .hover\:text-slate-200:hover,.reading-light .hover\:text-slate-300:hover,.reading-light .hover\:text-indigo-200:hover{color:#0f172a}
+.reading-light .placeholder\:text-slate-600::placeholder,.reading-light input::placeholder,.reading-light textarea::placeholder{color:#8a94a6}
+.reading-light .text-indigo-50,.reading-light .text-indigo-100,.reading-light .text-indigo-200,.reading-light .text-indigo-300,.reading-light .text-indigo-400,.reading-light .text-indigo-200\/70,.reading-light .text-indigo-200\/80,.reading-light .text-indigo-200\/90,.reading-light .text-indigo-300\/70,.reading-light .text-indigo-300\/80,.reading-light .text-indigo-300\/90,.reading-light .text-indigo-400\/70,.reading-light .text-indigo-400\/80,.reading-light .text-indigo-400\/90{color:#4338ca}
+.reading-light .text-emerald-50,.reading-light .text-emerald-100,.reading-light .text-emerald-200,.reading-light .text-emerald-300,.reading-light .text-emerald-400,.reading-light .text-emerald-200\/70,.reading-light .text-emerald-200\/80,.reading-light .text-emerald-200\/90,.reading-light .text-emerald-300\/70,.reading-light .text-emerald-300\/80,.reading-light .text-emerald-300\/90,.reading-light .text-emerald-400\/70,.reading-light .text-emerald-400\/80,.reading-light .text-emerald-400\/90{color:#047857}
+.reading-light .text-rose-50,.reading-light .text-rose-100,.reading-light .text-rose-200,.reading-light .text-rose-300,.reading-light .text-rose-400,.reading-light .text-rose-200\/70,.reading-light .text-rose-200\/80,.reading-light .text-rose-200\/90,.reading-light .text-rose-300\/70,.reading-light .text-rose-300\/80,.reading-light .text-rose-300\/90,.reading-light .text-rose-400\/70,.reading-light .text-rose-400\/80,.reading-light .text-rose-400\/90{color:#be123c}
+.reading-light .text-red-50,.reading-light .text-red-100,.reading-light .text-red-200,.reading-light .text-red-300,.reading-light .text-red-400,.reading-light .text-red-200\/70,.reading-light .text-red-200\/80,.reading-light .text-red-200\/90,.reading-light .text-red-300\/70,.reading-light .text-red-300\/80,.reading-light .text-red-300\/90,.reading-light .text-red-400\/70,.reading-light .text-red-400\/80,.reading-light .text-red-400\/90{color:#b91c1c}
+.reading-light .text-amber-50,.reading-light .text-amber-100,.reading-light .text-amber-200,.reading-light .text-amber-300,.reading-light .text-amber-400,.reading-light .text-amber-200\/70,.reading-light .text-amber-200\/80,.reading-light .text-amber-200\/90,.reading-light .text-amber-300\/70,.reading-light .text-amber-300\/80,.reading-light .text-amber-300\/90,.reading-light .text-amber-400\/70,.reading-light .text-amber-400\/80,.reading-light .text-amber-400\/90{color:#b45309}
+.reading-light .text-sky-50,.reading-light .text-sky-100,.reading-light .text-sky-200,.reading-light .text-sky-300,.reading-light .text-sky-400,.reading-light .text-sky-200\/70,.reading-light .text-sky-200\/80,.reading-light .text-sky-200\/90,.reading-light .text-sky-300\/70,.reading-light .text-sky-300\/80,.reading-light .text-sky-300\/90,.reading-light .text-sky-400\/70,.reading-light .text-sky-400\/80,.reading-light .text-sky-400\/90{color:#0369a1}
+.reading-light .text-violet-50,.reading-light .text-violet-100,.reading-light .text-violet-200,.reading-light .text-violet-300,.reading-light .text-violet-400,.reading-light .text-violet-200\/70,.reading-light .text-violet-200\/80,.reading-light .text-violet-200\/90,.reading-light .text-violet-300\/70,.reading-light .text-violet-300\/80,.reading-light .text-violet-300\/90,.reading-light .text-violet-400\/70,.reading-light .text-violet-400\/80,.reading-light .text-violet-400\/90{color:#6d28d9}
+.reading-light .text-fuchsia-50,.reading-light .text-fuchsia-100,.reading-light .text-fuchsia-200,.reading-light .text-fuchsia-300,.reading-light .text-fuchsia-400,.reading-light .text-fuchsia-200\/70,.reading-light .text-fuchsia-200\/80,.reading-light .text-fuchsia-200\/90,.reading-light .text-fuchsia-300\/70,.reading-light .text-fuchsia-300\/80,.reading-light .text-fuchsia-300\/90,.reading-light .text-fuchsia-400\/70,.reading-light .text-fuchsia-400\/80,.reading-light .text-fuchsia-400\/90{color:#a21caf}
+.reading-light .text-cyan-50,.reading-light .text-cyan-100,.reading-light .text-cyan-200,.reading-light .text-cyan-300,.reading-light .text-cyan-400,.reading-light .text-cyan-200\/70,.reading-light .text-cyan-200\/80,.reading-light .text-cyan-200\/90,.reading-light .text-cyan-300\/70,.reading-light .text-cyan-300\/80,.reading-light .text-cyan-300\/90,.reading-light .text-cyan-400\/70,.reading-light .text-cyan-400\/80,.reading-light .text-cyan-400\/90{color:#0e7490}
+.reading-light .text-green-50,.reading-light .text-green-100,.reading-light .text-green-200,.reading-light .text-green-300,.reading-light .text-green-400,.reading-light .text-green-200\/70,.reading-light .text-green-200\/80,.reading-light .text-green-200\/90,.reading-light .text-green-300\/70,.reading-light .text-green-300\/80,.reading-light .text-green-300\/90,.reading-light .text-green-400\/70,.reading-light .text-green-400\/80,.reading-light .text-green-400\/90{color:#15803d}
+.reading-light .text-yellow-50,.reading-light .text-yellow-100,.reading-light .text-yellow-200,.reading-light .text-yellow-300,.reading-light .text-yellow-400,.reading-light .text-yellow-200\/70,.reading-light .text-yellow-200\/80,.reading-light .text-yellow-200\/90,.reading-light .text-yellow-300\/70,.reading-light .text-yellow-300\/80,.reading-light .text-yellow-300\/90,.reading-light .text-yellow-400\/70,.reading-light .text-yellow-400\/80,.reading-light .text-yellow-400\/90{color:#a16207}
+.reading-light .border-white\/5{border-color:rgba(15,23,42,0.07)}
+.reading-light .border-white\/\[0\.05\]{border-color:rgba(15,23,42,0.07)}
+.reading-light .border-white\/\[0\.06\]{border-color:rgba(15,23,42,0.08)}
+.reading-light .border-white\/\[0\.07\]{border-color:rgba(15,23,42,0.09)}
+.reading-light .border-white\/\[0\.08\]{border-color:rgba(15,23,42,0.1)}
+.reading-light .border-white\/10{border-color:rgba(15,23,42,0.12)}
+.reading-light .border-white\/20{border-color:rgba(15,23,42,0.18)}
+.reading-light .divide-white\/5 > :not([hidden]) ~ :not([hidden]){border-color:rgba(15,23,42,.07)}
+.reading-light .border-slate-600,.reading-light .border-slate-600\/40{border-color:#cbd5e1}
+.reading-light .ring-white\/10,.reading-light .ring-white\/5{--tw-ring-color:rgba(15,23,42,.1)}
+.reading-light .bg-indigo-500.text-white,.reading-light .bg-indigo-500 .text-white,.reading-light .bg-indigo-500.text-slate-100,.reading-light .bg-indigo-600.text-white,.reading-light .bg-indigo-600 .text-white,.reading-light .bg-indigo-600.text-slate-100,.reading-light .bg-emerald-500.text-white,.reading-light .bg-emerald-500 .text-white,.reading-light .bg-emerald-500.text-slate-100,.reading-light .bg-emerald-600.text-white,.reading-light .bg-emerald-600 .text-white,.reading-light .bg-emerald-600.text-slate-100,.reading-light .bg-red-500.text-white,.reading-light .bg-red-500 .text-white,.reading-light .bg-red-500.text-slate-100,.reading-light .bg-red-600.text-white,.reading-light .bg-red-600 .text-white,.reading-light .bg-red-600.text-slate-100,.reading-light .bg-rose-500.text-white,.reading-light .bg-rose-500 .text-white,.reading-light .bg-rose-500.text-slate-100,.reading-light .bg-rose-600.text-white,.reading-light .bg-rose-600 .text-white,.reading-light .bg-rose-600.text-slate-100,.reading-light .bg-sky-500.text-white,.reading-light .bg-sky-500 .text-white,.reading-light .bg-sky-500.text-slate-100,.reading-light .bg-fuchsia-500.text-white,.reading-light .bg-fuchsia-500 .text-white,.reading-light .bg-fuchsia-500.text-slate-100,.reading-light .bg-violet-500.text-white,.reading-light .bg-violet-500 .text-white,.reading-light .bg-violet-500.text-slate-100{color:#fff}
+.reading-light [class*="bg-emerald-950"]{background-color:#ecfdf5}
+.reading-light [class*="bg-red-950"]{background-color:#fef2f2}
+.reading-light [class*="bg-amber-950"]{background-color:#fffbeb}
+.reading-light [class*="bg-sky-950"]{background-color:#f0f9ff}
+.reading-light [class*="bg-fuchsia-950"]{background-color:#fdf4ff}
+.reading-light [class*="bg-indigo-950"]{background-color:#eef2ff}
+.reading-light [class*="bg-rose-950"]{background-color:#fff1f2}
+.reading-light [class*="bg-violet-950"]{background-color:#f5f3ff}
+/* WCAG AA: primary buttons (white text) and rich toasts */
+.bg-indigo-500{background-color:#4f46e5}
+.hover\:bg-indigo-400:hover{background-color:#4338ca}
+.reading-light [data-sonner-toaster]{--success-text:#047857;--error-text:#b91c1c;--warning-text:#92400e;--info-text:#1d4ed8}
+.reading-light{background:#ffffff !important;color:#0f172a;border-color:rgba(15,23,42,.12) !important}
+.reading-light .text-white,.reading-light .text-slate-100,.reading-light .text-slate-200{color:#0f172a !important}.reading-light .text-slate-300,.reading-light .text-slate-400{color:#334155 !important}.reading-light .text-slate-500{color:#475569 !important}

@@ -37,6 +37,7 @@ export const RadarSettingsDialog = ({ onClose }) => {
       const n = (f) => r.companies.filter((c) => c.enabled && f(c)).length;
       const bad = r.companies.filter((c) => c.portal_url && !c.kind).map((c) => c.name);
       toast.success(`Réglages enregistrés : ${n((c) => c.kind === "workday")} portail(s) Workday, ${n((c) => c.kind && c.kind !== "workday")} autre(s) portail(s) employeur, ${n((c) => !c.kind)} entreprise(s) via Jooble.`);
+      if (r.auto_detecting?.length) toast.message(`Détection automatique lancée pour ${r.auto_detecting.length} entreprise(s) : les portails vérifiés avec certitude seront associés et signalés sur la page Radar.`, { duration: 8000 });
       if (bad.length) toast.warning(`URL non reconnue pour : ${bad.join(", ")}. Ces entreprises sont suivies via Jooble.`, { duration: 9000 });
       onClose();
     } catch (e) { toast.error(e.message); } finally { setBusy(false); }

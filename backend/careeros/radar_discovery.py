@@ -30,6 +30,13 @@ DIRECTORY = [
     ("Air Canada", "https://careers.aircanada.com/ca/fr/search-results", "Transport"),
     ("Metro", "https://talent.metro.ca/sitemap.xml", "Alimentation"), ("Airbus", WD("ag.wd3", "Airbus"), "Aéronautique"), ("Walmart Canada", WD("walmart.wd504", "WalmartExternal"), "Commerce de détail"),
     ("CGI", "", "Technologie"),
+    ("Molson Coors", "https://jobs.molsoncoors.com/services/rss/job/", "Alimentation et boissons"), ("Agropur", WD("agropur.wd3", "Agropur_Careers"), "Alimentation"),
+    ("Cascades", "https://jobs.cascades.com/services/rss/job/", "Industrie"), ("Purolator", "https://careers.purolator.com/services/rss/job/", "Transport et logistique"),
+    ("Alstom", "https://jobsearch.alstom.com/services/rss/job/", "Transport"), ("Kuehne+Nagel", "https://careers.kuehne-nagel.com/services/rss/job/", "Transport et logistique"),
+    ("Domtar", "https://jobs.domtar.com/services/rss/job/", "Industrie"), ("Home Depot Canada", WD("homedepot.wd5", "CareerDepotCanada"), "Commerce de détail"),
+    ("Dollarama", "https://jobs.dollarama.com/services/rss/job/", "Commerce de détail"), ("Vidéotron", "https://careers.smartrecruiters.com/Videotron", "Télécommunications"),
+    ("TD", WD("td.wd3", "TD_Bank_Careers"), "Finance"), ("BMO", WD("bmo.wd3", "External"), "Finance"), ("Thales", WD("thales.wd3", "Careers"), "Aéronautique et défense"),
+    ("Colabor", "https://carrieres.colabor.com/sitemap.xml", "Distribution alimentaire"), ("Cogeco", WD("cogeco.wd3", "Cogeco_Careers"), "Télécommunications"),
 ]
 NO_FEED_ATS = {"CGI": "Njoyn"}
 UNSUPPORTED = {"taleo.net": "Taleo", "phenompeople": "Phenom", "avature": "Avature", "njoyn": "Njoyn", "silkroad": "SilkRoad", "dayforcehcm": "Dayforce (API protégée)",
@@ -138,9 +145,13 @@ def _scan(url: str, text: str, found: dict, unsupported: set):
             unsupported.add(label)
 
 
-async def discover(name: str, website: str = "") -> dict:
+async def discover(name: str, website: str = "", shared_url: str = "") -> dict:
     found, unsupported, origin = {}, set(), {}
     d = directory_match(name)
+    if shared_url and not (d and d[1]):
+        k, s = S.parse_portal(shared_url)
+        if k:
+            found[(k, s)], origin[(k, s)] = shared_url, "annuaire partagé"
     async with httpx.AsyncClient(timeout=S.TIMEOUT, follow_redirects=True) as c:
         if d and not d[1]:
             unsupported.add(NO_FEED_ATS.get(d[0], "non identifié"))
