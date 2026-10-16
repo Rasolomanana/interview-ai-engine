@@ -97,7 +97,7 @@ def search_links(title: str, company: str, location: str, employer_url: str = ""
                ("Glassdoor", f"https://www.glassdoor.ca/Job/jobs.htm?sc.keyword={q}&locKeyword={loc}"),
                ("Google Emplois", f"https://www.google.com/search?q={quote_plus(f'{title} {company} emploi')}&ibp=htl;jobs"),
                ("Guichet-Emplois", f"https://www.guichetemplois.gc.ca/jobsearch/rechercheemplois?searchstring={q}&locationstring={loc}"),
-               ("Talent.com", f"https://ca.talent.com/jobs?k={q}&l={loc}"), ("Monster", f"https://www.monster.ca/jobs/search?q={q}&where={loc}"),
+               ("Talent.com", f"https://ca.talent.com/jobs?k={q}&l={loc}"), ("Monster", _site("monster.ca", title, company)),
                ("Careerjet", f"https://www.careerjet.ca/emplois?s={q}&l={loc}"), ("Eluta", f"https://www.eluta.ca/search?q={q}&l={loc}"),
                ("ZipRecruiter", f"https://www.ziprecruiter.com/jobs-search?search={q}&location={loc}"),
                ("CareerBeacon", _site("careerbeacon.com", title, company)), ("Workopolis", _site("workopolis.com", title, company))]

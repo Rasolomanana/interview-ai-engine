@@ -1,0 +1,36 @@
+{
+  "summary": "Tested the expanded 'search elsewhere' protocol. Backend: GET application returns 17 search_links (employer site + 12 general incl. Glassdoor + 4 Québec), each with label/url/quebec; auto_sources=['Portail officiel']. Province ordering verified: when the profile province is Québec (or empty, falling back to the Montréal offer location), Jobillico/Jobboom/Québec emploi/Isarta come right after Indeed/LinkedIn; with Ontario they come last; the province was restored to ''. POST availability?search=true returns 1 alternative (Portail officiel), no Careerjet. UI at /careeros/candidature/:id: auto-sources text correct, 17 anchors target=_blank rel=noopener noreferrer, Québec ones sky-blue (rgb(3,105,161)), 'Tout ouvrir (17)' opened 16 real tabs in headless (Eluta tab did not appear, and eluta.ca is unreachable from this container: environment issue, not the app). The blocked-popup toast was verified by stubbing window.open: '17 onglet(s) bloqué(s)…'. At 390px mobile, apply-bar, offer-availability and search-links have no overflow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PackView mobile 390px", "issues": [
+        "In the alternative row (alternative-0), the title span (flex-1 truncate) shrinks to about 10px and shows only 'A.' because the source badge, the match % and the two buttons take all the width. Make it wrap: put the title on its own full-width line (basis-full) on small screens.",
+        "Already present before this change (outside the apply-bar): the PackView header row (priority badge, IPS, status select, 'Préparer l'entrevue', pack-more-btn) overflows by 12px (document scrollWidth 402 > 390). Add flex-wrap."
+      ]},
+      {"screen": "Search links", "issues": [
+        "The Monster link (monster.ca/jobs/search?q=…) is redirected with 301 to the monster.com homepage, so the search query is lost. Use a Google site:monster.ca search or the monster.ca format that currently works.",
+        "'Tout ouvrir' fires 6 Google 'site:' searches at once (Jobboom, Québec emploi, Isarta, CareerBeacon, Workopolis, Google Emplois). In headless they all hit google.com/sorry (captcha). Real users may also hit Google rate limits; consider spacing them out."
+      ]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_search_links.py", "/app/backend/tests/test_offer_availability.py", "/app/test_reports/pytest/pytest_search_links.xml"],
+  "action_items": [
+    "Fix the Monster search URL: monster.ca redirects to the monster.com homepage and drops the query.",
+    "Mobile: let the alternative title wrap instead of truncating to 'A.'.",
+    "Mobile: add flex-wrap to the PackView header action row (12px horizontal overflow)."
+  ],
+  "critical_code_review_comments": [
+    "The review request gives the UI path /careeros/pack/:id, but the actual route is /careeros/candidature/:id.",
+    "router.get_app runs KB.lookup, a career_profiles query and _offer_meta on every GET. This is acceptable, but search_links could be cached.",
+    "The availability endpoint trusts the first X-Forwarded-For IP for Careerjet's user_ip. This is acceptable behind the ingress."
+  ],
+  "updated_files": ["/app/backend/tests/test_search_links.py (new)", "/app/backend/tests/test_offer_availability.py (test_workday_api_url now expects 17 links instead of 5)"],
+  "success_rate": {"backend": "100% (19/19 incl. regression)", "frontend": "95%"},
+  "test_credentials": "membre.test@careeros.dev / CareerOS2026!",
+  "seed_data_creation": "None. Profile province was changed temporarily and restored to ''. offer_link is https://example.com/jobs/TEST_123.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The PackView route is /careeros/candidature/:id. backend pytest.ini uses xdist (-n): pass -n 0 to see print output. test_search_links.py toggles the profile province (Québec, then Ontario) and restores it. The app's offer is expired (example.com 404), so the alternatives box shows 1 Portail officiel alternative."
+}

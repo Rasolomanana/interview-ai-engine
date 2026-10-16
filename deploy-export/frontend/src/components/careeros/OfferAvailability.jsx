@@ -59,7 +59,7 @@ export const OfferAvailability = ({ a, onChange }) => {
         {alts.map((x, i) => (
           <div key={x.url} className="flex flex-wrap items-center gap-2 border-t border-white/5 py-1.5 text-xs" data-testid={`alternative-${i}`}>
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${x.official ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-slate-300"}`}>{x.source}</span>
-            <span className="min-w-0 flex-1 truncate text-slate-200">{x.title} · {x.company}{x.location ? ` · ${x.location}` : ""}{x.posted_at ? ` · ${x.posted_at}` : ""}</span>
+            <span className="min-w-[60%] flex-1 break-words text-slate-200 sm:min-w-0">{x.title} · {x.company}{x.location ? ` · ${x.location}` : ""}{x.posted_at ? ` · ${x.posted_at}` : ""}</span>
             <span className="font-mono text-[10px] text-slate-400" data-testid={`alternative-match-${i}`}>{x.match} %</span>
             <a href={x.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-indigo-300 hover:text-white" data-testid={`alternative-open-${i}`}><ExternalLink className="h-3.5 w-3.5" />Ouvrir</a>
             <button type="button" onClick={() => use(x)} className="rounded-full border border-emerald-400/40 px-2 py-0.5 text-emerald-200 hover:bg-emerald-500/10" data-testid={`alternative-use-${i}`}>Utiliser ce lien</button>

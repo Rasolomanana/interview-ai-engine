@@ -124,7 +124,7 @@ def test_workday_api_url():
     assert _workday_api("https://example.com/x") == ""
     assert similarity("Analyste TI", "Analyste TI senior") >= 0.5
     links = search_links("Analyste", "Ville", "Montréal", "https://career.example")
-    assert links[0]["url"] == "https://career.example" and len(links) == 5
+    assert links[0]["url"] == "https://career.example" and len(links) == 17
 
 
 def test_workday_check_live():

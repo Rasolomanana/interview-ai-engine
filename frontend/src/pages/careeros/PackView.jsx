@@ -98,7 +98,7 @@ export default function PackView() {
           <p className="mt-1 text-sm text-slate-400">{d.entreprise}</p>
           <ConceptRow keys={["ips", "priorite", "pack", "suivi", "ics"]} />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {shown.ips && <><PriorityBadge priority={shown.ips.priority} testid="header-priority" /><span className="font-mono text-sm text-slate-300" data-testid="header-ips">IPS {shown.ips.score}</span></>}
           <select value={a.pipeline_status} onChange={(e) => changeStatus(e.target.value)} data-testid="pipeline-status-select"
             className="rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-slate-200 outline-none">

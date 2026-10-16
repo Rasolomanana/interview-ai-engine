@@ -464,3 +464,8 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Cron : étape « disponibilite » (15 dossiers à postuler / membre, >20 h).
 - UI : OfferAvailability dans ApplyBar ; badges Dashboard ; Radar « publiée il y a X j ».
 - Tests : iteration_40 + tests/test_offer_availability.py.
+
+## 2026-10-16 — Recherche élargie (Glassdoor, sites QC, Careerjet)
+- search_links : 16 sites + site carrière, Québec en tête si province Québec (Jobillico, Jobboom, Québec emploi, Isarta), Glassdoor/Indeed/LinkedIn en liens pré-remplis seulement ; bouton Tout ouvrir.
+- radar_sources.careerjet (API v4 partenaire ; CAREERJET_AFFID + CAREERJET_PAGE_URL, CAREERJET_API_KEY optionnel ; IP/UA du membre, à la demande uniquement). auto_sources affichées. render.yaml mis à jour.
+- Tests : iteration_41 + tests/test_search_links.py.
