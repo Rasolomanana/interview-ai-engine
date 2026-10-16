@@ -43,7 +43,7 @@ export const ApplyBar = ({ a, d, onChange }) => {
   const notYet = async () => { await careeros.applyNotYet(a.id).catch(() => {}); onChange({ apply_opened_at: null }); setAsk(false); };
   const later = () => { sessionStorage.setItem(LATER(a.id), "1"); setAsk(false); toast.message("D'accord, je vous le redemanderai à votre prochaine visite de ce dossier."); };
   const save = async () => {
-    try { const r = await careeros.setOfferLink(a.id, url); onChange({ offer_link: r.offer_link }); setUrl(""); toast.success("Lien de l'offre enregistré."); } catch (e) { toast.error(e.message); }
+    try { const r = await careeros.setOfferLink(a.id, url); onChange({ offer_link: r.offer_link, availability: r.availability }); setUrl(""); toast.success("Lien de l'offre enregistré."); } catch (e) { toast.error(e.message); }
   };
   const copy = () => navigator.clipboard.writeText(a.offer_link).then(() => toast.success("Lien copié."));
   const optimized = a.status === "done";

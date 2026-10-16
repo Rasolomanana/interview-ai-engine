@@ -457,3 +457,10 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - router.py : _offer_link (offer_link membre > origin.url Radar > inputs.offer_url > 1re URL du texte), offer_source ; PUT offer-link, POST apply-opened / applied (jamais de rétrogradation) / apply-not-yet ; _summary.apply_pending ; set_status postule -> applied_at.
 - ApplyBar.jsx dans PackView : étapes 1-2-3, bouton Postuler (nouvel onglet), hôte + source, copier, ajout du lien, J'ai postulé, dialogue « Avez-vous postulé ? » au retour / prochaine visite, rappel relance J+7 .ics. Badge Dashboard « Candidature à confirmer ».
 - Tests : iteration_39 + tests/test_apply_flow.py (18/18).
+
+## 2026-10-16 — Disponibilité de l'offre + recherche ailleurs
+- careeros/offer_check.py : check_url (404/410, phrases expirée, Workday via API JSON cxs, 403 = impossible), jooble_listed (API Jooble car pages 403), find_elsewhere (portail officiel base commune/entreprises membre, Jooble, Adzuna ; similarité titre >= 0.5), search_links (Indeed, LinkedIn, Guichet-Emplois, Google Emplois, site carrière) — liens pré-remplis uniquement.
+- router : POST /applications/{id}/availability?search= ; PUT offer-link revérifie + source ; GET app search_links ; _summary apply_urgent (A/B > 3 j) + availability.
+- Cron : étape « disponibilite » (15 dossiers à postuler / membre, >20 h).
+- UI : OfferAvailability dans ApplyBar ; badges Dashboard ; Radar « publiée il y a X j ».
+- Tests : iteration_40 + tests/test_offer_availability.py.

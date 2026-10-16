@@ -78,7 +78,7 @@ export const careeros = {
   checkAvailability: (id, search = false) => call(`/careeros/applications/${id}/availability?search=${search}`, { method: "POST" }),
   applied: (id) => call(`/careeros/applications/${id}/applied`, { method: "POST" }),
   applyNotYet: (id) => call(`/careeros/applications/${id}/apply-not-yet`, { method: "POST" }),
-  setOfferLink: (id, url) => call(`/careeros/applications/${id}/offer-link`, { method: "PUT", body: { url } }),
+  setOfferLink: (id, url, source = "") => call(`/careeros/applications/${id}/offer-link`, { method: "PUT", body: { url, source } }),
   setStatus: (id, pipeline_status) => call(`/careeros/applications/${id}/status`, { method: "PATCH", body: { pipeline_status } }),
   remove: (id) => call(`/careeros/applications/${id}`, { method: "DELETE" }),
   reanalyze: (id, b) => call(`/careeros/applications/${id}/reanalyze`, { method: "POST", body: b }),

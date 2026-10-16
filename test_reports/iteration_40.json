@@ -1,0 +1,37 @@
+{
+  "summary": "Tested the offer availability check, the search for the same offer elsewhere, the prefilled search links, apply urgency and the cron 'disponibilite' step, on both backend and frontend. Backend: 11/11 pytest pass. Expired link (example.com 404) returns status expired with alternatives searched automatically ('Analyste TI', Ville de Montréal, Portail officiel, 100 %, official=true). ?search=true works. The status persists on GET. search_links come back with the employer career site plus Indeed/LinkedIn/Guichet-Emplois/Google Emplois. The list returns apply_urgent and availability (abea3957 = priority A, 4 days old -> urgent true). Cross-member access returns 404, no auth returns 401/403. Workday JSON API checked on live Agropur postings: 'available' for real postings, 'expired' (HTTP 404) for a fake job id. Cron run logged a 'disponibilite' step ok=True for all 11 members. Frontend: the PackView availability block, alternatives, open/use buttons, search links (target=_blank), toasts, apply-urgent banner, Dashboard row badges (row-expired, row-apply-urgent) and Radar 'publiée il y a X j' all work. One real bug: the availability status reverts to expired after 'Utiliser ce lien' + reload.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/careeros/applications/{id}/offer-link", "issue": "Changing the link does not reset or re-check the stored 'availability' (and 'alternatives'), and offer_source is not saved. After 'Utiliser ce lien', the database still holds availability.status='expired' from the old link. The list keeps returning availability='expired' and the dashboard still shows 'Offre expirée · voir ailleurs'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OfferAvailability / 'Utiliser ce lien'", "issue": "After using an alternative, the UI shows 'Offre disponible · Lien remplacé…' only in local state. On reload the PackView shows the new host but 'Offre expirée sur ce site · Page supprimée (HTTP 404)' (stale status from the old link). It is not re-checked automatically because checked_at is less than 6h old. The source label also reverts to 'via oracle' (origin.source) instead of 'via Portail officiel'.", "selector": "[data-testid=availability-status], [data-testid=apply-offer-host]", "priority": "MEDIUM"},
+      {"component": "OfferAvailability", "issue": "The alternative that is now the dossier link stays listed with an active 'Utiliser ce lien' button (no 'lien actuel' state).", "selector": "[data-testid=alternative-use-0]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PackView without an offer link (e.g. abea3957)", "issues": ["The status, 'Vérifier maintenant' and 'Chercher la même offre ailleurs' buttons are hidden when there is no offer_link. The member cannot search for the offer on the official portal or Jooble; only the prefilled search links are available."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_offer_availability.py", "/app/test_reports/pytest/pytest_offer_availability.xml"],
+  "action_items": [
+    "In PUT /offer-link: $unset availability (or run OC.check_url on the new URL and store the result), save offer_source when an alternative is used, and optionally drop the used URL from alternatives. Or have the frontend call checkAvailability right after setOfferLink so the persisted state matches the UI.",
+    "Optional: let 'Chercher la même offre ailleurs' be used even when the pack has no offer_link."
+  ],
+  "critical_code_review_comments": [
+    "check_application: when status is unknown/available and search=false, the response returns the stale alternatives from the previous check. That is acceptable but can look misleading.",
+    "The cron 'disponibilite' step runs check_url on a_postuler packs that have no link. For member a116c167 it 'checked' 11 packs, mostly linkless and therefore 'unknown'. These could be filtered out to save requests and avoid writing meaningless 'Aucun lien' statuses.",
+    "The cron only checks members in the 'todo' list (radar-enabled and active). Packs of members without the Radar are never re-checked by the cron.",
+    "is_stale uses 20h on the backend vs 6h on the frontend. This is intentional (daily cron vs pack opening) but is not documented."
+  ],
+  "updated_files": ["/app/backend/tests/test_offer_availability.py"],
+  "success_rate": {"backend": "100%", "frontend": "90%"},
+  "seed_data_creation": "None. Application a793f26d's offer link was restored to https://example.com/jobs/TEST_123 and re-checked (status expired, 1 alternative).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest -n0 tests/test_offer_availability.py; the test fixture restores the TEST_123 link. Jooble and Adzuna are not configured, so alternatives come only from the portal (Ville de Montréal Oracle HCM). Real Workday URLs for testing are in db.radar_offers (url regex 'myworkdayjobs'). The cron test takes about 40s.",
+  "rca of the issue": "Repro: open /careeros/candidature/a793f26d… (status expired), click alternative-use-0 -> the UI shows 'Offre disponible'. Reload -> 'Offre expirée sur ce site' with the new oracle host, and the dashboard row-expired badge is still shown. Cause: set_offer_link only sets offer_link; the 'availability' doc field is untouched; the frontend's 'available' state is local only; the auto-check skips because checked_at < 6h."
+}

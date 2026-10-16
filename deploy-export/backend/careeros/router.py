@@ -347,7 +347,7 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
         a = await _own(app_id, user)
         a["decision_report"] = _report(a)
         a["offer_link"] = _offer_link(a)
-        a["offer_source"] = (a.get("origin") or {}).get("source") or ""
+        a["offer_source"] = (a.get("offer_link_source") if a.get("offer_link") else "") or (a.get("origin") or {}).get("source") or ""
         from . import offer_check as OC
         title, company, loc = await _offer_meta(a)
         card = await KB.lookup(db, company) if company else None
@@ -438,6 +438,7 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
 
     class LinkBody(BaseModel):
         url: str = Field(max_length=2000)
+        source: str = Field(default="", max_length=60)
 
     @router.put("/applications/{app_id}/offer-link")
     async def set_offer_link(app_id: str, body: LinkBody, user: dict = Depends(current_user)):
@@ -445,8 +446,12 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
         url = body.url.strip()
         if not re.match(r"^https?://\S+\.\S+", url):
             raise HTTPException(status_code=400, detail="Lien invalide : collez l'adresse complète de l'offre (https://…).")
-        await db.applications.update_one({"id": app_id}, {"$set": {"offer_link": url, "updated_at": _now()}})
-        return {"ok": True, "offer_link": url}
+        from . import offer_check as OC
+        a = await _own(app_id, user)
+        av = await OC.check_url(url)
+        alts = [x for x in a.get("alternatives") or [] if x.get("url") != url]
+        await db.applications.update_one({"id": app_id}, {"$set": {"offer_link": url, "offer_link_source": body.source.strip(), "availability": av, "alternatives": alts, "updated_at": _now()}})
+        return {"ok": True, "offer_link": url, "availability": av, "alternatives": alts}
 
     @router.post("/applications/{app_id}/apply-opened")
     async def apply_opened(app_id: str, user: dict = Depends(current_user)):
