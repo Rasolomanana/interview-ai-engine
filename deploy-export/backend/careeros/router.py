@@ -561,8 +561,12 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
         upd = {"availability": av}
         if search or av["status"] in ("expired", "expired_likely"):
             google = await _google_ok(a, manual)
-            if google:
+            if google:  # claim atomically: concurrent openings never spend two credits on the same dossier
                 upd["google_at"] = _now()
+                claimed = await db.applications.update_one({"id": a["id"], "google_at": a.get("google_at")}, {"$set": {"google_at": upd["google_at"]}})
+                google = bool(claimed.modified_count)
+                if not google:
+                    upd.pop("google_at")
             upd["alternatives"] = await OC.find_elsewhere(db, a["user_id"], title, company, loc, link, client, google) if title else []
             upd["alternatives_at"] = _now()
         await db.applications.update_one({"id": a["id"]}, {"$set": upd})

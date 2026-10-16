@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ExternalLink, HelpCircle, Loader2, RefreshCw, Search, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { careeros } from "@/lib/careeros";
@@ -25,7 +25,10 @@ export const OfferAvailability = ({ a, onChange }) => {
     } catch (e) { toast.error(e.message); } finally { setBusy(""); }
   };
   const todo = a.pipeline_status === "a_postuler";
+  const started = useRef("");
   useEffect(() => {
+    if (started.current === a.id) return;
+    started.current = a.id;
     if (todo && (!a.alternatives_at || Date.now() - new Date(a.alternatives_at).getTime() > CACHE_MS)) run(true, true);  // automatic search, cached 12 h
     else if (todo && a.offer_link && (!av?.checked_at || Date.now() - new Date(av.checked_at).getTime() > STALE_MS)) run(false);
   }, [a.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -34,7 +37,8 @@ export const OfferAvailability = ({ a, onChange }) => {
     catch (e) { toast.error(e.message); }
   };
   const covered = new Set((a.alternatives || []).map((x) => (x.source || "").toLowerCase()));
-  const manual = (a.search_links || []).filter((l) => ![...covered].some((c) => c.includes(l.label.toLowerCase())));
+  const hasOfficial = (a.alternatives || []).some((x) => x.official);
+  const manual = (a.search_links || []).filter((l) => ![...covered].some((c) => c.includes(l.label.toLowerCase())) && !(hasOfficial && l.label.startsWith("Site carrière")));
   const openAll = () => {
     const links = manual;
     const blocked = links.filter((l) => { const w = window.open(l.url, "_blank"); if (w) w.opener = null; return !w; }).length;

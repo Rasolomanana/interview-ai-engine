@@ -469,3 +469,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - search_links : 16 sites + site carrière, Québec en tête si province Québec (Jobillico, Jobboom, Québec emploi, Isarta), Glassdoor/Indeed/LinkedIn en liens pré-remplis seulement ; bouton Tout ouvrir.
 - radar_sources.careerjet (API v4 partenaire ; CAREERJET_AFFID + CAREERJET_PAGE_URL, CAREERJET_API_KEY optionnel ; IP/UA du membre, à la demande uniquement). auto_sources affichées. render.yaml mis à jour.
 - Tests : iteration_41 + tests/test_search_links.py.
+
+## 2026-10-16 — Trouver l'offre partout (Google Jobs SerpApi)
+- radar_sources.google_jobs (SerpApi engine=google_jobs, gl=ca hl=fr) : 1 lien par site « postuler sur » ; plafond dur 99/mois (serpapi_usage, upsert atomique).
+- Règles : A auto (1x/7 j par dossier, manuel 1x/24 h), B manuel si >30 crédits, jamais C ; claim google_at atomique.
+- Recherche auto à l'ouverture (cache 12 h), cron pré-cache A ; liens manuels repliés (sites non couverts).
+- SERPAPI_API_KEY dans render.yaml. Tests iteration_42 + tests/test_find_everywhere.py.

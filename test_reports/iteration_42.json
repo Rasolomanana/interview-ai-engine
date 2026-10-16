@@ -1,0 +1,37 @@
+{
+  "summary": "Tested 'Trouver l'offre partout' (automatic search at pack opening with a 12 h cache, manual search, google_jobs budget, collapsible manual sites) on the backend and frontend. Backend: 21/21 pytest passed. This covers the new test_find_everywhere.py (7 tests, including unit tests for the SerpApi 99/month cap with a fake Mongo and httpx MockTransport) and the regression files test_offer_availability.py and test_search_links.py. Frontend: after $unset alternatives_at, opening the dossier fires POST /availability?search=true&auto=true. Re-opening within 12 h fires no /availability call at all. Also verified: heading 'Offre trouvée sur 1 site(s) · 1 lien(s)' plus 'recherche du 2026-10-16 02 h 34'; button label 'Trouver l'offre partout'; the manual click sends auto=false, shows the busy label 'Recherche sur tous les sites…' and the toast '1 annonce(s) correspondante(s) trouvée(s) ailleurs.'; auto-sources text includes 'résultats gardés 12 h'; google-jobs-off is visible; manual-sites <details> is collapsed by default with the summary 'Autres sites (recherche manuelle) · 17'; expanding shows 17 search-link-i plus 'Tout ouvrir (17)'. Regression checks passed: 'Utiliser ce lien' (toast, host changes, status becomes 'Offre disponible'), J'ai postulé (apply-done 'Postulé le …'), and no overflow at 390px (scrollWidth 390). The test data was restored afterwards.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/careeros/applications/{id}/availability (check_application/_google_ok)", "issue": "Race condition: _google_ok reads a.google_at from a snapshot, so 2 concurrent searches on the same priority-A dossier (React StrictMode double effect in dev, two tabs, cron plus user) would both pass and each use a SerpApi credit. The monthly cap still holds, but the 'once per dossier per 7 days / 24 h' rule does not. Fix: claim atomically with update_one({id, $or:[{google_at:{$exists:false}},{google_at:{$lt:threshold}}]}, {$set:{google_at:now}}) and use Google only if modified_count==1."},
+      {"endpoint": "check_application", "issue": "google_at is set before google_jobs runs, even when the call is refused at the cap or SerpApi fails. The dossier is then blocked for 7 days without any results. Low impact."},
+      {"endpoint": "radar.py cron disponibilite", "issue": "Priority-A pre-caching only happens when availability is stale (>20 h, OC.is_stale). An A dossier checked recently but with alternatives_at older than 12 h is not pre-cached. Cron calls check_application without a client IP, so Careerjet is always skipped in cron."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OfferAvailability useEffect", "issue": "The first open fires the automatic search POST twice (React.StrictMode in index.js runs mount effects twice in dev). Production builds fire it once. Still, add a useRef guard (or an AbortController) so the work is not duplicated and to avoid the Google credit race above.", "selector": "[data-testid='offer-availability']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Pack view, manual sites", "issues": ["'Site carrière Ville de Montréal' is still listed in 'Autres sites' even though the 'Portail officiel' alternative already covers the employer portal. The exclusion only matches source names to labels. Consider also excluding the portal link when an official alternative exists."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_find_everywhere.py", "/app/backend/tests/test_offer_availability.py", "/app/backend/tests/test_search_links.py", "/app/test_reports/pytest/pytest_iter42.xml"],
+  "action_items": [
+    "Optional: claim google_at atomically in check_application to enforce 'once per dossier per 7 d / 24 h' under concurrency",
+    "Optional: add a useRef guard in the OfferAvailability auto-search effect (StrictMode double POST)",
+    "Optional: exclude the employer portal search link when an official alternative was found"
+  ],
+  "critical_code_review_comments": [
+    "The SerpApi cap is correctly atomic: the upsert filter count<$lt cap raises a duplicate key error at the cap, which is caught and returns []. The unit test confirmed exactly 99 HTTP calls out of 105 attempts.",
+    "The _google_ok rules match the spec: A gets an automatic run weekly and a manual run once per 24 h; B runs only on manual request with more than 30 credits left (plus a weekly limit); C never. Google is disabled when the key is absent or the status is not a_postuler.",
+    "A credit used on a failed SerpApi call (raise_for_status) is not refunded. This is acceptable but worth documenting."
+  ],
+  "updated_files": ["/app/backend/tests/test_find_everywhere.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. Unset alternatives_at for app a793f26d to test the automatic search. Restored offer_link to https://example.com/jobs/TEST_123, pipeline_status to a_postuler, and unset applied_at after the J'ai postulé test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login testids: auth-email-input, auth-password-input, auth-submit-btn; close the privacy banner via [data-testid*=privacy] button. App a793f26d is priority B with an expired example.com link and 1 Portail officiel alternative; manual list has 17 links. To retest the automatic search, $unset alternatives_at in test_database.applications. After 'Utiliser ce lien' or J'ai postulé, restore via PUT offer-link, PATCH status a_postuler and $unset applied_at (see /tmp/restore.py pattern). serpapi_usage collection is empty (no key in preview)."
+}
