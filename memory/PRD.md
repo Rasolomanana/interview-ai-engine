@@ -452,3 +452,8 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - PUT /api/admin/roles/{id}/test ; Rôles : colonne « Compte de test », badge TEST, filtre « Afficher les comptes de test », confirmation avant rôle sur compte test.
 - Admin : bouton global « Afficher les comptes de test » (sessionStorage adminIncludeTest) ; badge TEST dans Membres payants ; colonne test dans les traces membres.
 - Démo réelle preview : membre.reel.demo@example.com / Reel2026!demo.
+
+## 2026-10-15 — Où postuler / J'ai postulé
+- router.py : _offer_link (offer_link membre > origin.url Radar > inputs.offer_url > 1re URL du texte), offer_source ; PUT offer-link, POST apply-opened / applied (jamais de rétrogradation) / apply-not-yet ; _summary.apply_pending ; set_status postule -> applied_at.
+- ApplyBar.jsx dans PackView : étapes 1-2-3, bouton Postuler (nouvel onglet), hôte + source, copier, ajout du lien, J'ai postulé, dialogue « Avez-vous postulé ? » au retour / prochaine visite, rappel relance J+7 .ics. Badge Dashboard « Candidature à confirmer ».
+- Tests : iteration_39 + tests/test_apply_flow.py (18/18).

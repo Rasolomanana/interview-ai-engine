@@ -9,8 +9,8 @@ const LATER = (id) => `cos.applyLater.${id}`;
 
 // Follow-up reminder 7 days later, as a downloadable .ics (nothing is added to a calendar automatically).
 const relanceIcs = (a, d) => {
-  const day = new Date(Date.now() + 7 * 864e5);
-  const ymd = day.toISOString().slice(0, 10).replace(/-/g, "");
+  const day = new Date(new Date(a.applied_at || Date.now()).getTime() + 7 * 864e5);
+  const ymd = `${day.getFullYear()}${String(day.getMonth() + 1).padStart(2, "0")}${String(day.getDate()).padStart(2, "0")}`;
   const esc = (s) => String(s || "").replace(/[,;\\]/g, (c) => `\\${c}`).replace(/\n/g, "\\n");
   const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//CareerOS//Relance//FR", "BEGIN:VEVENT", `UID:relance-${a.id}@careeros`,
     `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`, `DTSTART;VALUE=DATE:${ymd}`, `SUMMARY:${esc(`Relancer ${d.entreprise || "l'employeur"} — ${d.poste || "candidature"}`)}`,

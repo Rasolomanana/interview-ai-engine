@@ -69,7 +69,7 @@ export default function PackView() {
 
   const changeStatus = async (s) => {
     await careeros.setStatus(id, s);
-    setA({ ...a, pipeline_status: s });
+    setA({ ...a, pipeline_status: s, apply_opened_at: null, applied_at: a.applied_at || (s === "postule" ? new Date().toISOString() : a.applied_at) });
     toast.success(`Statut : ${PIPELINE_LABELS[s]}`);
   };
   const retry = async () => {

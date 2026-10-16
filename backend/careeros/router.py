@@ -419,8 +419,11 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
         upd = {"pipeline_status": body.pipeline_status, "updated_at": _now()}
         if body.pipeline_status in ("entrevue", "offre"):
             upd["had_interview"] = True
+        cur = await _own(app_id, user)
+        if body.pipeline_status == "postule" and not cur.get("applied_at"):
+            upd["applied_at"] = _now()
         await db.applications.update_one({"id": app_id}, {
-            "$set": upd, "$push": {"timeline": {"at": _now(), "type": "status", "detail": body.pipeline_status, "note": body.note or ""}}})
+            "$unset": {"apply_opened_at": ""}, "$set": upd, "$push": {"timeline": {"at": _now(), "type": "status", "detail": body.pipeline_status, "note": body.note or ""}}})
         await recompute_career_score(user["id"], "status_changed")
         return {"ok": True, "pipeline_status": body.pipeline_status}
 
@@ -446,8 +449,10 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
 
     @router.post("/applications/{app_id}/applied")
     async def applied(app_id: str, user: dict = Depends(current_user)):
-        await _own(app_id, user)
+        a = await _own(app_id, user)
         now = _now()
+        if a.get("pipeline_status") != "a_postuler":  # never downgrade a later stage (interview, offer…)
+            return {"ok": True, "pipeline_status": a.get("pipeline_status"), "applied_at": a.get("applied_at")}
         await db.applications.update_one({"id": app_id}, {"$set": {"pipeline_status": "postule", "applied_at": now, "updated_at": now}, "$unset": {"apply_opened_at": ""},
                                                           "$push": {"timeline": {"at": now, "type": "status", "detail": "postule", "note": "Candidature envoyée (confirmée par le membre)"}}})
         await recompute_career_score(user["id"], "status_changed")

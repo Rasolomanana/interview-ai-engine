@@ -1,0 +1,36 @@
+{
+  "summary": "Apply-flow feature (A+B+C+D) tested end-to-end. Backend: 18/18 pytest pass (offer_link/offer_source on detail, offer-link validation 400 + persistence, apply-opened only when a_postuler, apply_pending in list, apply-not-yet clears, applied sets postule+applied_at+timeline and clears pending, cross-member 404 on all 5 endpoints, unauth 401). _offer_link unit-checked for offer_url and first URL in offer_text (trailing .,; and parenthesis stripped). Frontend: apply-bar + 3 steps, open-offer opens original Workday URL in new tab, host 'desjardins.wd10.myworkdayjobs.com · via workday', copy link puts URL in clipboard + toast, ask dialog after return (visibilitychange), 'later' suppresses dialog on reload within session and dialog reappears after sessionStorage cleared, 'Pas encore' clears pending (no dialog after reload), 'Oui' -> select shows Postulé, apply-done 'Postulé le …', hint, button becomes 'Revoir l'offre', .ics downloads (CO-xxx_relance.ics, DTSTART J+7, offer URL in description). No-link pack shows apply-add-link; invalid URL toast; valid URL saved and persisted after reload; direct 'J'ai postulé' works. Dashboard row-apply-pending badge 'Candidature à confirmer' shown. All test data restored (3 apps back to a_postuler, offer_link/applied_at/apply_opened_at unset).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/careeros/applications/{id}/applied", "issue": "No status guard: calling it on an app at 'entrevue'/'offre' downgrades it to 'postule' and overwrites applied_at. UI only shows the button when a_postuler, but API should ignore/409 when already past a_postuler."},
+      {"endpoint": "PATCH /api/careeros/applications/{id}/status", "issue": "Manual status change via select to 'postule' does not set applied_at (UI shows 'Candidature envoyée' without date) and reverting to a_postuler leaves stale applied_at / apply_opened_at (old pending could resurface)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ApplyBar relanceIcs", "issue": "J+7 date computed from Date.now() at download time, not from a.applied_at; downloading on a later visit gives wrong reminder date and the description 'envoyée il y a 7 jours' becomes inaccurate. Also uses UTC toISOString date (can be off by one in evening Montreal time). Lines not folded at 75 octets (most clients tolerate).", "selector": "[data-testid='apply-relance-ics-btn']", "priority": "LOW"},
+      {"component": "ApplyBar open()", "issue": "Each click on apply-open-offer-btn adds a new visibilitychange listener (removed only after firing) — harmless but could stack; listener not cleaned on unmount.", "selector": "[data-testid='apply-open-offer-btn']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PackView mobile 390px", "issues": ["'Plus' action next to 'Préparer l'entrevue' is clipped at right edge (pre-existing header row, not apply bar)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_apply_flow.py", "/app/test_reports/pytest/pytest_apply_flow.xml"],
+  "action_items": [
+    "Optional: guard POST /applied (only when pipeline_status == a_postuler) to avoid downgrading later stages",
+    "Optional: set applied_at when status manually changed to 'postule'; unset apply_opened_at on manual status changes",
+    "Optional: base .ics reminder date on applied_at (local date) instead of now"
+  ],
+  "critical_code_review_comments": [
+    "ApplyBar `applied = a.pipeline_status !== 'a_postuler'` treats null/undefined pipeline_status as applied — fine if always set at creation; verify legacy docs.",
+    "Headless note: page.bring_to_front() does not fire visibilitychange in Playwright; dialog verified by dispatching the event manually (real browsers fire it on tab return)."
+  ],
+  "updated_files": ["/app/backend/tests/test_apply_flow.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None persisted; temporary changes on apps 9cdcacbd, abea3957, a793f26d were reverted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Member has 13 apps all a_postuler; 12 Radar (origin.url) and abea3957 (manual, no link) used to test add-link. Run tests/test_apply_flow.py (it modifies a793f26d then reverts status; offer_link must be unset via mongo after if needed). Dismiss PrivacyBanner 'J'ai compris'. Use document.dispatchEvent(new Event('visibilitychange')) to simulate tab return."
+}
