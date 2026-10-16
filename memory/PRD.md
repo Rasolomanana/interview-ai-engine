@@ -480,3 +480,8 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - radar.py : start_daily(trigger, force) avec claim atomique radar_daily {_id: jour Toronto} ; maybe_start (>= 06 h Toronto) appelé par scheduler_loop (5 min, lancé au startup) ET par un middleware sur toute requête /api (rattrapage au réveil) ; keepalive RENDER_EXTERNAL_URL/api/ping toutes les 4 min pendant le passage ; log trigger/day ; /cron idempotent (already) + ?force=true ; rescoring startup en arrière-plan (démarrage à froid rapide).
 - server.py : GET /api/ping (réponse minuscule pour cron-job.org).
 - Vérifié preview : démarrage interne 10 h 08 Toronto, 11 membres, log done, cron -> already.
+
+## 2026-10-16 — Panneaux repliables + Carte de compétences
+- lib/usePersistedToggle.js (localStorage) ; PortalHealth : bouton Masquer/Afficher le détail (compteurs toujours visibles) ; Radar : en-têtes A/B/C cliquables (chevron) mémorisés.
+- lib/skillMap.js : regroupement déterministe par domaines (16 domaines + Autres), fusion des formulations proches (Jaccard >= 0.6), poids = variantes + mentions CV/Career Memory.
+- SkillMap.jsx sous le CV maître : bulles flottantes 3D (perspective suit souris/tactile, translateZ selon poids), clic = détail des compétences ; repliable ; prefers-reduced-motion respecté.

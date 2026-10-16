@@ -95,3 +95,8 @@ body {
 }
 .radar-urgent { animation: radar-urgent-glow 2.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .radar-urgent { animation: none; } }
+
+@keyframes skill-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -7px; } }
+.skill-bubble { animation: skill-float 5s ease-in-out infinite; transition: box-shadow .2s, filter .2s; }
+.skill-bubble:hover { filter: brightness(1.12); }
+@media (prefers-reduced-motion: reduce) { .skill-bubble { animation: none; } }

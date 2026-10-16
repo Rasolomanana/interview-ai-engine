@@ -1,3 +1,5 @@
+import { usePersistedToggle } from "@/lib/usePersistedToggle";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { ArrowDownUp, TriangleAlert } from "lucide-react";
 import { InfoTip } from "@/components/careeros/guide/InfoTip";
@@ -40,6 +42,7 @@ const Card = ({ p, active, onPick }) => (
 );
 
 export const PortalHealth = ({ status, run, active, onPick }) => {
+  const [open, toggleOpen] = usePersistedToggle("cos.portals.open", true);
   const [qf, setQf] = useState(null);
   const [sort, setSort] = useState(["matched", -1]);
   const all = Object.entries(run?.portals || {}).map(([name, p]) => ({ ...p, name, quality: qualityOf(p), note: note(p) }));
@@ -60,6 +63,8 @@ export const PortalHealth = ({ status, run, active, onPick }) => {
         <span className="text-xs text-slate-300" data-testid="portal-configured">{configured} configuré(s)</span>
         <span className="text-xs text-slate-300" data-testid="portal-success-rate">Lecture réussie : {rate === null ? "—" : `${ok}/${all.length} (${rate} %)`}</span>
         <span className="text-xs text-slate-300">Offres : {all.reduce((a, p) => a + (p.fetched || 0), 0)} lues · {all.reduce((a, p) => a + (p.matched || 0), 0)} retenues</span>
+        {all.length > 0 && <button type="button" onClick={toggleOpen} aria-expanded={open} className="ml-auto flex items-center gap-1 text-[11px] text-indigo-300 hover:text-white" data-testid="portal-toggle">
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />{open ? "Masquer le détail" : `Afficher le détail (${all.length})`}</button>}
       </div>
       {all.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2" data-testid="portal-quality-summary">
@@ -70,7 +75,7 @@ export const PortalHealth = ({ status, run, active, onPick }) => {
           {qf && <button type="button" onClick={() => setQf(null)} className="text-[11px] text-indigo-300 hover:text-white" data-testid="portal-quality-clear">Tout afficher</button>}
           <InfoTip k="qualite" className="self-center" />
         </div>)}
-      {all.length === 0 ? <p className="text-xs text-slate-500" data-testid="portal-none">Aucun portail lu au dernier passage. Ajoutez des entreprises depuis l'annuaire ou « Trouver le portail » dans les réglages.</p> : (<>
+      {!open ? null : all.length === 0 ? <p className="text-xs text-slate-500" data-testid="portal-none">Aucun portail lu au dernier passage. Ajoutez des entreprises depuis l'annuaire ou « Trouver le portail » dans les réglages.</p> : (<>
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-xs" data-testid="portal-table">
             <thead><tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">

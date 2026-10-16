@@ -7,6 +7,7 @@ import { GoalsSelect } from "@/components/careeros/GoalsSelect";
 import { careeros } from "@/lib/careeros";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
 import { SharingPanel } from "@/components/careeros/SharingPanel";
+import { SkillMap } from "@/components/careeros/SkillMap";
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white outline-none focus:border-indigo-400/60";
 const TEXT = [["full_name", "Nom complet"], ["headline", "Titre professionnel"], ["location", "Localisation"], ["country", "Pays"], ["province", "Province / région"], ["city", "Ville"], ["target_roles", "Postes visés"], ["sectors", "Secteurs visés"], ["salary_expectation", "Attentes salariales"]];
@@ -71,6 +72,7 @@ export default function Profile() {
         <section>
           <label className="block"><span className="mb-1 block text-xs text-slate-400">CV maître (utilisé par défaut dans chaque pack)</span>
             <textarea rows={26} value={p.cv_text || ""} onChange={set("cv_text")} className={`${inputCls} font-mono text-xs`} data-testid="profile-cv-input" /></label>
+          <SkillMap profile={p} />
         </section>
       </div>
       <SharingPanel />

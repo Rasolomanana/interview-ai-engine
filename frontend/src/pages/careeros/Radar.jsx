@@ -1,3 +1,5 @@
+import { ChevronDown } from "lucide-react";
+import { usePersistedToggle } from "@/lib/usePersistedToggle";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ClipboardPaste, ExternalLink, GitCompare, TriangleAlert, Wrench, Zap, EyeOff, ListChecks, Loader2, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
@@ -74,11 +76,11 @@ const TONES = {
   c: { box: "border-rose-400/25 bg-rose-500/[0.06]", bar: "bg-rose-400", text: "text-rose-200", chip: "bg-rose-400/80 text-rose-950", icon: TriangleAlert, cta: "À éviter" },
 };
 
-const SectionHead = ({ title, n, tone }) => {
+const SectionHead = ({ title, n, tone, open, onToggle }) => {
   const t = TONES[tone];
   const urgent = tone === "a" && n > 0;
   return (
-    <div className={`relative flex items-center gap-3 overflow-hidden rounded-xl border px-4 py-3 ${t.box} ${urgent ? "radar-urgent" : ""}`} data-testid={`radar-section-head-${tone}`}>
+    <button type="button" onClick={onToggle} aria-expanded={open} title={open ? "Masquer ces offres" : "Afficher ces offres"} className={`relative flex w-full items-center gap-3 overflow-hidden rounded-xl border px-4 py-3 text-left ${t.box} ${urgent ? "radar-urgent" : ""}`} data-testid={`radar-section-head-${tone}`}>
       <span className={`absolute inset-y-0 left-0 w-1 ${t.bar}`} />
       <span className="relative flex h-7 w-7 shrink-0 items-center justify-center">
         {urgent && <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${t.bar} opacity-40`} />}
@@ -87,16 +89,20 @@ const SectionHead = ({ title, n, tone }) => {
       <h2 className={`min-w-0 flex-1 text-sm font-semibold ${t.text}`}>{title}</h2>
       <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums ${t.chip} ${urgent ? "animate-pulse" : ""}`} data-testid={`radar-section-count-${tone}`}>{n}</span>
       {n > 0 && <span className={`hidden text-[11px] font-semibold uppercase tracking-wider sm:inline ${t.text}`}>{t.cta}</span>}
-    </div>
+      <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${t.text} ${open ? "rotate-180" : ""}`} data-testid={`radar-section-toggle-${tone}`} />
+    </button>
   );
 };
 
-const Section = ({ title, items, testid, tone, ...p }) => (
-  <section className="space-y-3" data-testid={testid}>
-    {tone ? <SectionHead title={title} n={items.length} tone={tone} /> : <h2 className="text-sm font-semibold text-slate-200">{title} <span className="text-slate-500">({items.length})</span></h2>}
-    {items.length === 0 ? <p className="text-xs text-slate-500">Aucune opportunité.</p> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{items.map((o) => <OfferCard key={o.id} o={o} {...p} />)}</div>}
-  </section>
-);
+const Section = ({ title, items, testid, tone, ...p }) => {
+  const [open, toggle] = usePersistedToggle(`cos.radar.section.${tone || testid}`, true);
+  return (
+    <section className="space-y-3" data-testid={testid}>
+      {tone ? <SectionHead title={title} n={items.length} tone={tone} open={open} onToggle={toggle} /> : <h2 className="text-sm font-semibold text-slate-200">{title} <span className="text-slate-500">({items.length})</span></h2>}
+      {!open ? null : items.length === 0 ? <p className="text-xs text-slate-500">Aucune opportunité.</p> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{items.map((o) => <OfferCard key={o.id} o={o} {...p} />)}</div>}
+    </section>
+  );
+};
 
 export default function Radar() {
   usePageTitle("Radar");
