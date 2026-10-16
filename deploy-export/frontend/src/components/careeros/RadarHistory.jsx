@@ -28,7 +28,9 @@ export const TodayMarker = ({ runs, running }) => {
     </div>
     {cs && <p className={`mt-2 text-[11px] ${cs.included ? "text-slate-500" : "text-rose-300"}`} data-testid="radar-cron-status">
       {cs.included ? "Votre compte est inclus dans le passage automatique de 6 h." : `Votre compte n'est pas inclus dans le passage automatique : ${cs.reason}`}
-      {cs.last_auto ? ` Dernier passage automatique : ${day(cs.last_auto.at)} à ${hour(cs.last_auto.at)}.` : " Aucun passage automatique enregistré pour votre compte."}</p>}
+      {cs.last_auto ? ` Dernier passage automatique : ${day(cs.last_auto.at)} à ${hour(cs.last_auto.at)}.` : " Aucun passage automatique enregistré pour votre compte."}
+      {cs.last_daily ? <span data-testid="radar-cron-last-daily"> Dernier démarrage du passage quotidien : {day(cs.last_daily.at)} à {hour(cs.last_daily.at)} ({cs.last_daily.trigger || "cron"}, {cs.last_daily.members} membre(s), {cs.last_daily.status === "done" ? "terminé" : cs.last_daily.status === "error" ? "erreur" : "en cours"}).</span> : null}
+      {" "}Le serveur démarre lui-même le passage chaque jour dès 6 h (heure de Toronto) ; s'il dormait, il le rattrape dès son réveil.</p>}
   </>);
 };
 

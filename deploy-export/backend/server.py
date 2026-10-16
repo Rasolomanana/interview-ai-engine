@@ -1,3 +1,4 @@
+import asyncio
 import os
 import io
 import hmac
@@ -804,7 +805,27 @@ auth_router, current_member = create_auth(db)
 app.include_router(auth_router)
 careeros_router = create_careeros_router(db, current_member, _generate_text, _fetch_page_text, _parse_json_object)
 app.include_router(careeros_router)
-app.include_router(create_radar_router(db, current_member, _generate_text, _parse_json_object, careeros_router))
+radar_router = create_radar_router(db, current_member, _generate_text, _parse_json_object, careeros_router)
+app.include_router(radar_router)
+
+
+@app.get("/api/ping")
+async def ping():
+    """Tiny wake-up endpoint for cron-job.org (avoids 'output too large')."""
+    return {"ok": True}
+
+
+_SCHED_BG = set()
+
+
+@app.middleware("http")
+async def _daily_radar_catchup(request, call_next):
+    """Any request after 06:00 Toronto (wake-up ping, member visit) starts today's automatic Radar if not done yet."""
+    if request.url.path.startswith("/api/"):
+        t = asyncio.create_task(radar_router.maybe_start(f"requête {request.url.path[:40]}"))
+        _SCHED_BG.add(t)
+        t.add_done_callback(_SCHED_BG.discard)
+    return await call_next(request)
 app.include_router(create_journey_router(db, current_member))
 app.include_router(create_followup_router(db, current_member, _generate_text, _parse_json_object, careeros_router))
 from careeros.admin_rbac import create_rbac_router, make_rbac_middleware  # noqa: E402
@@ -838,6 +859,8 @@ async def _admin_startup():
         await ensure_finance_indexes(db)
     except Exception:
         logger.exception("careeros index setup failed")
+    t = asyncio.create_task(radar_router.scheduler_loop())  # daily 06:00 Toronto run, independent of cron-job.org
+    _SCHED_BG.add(t)
 
 
 @app.on_event("shutdown")

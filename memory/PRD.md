@@ -475,3 +475,8 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Règles : A auto (1x/7 j par dossier, manuel 1x/24 h), B manuel si >30 crédits, jamais C ; claim google_at atomique.
 - Recherche auto à l'ouverture (cache 12 h), cron pré-cache A ; liens manuels repliés (sites non couverts).
 - SERPAPI_API_KEY dans render.yaml. Tests iteration_42 + tests/test_find_everywhere.py.
+
+## 2026-10-16 — Passage quotidien auto-planifié (fin de la dépendance à cron-job.org)
+- radar.py : start_daily(trigger, force) avec claim atomique radar_daily {_id: jour Toronto} ; maybe_start (>= 06 h Toronto) appelé par scheduler_loop (5 min, lancé au startup) ET par un middleware sur toute requête /api (rattrapage au réveil) ; keepalive RENDER_EXTERNAL_URL/api/ping toutes les 4 min pendant le passage ; log trigger/day ; /cron idempotent (already) + ?force=true ; rescoring startup en arrière-plan (démarrage à froid rapide).
+- server.py : GET /api/ping (réponse minuscule pour cron-job.org).
+- Vérifié preview : démarrage interne 10 h 08 Toronto, 11 membres, log done, cron -> already.

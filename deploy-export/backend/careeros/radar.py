@@ -40,6 +40,13 @@ JOOBLE_COMPANY_LIMIT = 20
 
 
 _BG = set()
+_STATE = {}  # in-memory: Toronto day already claimed (avoids a DB hit per request)
+DAILY_HOUR = 6
+
+
+def _toronto_now():
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("America/Toronto"))
 
 
 def _day_start() -> str:
@@ -664,12 +671,15 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         await db.radar_offers.update_one({"id": offer_id}, {"$set": {"status": "pack", "application_id": res["id"]}})
         return res
 
-    # ---------------- Daily job (external scheduler) ----------------
-    @router.post("/cron")
-    async def cron(x_cron_secret: str = Header(None)):
-        secret = os.environ.get("RADAR_CRON_SECRET")
-        if not secret or x_cron_secret != secret:
-            raise HTTPException(status_code=401, detail="Non autorisé")
+    # ---------------- Daily job: self-scheduled at 06:00 Toronto, external cron only wakes the server ----------------
+    async def start_daily(trigger: str, force: bool = False) -> dict:
+        """Start today's automatic run once (atomic claim per Toronto day). force=True: manual relaunch."""
+        today = _toronto_now().strftime("%Y-%m-%d")
+        if not force:
+            try:
+                await db.radar_daily.insert_one({"_id": today, "at": _now().isoformat(), "trigger": trigger})
+            except Exception:  # noqa: BLE001  (already claimed today)
+                return {"started": False, "already": True, "day": today}
         since = (_now() - timedelta(days=ACTIVE_DAYS)).isoformat()
         active = {u["id"]: u.get("last_seen_at") or "" async for u in db.users.find({"last_seen_at": {"$gte": since}}, {"id": 1, "last_seen_at": 1})}
         users = [s["user_id"] async for s in db.radar_settings.find({"enabled": True}, {"user_id": 1})]
@@ -678,13 +688,36 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         users = [u for u in users if u in active]  # only members active in the last 7 days
         disabled = {s["user_id"] async for s in db.radar_settings.find({"enabled": False}, {"user_id": 1})}
         todo = sorted(dict.fromkeys(u for u in users if u not in disabled), key=lambda u: active[u], reverse=True)  # most recently active first
-        log = {"id": str(uuid.uuid4()), "at": _now().isoformat(), "status": "started", "members": len(todo), "inactive_skipped": len(set(candidates) - set(active)), "steps": []}
+        log = {"id": str(uuid.uuid4()), "at": _now().isoformat(), "status": "started", "trigger": trigger, "day": today, "members": len(todo), "inactive_skipped": len(set(candidates) - set(active)), "steps": []}
         await db.radar_cron_log.insert_one(dict(log))
 
         async def step(**kw):
             await db.radar_cron_log.update_one({"id": log["id"]}, {"$push": {"steps": {**kw, "at": _now().isoformat()}}})
 
+        async def keepalive():
+            """Render free instances sleep after 15 min without inbound traffic: ping our public URL during the run."""
+            url = os.environ.get("RENDER_EXTERNAL_URL")
+            if not url:
+                return
+            async with httpx.AsyncClient(timeout=10) as c:
+                while True:
+                    await asyncio.sleep(240)
+                    try:
+                        await c.get(f"{url}/api/ping")
+                    except Exception:  # noqa: BLE001
+                        pass
+
         async def all_runs():
+            ka = asyncio.create_task(keepalive())
+            try:
+                await _all_runs()
+            except Exception as e:  # noqa: BLE001
+                logger.exception("radar daily run")
+                await db.radar_cron_log.update_one({"id": log["id"]}, {"$set": {"status": "error", "error": f"{type(e).__name__}: {e}"[:300]}})
+            finally:
+                ka.cancel()
+
+        async def _all_runs():
             for uid in todo:  # history first: the daily run never waits for portal discovery
                 try:
                     r = await asyncio.wait_for(run_for_user(uid, "quotidien"), timeout=900)
@@ -720,8 +753,41 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             await AC.check_alert(db)  # daily low-credit check
         except Exception:  # noqa: BLE001
             logger.exception("credit alert check failed")
-        logger.info("radar cron started: %s member(s), log %s", len(todo), log["id"])
+        logger.info("radar daily started (%s): %s member(s), log %s", trigger, len(todo), log["id"])
         return {"started": True, "members": len(todo), "log_id": log["id"], "skipped_disabled": len(set(users) & disabled), "skipped_inactive": log["inactive_skipped"]}
+
+    async def maybe_start(trigger: str):
+        """Called by the internal loop and by any incoming request: start today's run once it is past 06:00 Toronto."""
+        now = _toronto_now()
+        day = now.strftime("%Y-%m-%d")
+        if now.hour < DAILY_HOUR or _STATE.get("day") == day:
+            return
+        r = await start_daily(trigger)
+        _STATE["day"] = day
+        if r.get("started"):
+            logger.info("daily radar auto-started by %s", trigger)
+
+    async def scheduler_loop():
+        while True:
+            try:
+                await maybe_start("planificateur interne")
+            except Exception:  # noqa: BLE001
+                logger.exception("radar scheduler")
+            await asyncio.sleep(300)
+
+    router.maybe_start = maybe_start
+    router.scheduler_loop = scheduler_loop
+
+    @router.post("/cron")
+    async def cron(force: bool = False, x_cron_secret: str = Header(None)):
+        secret = os.environ.get("RADAR_CRON_SECRET")
+        if not secret or x_cron_secret != secret:
+            raise HTTPException(status_code=401, detail="Non autorisé")
+        if not force and _toronto_now().hour < DAILY_HOUR:
+            return {"started": False, "reason": f"avant {DAILY_HOUR} h (heure de Toronto) : serveur réveillé, le passage démarrera à {DAILY_HOUR} h"}
+        r = await start_daily("cron-job.org" if not force else "relance manuelle", force=force)
+        _STATE["day"] = _toronto_now().strftime("%Y-%m-%d")
+        return r
 
     @router.get("/cron-status")
     async def cron_status(user: dict = Depends(current_user)):
@@ -731,10 +797,11 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "last_seen_at": 1}) or {}
         since = (_now() - timedelta(days=ACTIVE_DAYS)).isoformat()
         last = await db.radar_runs.find_one({"user_id": user["id"], "trigger": "quotidien"}, {"_id": 0, "at": 1, "status": 1}, sort=[("at", -1)])
+        log = await db.radar_cron_log.find_one({}, {"_id": 0, "at": 1, "status": 1, "trigger": 1, "members": 1}, sort=[("at", -1)])
         reason = ("Désactivé : cochez « Recherche quotidienne automatique » dans les Réglages." if st.get("enabled") is False
                   else "Ajoutez votre CV dans la Career Memory." if len((profile.get("cv_text") or "").strip()) < 80
                   else f"Inactif depuis plus de {ACTIVE_DAYS} jours." if (u.get("last_seen_at") or "") < since else "")
-        return {"included": not reason, "reason": reason, "last_auto": last}
+        return {"included": not reason, "reason": reason, "last_auto": last, "last_daily": log, "hour": DAILY_HOUR}
 
     return router
 
@@ -751,6 +818,12 @@ async def ensure_radar_indexes(db):
     await db.radar_cron_log.create_index("at")
     await db.radar_settings.create_index("user_id", unique=True)
     await db.radar_runs.update_many({"status": "running"}, {"$set": {"status": "interrompue"}})
+    task = asyncio.create_task(_rescore_all(db))  # in background: never delays the server start (cold start on Render)
+    _BG.add(task)
+    task.add_done_callback(_BG.discard)
+
+
+async def _rescore_all(db):
     async for o in db.radar_offers.find({"ips": {"$ne": None}, "ips.stage": {"$ne": "radar"}}, {"_id": 0}):
         ips, report = rescore_radar(o)
         await db.radar_offers.update_one({"id": o["id"]}, {"$set": {"ips": ips, "decision_report": report, "excerpt": is_excerpt(o)}})
