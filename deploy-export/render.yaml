@@ -69,6 +69,12 @@ services:
         sync: false
       - key: ADZUNA_APP_KEY
         sync: false
+      - key: CAREERJET_AFFID
+        sync: false
+      - key: CAREERJET_PAGE_URL
+        sync: false
+      - key: CAREERJET_API_KEY
+        sync: false
       - key: RADAR_DAILY_LIMIT
         value: "50"
       - key: RADAR_CRON_SECRET

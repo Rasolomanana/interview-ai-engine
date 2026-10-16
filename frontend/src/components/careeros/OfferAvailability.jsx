@@ -31,6 +31,11 @@ export const OfferAvailability = ({ a, onChange }) => {
     try { const r = await careeros.setOfferLink(a.id, alt.url, alt.source); onChange({ offer_link: r.offer_link, offer_source: alt.source, availability: r.availability, alternatives: r.alternatives }); toast.success("Lien du dossier remplacé : vous pouvez postuler."); }
     catch (e) { toast.error(e.message); }
   };
+  const openAll = () => {
+    const links = a.search_links || [];
+    const blocked = links.filter((l) => { const w = window.open(l.url, "_blank"); if (w) w.opener = null; return !w; }).length;
+    if (blocked && links.length) toast.message(`${blocked} onglet(s) bloqué(s) par le navigateur : autorisez les fenêtres surgissantes pour ce site, ou cliquez sur chaque lien.`);
+  };
   const prio = a.ips?.priority;
   const age = ago(a.created_at);
   const urgent = todo && ["A", "B"].includes(prio) && age >= 3;
@@ -60,11 +65,13 @@ export const OfferAvailability = ({ a, onChange }) => {
             <button type="button" onClick={() => use(x)} className="rounded-full border border-emerald-400/40 px-2 py-0.5 text-emerald-200 hover:bg-emerald-500/10" data-testid={`alternative-use-${i}`}>Utiliser ce lien</button>
           </div>))}
       </div>}
+      <p className="text-[11px] text-slate-500" data-testid="auto-sources">Recherche automatique : {(a.auto_sources || ["Portail officiel"]).join(" · ")}{(a.auto_sources || []).length < 4 ? " — Jooble, Adzuna et Careerjet s'ajoutent dès que leur clé est configurée." : ""}</p>
       <div className="flex flex-wrap items-center gap-2 text-[11px]" data-testid="search-links">
         <span className="text-slate-500">Vérifier vous-même sur :</span>
-        {(a.search_links || []).map((l, i) => <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300 hover:border-white/25 hover:text-white" data-testid={`search-link-${i}`}>{l.label}</a>)}
-        <span className="text-slate-600">(recherches pré-remplies, ouvertes par vous : ces sites interdisent la lecture automatique)</span>
+        {(a.search_links || []).map((l, i) => <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" className={`rounded-full border px-2.5 py-1 hover:text-white ${l.quebec ? "border-sky-400/30 text-sky-200" : "border-white/10 text-slate-300"} hover:border-white/25`} data-testid={`search-link-${i}`}>{l.label}</a>)}
+        <button type="button" onClick={openAll} className="rounded-full border border-emerald-400/40 px-2.5 py-1 text-emerald-200 hover:bg-emerald-500/10" data-testid="search-links-open-all">Tout ouvrir ({(a.search_links || []).length})</button>
       </div>
+      <p className="text-[10px] text-slate-600">Recherches pré-remplies ouvertes par vous : Indeed, LinkedIn, Glassdoor et les autres sites interdisent la lecture automatique. En bleu : sites québécois. Si le navigateur bloque les fenêtres, autorisez les fenêtres surgissantes pour CareerOS.</p>
     </div>
   );
 };

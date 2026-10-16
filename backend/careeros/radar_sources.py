@@ -38,6 +38,7 @@ def group(source: str) -> str:
 def configured() -> dict:
     return {"jooble": bool(os.environ.get("JOOBLE_API_KEY")),
             "adzuna": bool(os.environ.get("ADZUNA_APP_ID") and os.environ.get("ADZUNA_APP_KEY")),
+            "careerjet": bool(os.environ.get("CAREERJET_AFFID") and os.environ.get("CAREERJET_PAGE_URL")),
             "workday": True, "boards": True}
 
 
@@ -407,6 +408,22 @@ async def adzuna(client, what: str, where: str, company: str = "", max_days: int
                     "company": (j.get("company") or {}).get("display_name", ""), "location": (j.get("location") or {}).get("display_name", ""),
                     "url": j.get("redirect_url", ""), "description": _clean(j.get("description")), "posted_at": (j.get("created") or "")[:10], "salary": sal})
     return out
+
+
+async def careerjet(client, what: str, where: str, user_ip: str, user_agent: str, locale: str = "fr_CA"):
+    """Careerjet partner API v4. Requires the end user's IP and User-Agent (on-demand searches only, never from the cron)."""
+    if not configured()["careerjet"] or not user_ip:
+        return []
+    params = {"locale_code": locale, "keywords": what, "location": where or "Canada", "affid": os.environ["CAREERJET_AFFID"], "user_ip": user_ip,
+              "user_agent": (user_agent or "")[:512], "url": os.environ["CAREERJET_PAGE_URL"], "page": 1, "page_size": 30, "sort": "relevance"}
+    key = os.environ.get("CAREERJET_API_KEY")
+    r = await client.get("https://search.api.careerjet.net/v4/query", params=params, headers={"Accept": "application/json", "Referer": os.environ["CAREERJET_PAGE_URL"]},
+                         auth=(key, "") if key else None)
+    r.raise_for_status()
+    data = r.json()
+    return [{"source": "careerjet", "external_id": j.get("url", ""), "title": j.get("title", ""), "company": j.get("company", ""), "location": j.get("locations", ""),
+             "url": j.get("url", ""), "description": _clean(j.get("description")), "posted_at": (j.get("date") or "")[:16], "salary": j.get("salary", "")}
+            for j in (data.get("jobs") or [])] if data.get("type") != "LOCATIONS" else []
 
 
 JOOBLE_HOST = os.environ.get("JOOBLE_HOST") or "ca.jooble.org"  # keys are country-specific: ca.jooble.org = Canada

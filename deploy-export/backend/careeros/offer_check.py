@@ -85,18 +85,32 @@ async def jooble_listed(title: str, company: str, location: str, url: str):
     return any(o["url"] == url or (key and key in o["url"]) for o in rows)
 
 
-def search_links(title: str, company: str, location: str, employer_url: str = "") -> list:
-    q, loc = " ".join(x for x in (title, company) if x), location or ""
-    links = [{"label": "Indeed", "url": f"https://ca.indeed.com/jobs?q={quote_plus(q)}&l={quote_plus(loc)}"},
-             {"label": "LinkedIn", "url": f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(q)}&location={quote_plus(loc)}"},
-             {"label": "Guichet-Emplois", "url": f"https://www.guichetemplois.gc.ca/jobsearch/rechercheemplois?searchstring={quote_plus(q)}&locationstring={quote_plus(loc)}"},
-             {"label": "Google Emplois", "url": f"https://www.google.com/search?q={quote_plus(f'{title} {company} emploi')}&ibp=htl;jobs"}]
+def _site(domain: str, title: str, company: str) -> str:
+    query = f'site:{domain} "{title}" {company}'.strip()
+    return f"https://www.google.com/search?q={quote_plus(query)}"
+
+
+def search_links(title: str, company: str, location: str, employer_url: str = "", province: str = "") -> list:
+    """Prefilled searches opened by the member (these sites forbid automated reading). Québec sites first for Québec members."""
+    q, loc = quote_plus(" ".join(x for x in (title, company) if x)), quote_plus(location or "")
+    general = [("Indeed", f"https://ca.indeed.com/jobs?q={q}&l={loc}"), ("LinkedIn", f"https://www.linkedin.com/jobs/search/?keywords={q}&location={loc}"),
+               ("Glassdoor", f"https://www.glassdoor.ca/Job/jobs.htm?sc.keyword={q}&locKeyword={loc}"),
+               ("Google Emplois", f"https://www.google.com/search?q={quote_plus(f'{title} {company} emploi')}&ibp=htl;jobs"),
+               ("Guichet-Emplois", f"https://www.guichetemplois.gc.ca/jobsearch/rechercheemplois?searchstring={q}&locationstring={loc}"),
+               ("Talent.com", f"https://ca.talent.com/jobs?k={q}&l={loc}"), ("Monster", f"https://www.monster.ca/jobs/search?q={q}&where={loc}"),
+               ("Careerjet", f"https://www.careerjet.ca/emplois?s={q}&l={loc}"), ("Eluta", f"https://www.eluta.ca/search?q={q}&l={loc}"),
+               ("ZipRecruiter", f"https://www.ziprecruiter.com/jobs-search?search={q}&location={loc}"),
+               ("CareerBeacon", _site("careerbeacon.com", title, company)), ("Workopolis", _site("workopolis.com", title, company))]
+    quebec = [("Jobillico", f"https://www.jobillico.com/recherche-emploi?skwd={q}&scty={loc}"), ("Jobboom", _site("jobboom.com", title, company)),
+              ("Québec emploi", _site("quebecemploi.gouv.qc.ca", title, company)), ("Isarta", _site("isarta.com", title, company))]
+    ordered = (general[:2] + quebec + general[2:]) if province == "Québec" else (general + quebec)
+    links = [{"label": lbl, "url": u, "quebec": (lbl, u) in quebec} for lbl, u in ordered]
     if employer_url:
-        links.insert(0, {"label": f"Site carrière {company}".strip(), "url": employer_url})
+        links.insert(0, {"label": f"Site carrière {company}".strip(), "url": employer_url, "quebec": False})
     return links
 
 
-async def find_elsewhere(db, user_id: str, title: str, company: str, location: str, exclude_url: str = "") -> list:
+async def find_elsewhere(db, user_id: str, title: str, company: str, location: str, exclude_url: str = "", client: dict = None) -> list:
     """Same offer on the employer's official portal, other Jooble listings, Adzuna. Ranked by title similarity."""
     portals = []
     card = await KB.lookup(db, company) if company else None
@@ -112,6 +126,8 @@ async def find_elsewhere(db, user_id: str, title: str, company: str, location: s
         tasks += [("jooble", S.jooble(cl, f"{title} {company}".strip(), location)), ("jooble", S.jooble(cl, title, location, company))] if company else [("jooble", S.jooble(cl, title, location))]
         if S.configured().get("adzuna"):
             tasks.append(("adzuna", S.adzuna(cl, title, location, company, max_days=30)))
+        if S.configured().get("careerjet") and client and client.get("ip"):
+            tasks.append(("careerjet", S.careerjet(cl, f"{title} {company}".strip(), location, client["ip"], client.get("ua", ""))))
         res = await asyncio.gather(*(t for _, t in tasks), return_exceptions=True)
     seen, out = {exclude_url}, []
     for (origin, _), r in zip(tasks, res):
@@ -125,7 +141,7 @@ async def find_elsewhere(db, user_id: str, title: str, company: str, location: s
             if sim >= 0.5 and same_co:
                 seen.add(o["url"])
                 out.append({"title": o.get("title"), "company": o.get("company") or company, "location": o.get("location", ""), "url": o["url"],
-                            "source": "Portail officiel" if origin == "portail" else o.get("source", origin).capitalize(), "posted_at": o.get("posted_at", ""),
+                            "source": "Portail officiel" if origin == "portail" else {"jooble": "Jooble", "adzuna": "Adzuna", "careerjet": "Careerjet"}.get(origin, origin), "posted_at": o.get("posted_at", ""),
                             "match": int(sim * 100), "official": origin == "portail"})
     out.sort(key=lambda x: (not x["official"], -x["match"]))
     return out[:8]

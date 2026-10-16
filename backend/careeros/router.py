@@ -18,11 +18,12 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
 from . import knowledge as KB
+from . import radar_sources as S
 from . import prompts as PR
 from .ips import compute_ips
 from .decision_report import build_decision_report
@@ -351,7 +352,11 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
         from . import offer_check as OC
         title, company, loc = await _offer_meta(a)
         card = await KB.lookup(db, company) if company else None
-        a["search_links"] = OC.search_links(title, company, loc, (card or {}).get("portal_url") or (a.get("inputs") or {}).get("company_url") or "")
+        prof = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0, "location": 1, "country": 1, "province": 1, "city": 1}) or {}
+        from .geo import member_geo
+        a["search_links"] = OC.search_links(title, company, loc, (card or {}).get("portal_url") or (a.get("inputs") or {}).get("company_url") or "",
+                                            member_geo(prof, loc)["province"])
+        a["auto_sources"] = ["Portail officiel"] + [n for k, n in (("jooble", "Jooble"), ("adzuna", "Adzuna"), ("careerjet", "Careerjet")) if S.configured().get(k)]
         a["versions"] = [_version_summary(v) async for v in db.application_versions.find(
             {"application_id": app_id}, {"_id": 0, "inputs": 0}).sort("version", 1)]
         return a
@@ -529,7 +534,7 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
             o["location"] = st.get("location") or ""
         return d.get("poste") or o.get("title") or "", d.get("entreprise") or o.get("company") or "", o.get("location") or ""
 
-    async def check_application(a: dict, search: bool = False) -> dict:
+    async def check_application(a: dict, search: bool = False, client: dict = None) -> dict:
         """Availability of the offer link; when expired (or on demand) look for the same offer elsewhere."""
         from . import offer_check as OC
         link = _offer_link(a)
@@ -542,15 +547,16 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
                       "detail": "Toujours listée dans les résultats Jooble." if listed else "Ne figure plus dans les résultats Jooble : l'annonce a probablement été retirée."}
         upd = {"availability": av}
         if search or av["status"] in ("expired", "expired_likely"):
-            upd["alternatives"] = await OC.find_elsewhere(db, a["user_id"], title, company, loc, link) if title else []
+            upd["alternatives"] = await OC.find_elsewhere(db, a["user_id"], title, company, loc, link, client) if title else []
             upd["alternatives_at"] = _now()
         await db.applications.update_one({"id": a["id"]}, {"$set": upd})
         return {**{"alternatives": a.get("alternatives") or [], "alternatives_at": a.get("alternatives_at")}, **upd}
 
     @router.post("/applications/{app_id}/availability")
-    async def availability(app_id: str, search: bool = False, user: dict = Depends(current_user)):
+    async def availability(request: Request, app_id: str, search: bool = False, user: dict = Depends(current_user)):
         a = await _own(app_id, user)
-        return await check_application(a, search)
+        ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (request.client.host if request.client else "")
+        return await check_application(a, search, {"ip": ip, "ua": request.headers.get("user-agent", "")})
 
     router.create_pack_internal = _create_pack
     router.check_application = check_application
