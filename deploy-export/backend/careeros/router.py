@@ -15,13 +15,14 @@ import re
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
+from . import knowledge as KB
 from . import prompts as PR
 from .ips import compute_ips
 from .decision_report import build_decision_report
@@ -96,6 +97,7 @@ def _report(doc: dict):
     return r
 
 
+URGENT_DAYS = 3  # A/B offers not applied to after this delay are flagged
 _URL = re.compile(r"https?://[^\s<>\"')]+")
 
 
@@ -112,6 +114,9 @@ def _summary(a: dict) -> dict:
         "id": a["id"], "code": a.get("code"), "created_at": a["created_at"], "status": a["status"],
         "pipeline_status": a.get("pipeline_status"), "poste": d.get("poste") or "",
         "apply_pending": bool(a.get("apply_opened_at")) and a.get("pipeline_status") == "a_postuler",
+        "apply_urgent": a.get("pipeline_status") == "a_postuler" and (a.get("ips") or {}).get("priority") in ("A", "B")
+                        and (a.get("created_at") or "9") < (datetime.now(timezone.utc) - timedelta(days=URGENT_DAYS)).isoformat(),
+        "availability": (a.get("availability") or {}).get("status") or "",
         "entreprise": d.get("entreprise", ""), "ips": (a.get("ips") or {}).get("score"),
         "priority": (a.get("ips") or {}).get("priority"), "ats": (d.get("ats") or {}).get("score"),
         "version": a.get("current_version", 1), "ips_history": a.get("ips_history", []),
@@ -343,6 +348,10 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
         a["decision_report"] = _report(a)
         a["offer_link"] = _offer_link(a)
         a["offer_source"] = (a.get("origin") or {}).get("source") or ""
+        from . import offer_check as OC
+        title, company, loc = await _offer_meta(a)
+        card = await KB.lookup(db, company) if company else None
+        a["search_links"] = OC.search_links(title, company, loc, (card or {}).get("portal_url") or (a.get("inputs") or {}).get("company_url") or "")
         a["versions"] = [_version_summary(v) async for v in db.application_versions.find(
             {"application_id": app_id}, {"_id": 0, "inputs": 0}).sort("version", 1)]
         return a
@@ -505,7 +514,41 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
     for _name, _model in ENTITIES.items():
         _entity_routes(_name, _model)
 
+    async def _offer_meta(a: dict) -> tuple:
+        d = (a.get("parts") or {}).get("decision") or {}
+        o = {}
+        if (a.get("origin") or {}).get("radar_offer_id"):
+            o = await db.radar_offers.find_one({"id": a["origin"]["radar_offer_id"]}, {"_id": 0, "title": 1, "company": 1, "location": 1}) or {}
+        if not o.get("location"):
+            st = await db.radar_settings.find_one({"user_id": a["user_id"]}, {"_id": 0, "location": 1}) or {}
+            o["location"] = st.get("location") or ""
+        return d.get("poste") or o.get("title") or "", d.get("entreprise") or o.get("company") or "", o.get("location") or ""
+
+    async def check_application(a: dict, search: bool = False) -> dict:
+        """Availability of the offer link; when expired (or on demand) look for the same offer elsewhere."""
+        from . import offer_check as OC
+        link = _offer_link(a)
+        av = await OC.check_url(link)
+        title, company, loc = await _offer_meta(a)
+        if av["status"] == "unknown" and "jooble." in link:
+            listed = await OC.jooble_listed(title, company, loc, link)
+            if listed is not None:
+                av = {**av, "status": "available" if listed else "expired_likely",
+                      "detail": "Toujours listée dans les résultats Jooble." if listed else "Ne figure plus dans les résultats Jooble : l'annonce a probablement été retirée."}
+        upd = {"availability": av}
+        if search or av["status"] in ("expired", "expired_likely"):
+            upd["alternatives"] = await OC.find_elsewhere(db, a["user_id"], title, company, loc, link) if title else []
+            upd["alternatives_at"] = _now()
+        await db.applications.update_one({"id": a["id"]}, {"$set": upd})
+        return {**{"alternatives": a.get("alternatives") or [], "alternatives_at": a.get("alternatives_at")}, **upd}
+
+    @router.post("/applications/{app_id}/availability")
+    async def availability(app_id: str, search: bool = False, user: dict = Depends(current_user)):
+        a = await _own(app_id, user)
+        return await check_application(a, search)
+
     router.create_pack_internal = _create_pack
+    router.check_application = check_application
     router.own_application = _own
     return router
 

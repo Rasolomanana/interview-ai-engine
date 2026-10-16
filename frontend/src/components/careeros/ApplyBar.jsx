@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BellRing, CheckCircle2, Copy, ExternalLink, Link2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { careeros } from "@/lib/careeros";
+import { OfferAvailability } from "@/components/careeros/OfferAvailability";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
@@ -77,6 +78,7 @@ export const ApplyBar = ({ a, d, onChange }) => {
           <button type="button" onClick={confirm} className="ml-auto flex items-center gap-1.5 rounded-full border border-emerald-400/50 px-4 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/10" data-testid="apply-confirm-btn"><Send className="h-3.5 w-3.5" />J'ai postulé</button>
         )}
       </div>
+      <OfferAvailability a={a} onChange={onChange} />
       {justApplied && <p className="mt-3 text-[11px] text-slate-400" data-testid="apply-relance-hint">Conseil : relancez l'employeur dans 7 jours si vous n'avez pas de réponse. Le rappel .ics se télécharge ; rien n'est ajouté à votre calendrier sans votre action.</p>}
       <Dialog open={ask} onOpenChange={(o) => !o && later()}>
         <DialogContent className="max-w-md border-white/10 bg-[#121520] text-slate-100" data-testid="apply-ask-dialog">

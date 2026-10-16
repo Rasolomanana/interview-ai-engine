@@ -75,6 +75,7 @@ export const careeros = {
   list: () => call("/careeros/applications"),
   get: (id) => call(`/careeros/applications/${id}`),
   applyOpened: (id) => call(`/careeros/applications/${id}/apply-opened`, { method: "POST" }),
+  checkAvailability: (id, search = false) => call(`/careeros/applications/${id}/availability?search=${search}`, { method: "POST" }),
   applied: (id) => call(`/careeros/applications/${id}/applied`, { method: "POST" }),
   applyNotYet: (id) => call(`/careeros/applications/${id}/apply-not-yet`, { method: "POST" }),
   setOfferLink: (id, url) => call(`/careeros/applications/${id}/offer-link`, { method: "PUT", body: { url } }),

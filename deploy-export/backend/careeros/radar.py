@@ -699,6 +699,16 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 except Exception as e:  # noqa: BLE001
                     logger.exception("radar auto-detect user %s", uid)
                     await step(member=uid[:8], step="detection", ok=False, error=f"{type(e).__name__}: {e}"[:300])
+            from . import offer_check as OC
+            for uid in todo:  # are the offers still open? expired ones are searched elsewhere
+                try:
+                    apps = [a async for a in db.applications.find({"user_id": uid, "pipeline_status": "a_postuler", "archived": {"$ne": True}}, {"_id": 0}).sort("created_at", -1).limit(30)]
+                    checked = [await asyncio.wait_for(careeros_router.check_application(a), timeout=60) for a in [x for x in apps if OC.is_stale(x)][:15]]
+                    await step(member=uid[:8], step="disponibilite", ok=True, checked=len(checked),
+                               expired=sum(c["availability"]["status"] in ("expired", "expired_likely") for c in checked), found_elsewhere=sum(bool(c.get("alternatives")) for c in checked))
+                except Exception as e:  # noqa: BLE001
+                    logger.exception("offer availability user %s", uid)
+                    await step(member=uid[:8], step="disponibilite", ok=False, error=f"{type(e).__name__}: {e}"[:300])
             await db.radar_cron_log.update_one({"id": log["id"]}, {"$set": {"status": "done", "ended_at": _now().isoformat()}})
 
         task = asyncio.create_task(all_runs())

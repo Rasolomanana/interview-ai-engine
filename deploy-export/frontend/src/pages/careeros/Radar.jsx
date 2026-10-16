@@ -9,6 +9,7 @@ import { MoreMenu } from "@/components/careeros/guide/MoreMenu";
 import { ConceptRow, InfoTip } from "@/components/careeros/guide/InfoTip";
 import { PageTour, TourButton, usePageTour } from "@/components/careeros/guide/PageTour";
 
+const postedAge = (d) => { const n = Math.floor((Date.now() - new Date(d).getTime()) / 864e5); return Number.isNaN(n) ? d : n <= 0 ? "publiée aujourd'hui" : `publiée il y a ${n} j`; };
 const RADAR_STEPS = [
   { target: "radar-settings-btn", title: "Réglages", text: "Postes visés, ville, sources et entreprises suivies. C'est ici que vous associez les portails employeurs." },
   { target: "radar-run-btn", title: "Rechercher maintenant", text: "Lance un passage immédiat. Le Radar tourne aussi automatiquement chaque matin." },
@@ -34,7 +35,7 @@ const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, deepId, busy }) => 
       <PriorityBadge priority={o.ips?.priority} testid={`radar-priority-${o.id}`} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-white">{o.title}</p>
-        <p className="truncate text-xs text-slate-500">{o.company} · {o.location} · {o.source}{o.posted_at ? ` · ${o.posted_at}` : ""}</p>
+        <p className="truncate text-xs text-slate-500">{o.company} · {o.location} · {o.source}{o.posted_at ? ` · ${postedAge(o.posted_at)}` : ""}</p>
       </div>
       {o.ips ? <button type="button" onClick={() => onExplain(o)} className="whitespace-nowrap rounded-md px-1 font-mono text-xs text-indigo-300 underline decoration-indigo-400/40 underline-offset-2 hover:bg-indigo-500/10" title="IPS Radar provisoire : cliquez pour le détail du score" data-testid={`radar-ips-${o.id}`}>IPS Radar {o.ips.score}</button>
         : <span className="whitespace-nowrap font-mono text-xs text-slate-300" data-testid={`radar-ips-${o.id}`}>IPS Radar —</span>}
