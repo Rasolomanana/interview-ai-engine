@@ -6,8 +6,8 @@ import html
 import json
 import os
 import re
-import unicodedata
 from datetime import datetime, timezone
+import unicodedata
 
 import httpx
 
@@ -39,6 +39,7 @@ def configured() -> dict:
     return {"jooble": bool(os.environ.get("JOOBLE_API_KEY")),
             "adzuna": bool(os.environ.get("ADZUNA_APP_ID") and os.environ.get("ADZUNA_APP_KEY")),
             "careerjet": bool(os.environ.get("CAREERJET_AFFID") and os.environ.get("CAREERJET_PAGE_URL")),
+            "google_jobs": bool(os.environ.get("SERPAPI_API_KEY")),
             "workday": True, "boards": True}
 
 
@@ -424,6 +425,39 @@ async def careerjet(client, what: str, where: str, user_ip: str, user_agent: str
     return [{"source": "careerjet", "external_id": j.get("url", ""), "title": j.get("title", ""), "company": j.get("company", ""), "location": j.get("locations", ""),
              "url": j.get("url", ""), "description": _clean(j.get("description")), "posted_at": (j.get("date") or "")[:16], "salary": j.get("salary", "")}
             for j in (data.get("jobs") or [])] if data.get("type") != "LOCATIONS" else []
+
+
+GOOGLE_JOBS_MONTHLY_CAP = 99  # hard cap requested by the owner (SerpApi credits)
+
+
+async def google_jobs_budget(db) -> dict:
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    doc = await db.serpapi_usage.find_one({"_id": month}) or {}
+    return {"month": month, "used": doc.get("count", 0), "cap": GOOGLE_JOBS_MONTHLY_CAP}
+
+
+async def google_jobs(client, db, title: str, company: str, city: str):
+    """Google Jobs via SerpApi: one credit per search, atomically capped per month. Returns one entry per 'apply on' site."""
+    if not configured()["google_jobs"]:
+        return []
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    try:  # matches only while count < cap; at the cap the upsert collides with the month document -> refused
+        await db.serpapi_usage.find_one_and_update({"_id": month, "count": {"$lt": GOOGLE_JOBS_MONTHLY_CAP}}, {"$inc": {"count": 1}}, upsert=True)
+    except Exception:  # noqa: BLE001
+        return []
+    params = {"engine": "google_jobs", "q": " ".join(x for x in (title, company, city) if x), "gl": "ca", "hl": "fr", "api_key": os.environ["SERPAPI_API_KEY"], "no_cache": "false"}
+    if city:
+        params["location"] = f"{city}, Canada" if "canada" not in city.lower() else city
+    r = await client.get("https://serpapi.com/search", params=params, timeout=25)
+    r.raise_for_status()
+    out = []
+    for j in r.json().get("jobs_results") or []:
+        for opt in j.get("apply_options") or []:
+            if opt.get("link"):
+                out.append({"source": opt.get("title") or "Google Jobs", "external_id": opt["link"], "title": j.get("title", ""), "company": j.get("company_name", ""),
+                            "location": j.get("location", ""), "url": opt["link"], "description": "", "posted_at": (j.get("detected_extensions") or {}).get("posted_at", ""),
+                            "salary": "", "via_google": True})
+    return out
 
 
 JOOBLE_HOST = os.environ.get("JOOBLE_HOST") or "ca.jooble.org"  # keys are country-specific: ca.jooble.org = Canada

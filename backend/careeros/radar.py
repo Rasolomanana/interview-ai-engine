@@ -703,7 +703,8 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             for uid in todo:  # are the offers still open? expired ones are searched elsewhere
                 try:
                     apps = [a async for a in db.applications.find({"user_id": uid, "pipeline_status": "a_postuler", "archived": {"$ne": True}}, {"_id": 0}).sort("created_at", -1).limit(30)]
-                    checked = [await asyncio.wait_for(careeros_router.check_application(a), timeout=60) for a in [x for x in apps if OC.is_stale(x)][:15]]
+                    stale = sorted([x for x in apps if OC.is_stale(x)], key=lambda x: {"A": 0, "B": 1}.get((x.get("ips") or {}).get("priority"), 2))[:15]
+                    checked = [await asyncio.wait_for(careeros_router.check_application(a, search=(a.get("ips") or {}).get("priority") == "A"), timeout=90) for a in stale]
                     await step(member=uid[:8], step="disponibilite", ok=True, checked=len(checked),
                                expired=sum(c["availability"]["status"] in ("expired", "expired_likely") for c in checked), found_elsewhere=sum(bool(c.get("alternatives")) for c in checked))
                 except Exception as e:  # noqa: BLE001

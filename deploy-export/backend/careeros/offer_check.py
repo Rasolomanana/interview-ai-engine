@@ -110,7 +110,7 @@ def search_links(title: str, company: str, location: str, employer_url: str = ""
     return links
 
 
-async def find_elsewhere(db, user_id: str, title: str, company: str, location: str, exclude_url: str = "", client: dict = None) -> list:
+async def find_elsewhere(db, user_id: str, title: str, company: str, location: str, exclude_url: str = "", client: dict = None, google: bool = False) -> list:
     """Same offer on the employer's official portal, other Jooble listings, Adzuna. Ranked by title similarity."""
     portals = []
     card = await KB.lookup(db, company) if company else None
@@ -126,6 +126,8 @@ async def find_elsewhere(db, user_id: str, title: str, company: str, location: s
         tasks += [("jooble", S.jooble(cl, f"{title} {company}".strip(), location)), ("jooble", S.jooble(cl, title, location, company))] if company else [("jooble", S.jooble(cl, title, location))]
         if S.configured().get("adzuna"):
             tasks.append(("adzuna", S.adzuna(cl, title, location, company, max_days=30)))
+        if google and S.configured().get("google_jobs"):
+            tasks.append(("google", S.google_jobs(cl, db, title, company, (location or "").split(",")[0].strip())))
         if S.configured().get("careerjet") and client and client.get("ip"):
             tasks.append(("careerjet", S.careerjet(cl, f"{title} {company}".strip(), location, client["ip"], client.get("ua", ""))))
         res = await asyncio.gather(*(t for _, t in tasks), return_exceptions=True)
@@ -137,14 +139,14 @@ async def find_elsewhere(db, user_id: str, title: str, company: str, location: s
             if not o.get("url") or o["url"] in seen:
                 continue
             sim = similarity(title, o.get("title", ""))
-            same_co = not company or origin == "portail" or S.company_match(o, company)
+            same_co = not company or origin == "portail" or S.company_match(o, company) or (origin == "google" and similarity(company, o.get("company", "")) >= 0.5)
             if sim >= 0.5 and same_co:
                 seen.add(o["url"])
                 out.append({"title": o.get("title"), "company": o.get("company") or company, "location": o.get("location", ""), "url": o["url"],
-                            "source": "Portail officiel" if origin == "portail" else {"jooble": "Jooble", "adzuna": "Adzuna", "careerjet": "Careerjet"}.get(origin, origin), "posted_at": o.get("posted_at", ""),
-                            "match": int(sim * 100), "official": origin == "portail"})
+                            "source": "Portail officiel" if origin == "portail" else (o.get("source") if origin == "google" else {"jooble": "Jooble", "adzuna": "Adzuna", "careerjet": "Careerjet"}.get(origin, origin)), "posted_at": o.get("posted_at", ""),
+                            "match": int(sim * 100), "official": origin == "portail", "via": "Google Jobs" if origin == "google" else ""})
     out.sort(key=lambda x: (not x["official"], -x["match"]))
-    return out[:8]
+    return out[:15]
 
 
 def is_stale(a: dict, hours: int = 20) -> bool:

@@ -75,6 +75,8 @@ services:
         sync: false
       - key: CAREERJET_API_KEY
         sync: false
+      - key: SERPAPI_API_KEY
+        sync: false
       - key: RADAR_DAILY_LIMIT
         value: "50"
       - key: RADAR_CRON_SECRET

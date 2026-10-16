@@ -356,7 +356,8 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
         from .geo import member_geo
         a["search_links"] = OC.search_links(title, company, loc, (card or {}).get("portal_url") or (a.get("inputs") or {}).get("company_url") or "",
                                             member_geo(prof, loc)["province"])
-        a["auto_sources"] = ["Portail officiel"] + [n for k, n in (("jooble", "Jooble"), ("adzuna", "Adzuna"), ("careerjet", "Careerjet")) if S.configured().get(k)]
+        a["auto_sources"] = ["Portail officiel"] + [n for k, n in (("jooble", "Jooble"), ("adzuna", "Adzuna"), ("careerjet", "Careerjet"), ("google_jobs", "Google Jobs")) if S.configured().get(k)]
+        a["google_jobs"] = {**(await S.google_jobs_budget(db)), "enabled": S.configured().get("google_jobs", False), "last": a.get("google_at")}
         a["versions"] = [_version_summary(v) async for v in db.application_versions.find(
             {"application_id": app_id}, {"_id": 0, "inputs": 0}).sort("version", 1)]
         return a
@@ -534,7 +535,19 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
             o["location"] = st.get("location") or ""
         return d.get("poste") or o.get("title") or "", d.get("entreprise") or o.get("company") or "", o.get("location") or ""
 
-    async def check_application(a: dict, search: bool = False, client: dict = None) -> dict:
+    async def _google_ok(a: dict, manual: bool) -> bool:
+        """Google Jobs credits (99/month): priority A automatically (weekly per dossier), B only on explicit request with budget left, never C."""
+        if not S.configured().get("google_jobs") or a.get("pipeline_status") != "a_postuler":
+            return False
+        prio, last = (a.get("ips") or {}).get("priority"), a.get("google_at") or ""
+        if prio == "A":
+            return (manual and last < (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()) or last < (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        if prio == "B" and manual:
+            b = await S.google_jobs_budget(db)
+            return b["cap"] - b["used"] > 30 and last < (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        return False
+
+    async def check_application(a: dict, search: bool = False, client: dict = None, manual: bool = False) -> dict:
         """Availability of the offer link; when expired (or on demand) look for the same offer elsewhere."""
         from . import offer_check as OC
         link = _offer_link(a)
@@ -547,16 +560,20 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
                       "detail": "Toujours listée dans les résultats Jooble." if listed else "Ne figure plus dans les résultats Jooble : l'annonce a probablement été retirée."}
         upd = {"availability": av}
         if search or av["status"] in ("expired", "expired_likely"):
-            upd["alternatives"] = await OC.find_elsewhere(db, a["user_id"], title, company, loc, link, client) if title else []
+            google = await _google_ok(a, manual)
+            if google:
+                upd["google_at"] = _now()
+            upd["alternatives"] = await OC.find_elsewhere(db, a["user_id"], title, company, loc, link, client, google) if title else []
             upd["alternatives_at"] = _now()
         await db.applications.update_one({"id": a["id"]}, {"$set": upd})
-        return {**{"alternatives": a.get("alternatives") or [], "alternatives_at": a.get("alternatives_at")}, **upd}
+        return {**{"alternatives": a.get("alternatives") or [], "alternatives_at": a.get("alternatives_at")}, **upd,
+                "google_jobs": {**(await S.google_jobs_budget(db)), "enabled": S.configured().get("google_jobs", False), "last": upd.get("google_at") or a.get("google_at")}}
 
     @router.post("/applications/{app_id}/availability")
-    async def availability(request: Request, app_id: str, search: bool = False, user: dict = Depends(current_user)):
+    async def availability(request: Request, app_id: str, search: bool = False, auto: bool = False, user: dict = Depends(current_user)):
         a = await _own(app_id, user)
         ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (request.client.host if request.client else "")
-        return await check_application(a, search, {"ip": ip, "ua": request.headers.get("user-agent", "")})
+        return await check_application(a, search, {"ip": ip, "ua": request.headers.get("user-agent", "")}, manual=search and not auto)
 
     router.create_pack_internal = _create_pack
     router.check_application = check_application
