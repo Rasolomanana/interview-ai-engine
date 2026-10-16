@@ -1,4 +1,5 @@
 import { MoreMenu } from "@/components/careeros/guide/MoreMenu";
+import { ApplyBar } from "@/components/careeros/ApplyBar";
 import { ConceptRow, InfoTip } from "@/components/careeros/guide/InfoTip";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -110,6 +111,7 @@ export default function PackView() {
           ]} />
         </div>
       </div>
+      <ApplyBar a={a} d={d} onChange={(p) => setA((x) => ({ ...x, ...p }))} />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-[#121520]/60 px-4 py-3" data-testid="versions-panel">
         <div className="flex flex-wrap items-center gap-3">
           <span className="flex items-center font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">Historique IPS<InfoTip k="versions" /></span>

@@ -11,6 +11,7 @@ Collections (multi-user; nothing is ever overwritten, only appended/versioned):
 - career_score_history    : every Career Score change.
 - counters                : yearly sequence for application codes.
 """
+import re
 import asyncio
 import logging
 import uuid
@@ -95,11 +96,22 @@ def _report(doc: dict):
     return r
 
 
+_URL = re.compile(r"https?://[^\s<>\"')]+")
+
+
+def _offer_link(a: dict) -> str:
+    """Where to apply: link saved by the member, Radar offer URL, URL given at creation, or first URL of the offer text."""
+    inp = a.get("inputs") or {}
+    m = _URL.search(inp.get("offer_text") or "")
+    return a.get("offer_link") or (a.get("origin") or {}).get("url") or (inp.get("offer_url") or "").strip() or (m.group(0).rstrip(".,;") if m else "")
+
+
 def _summary(a: dict) -> dict:
     d = (a.get("parts") or {}).get("decision") or {}
     return {
         "id": a["id"], "code": a.get("code"), "created_at": a["created_at"], "status": a["status"],
         "pipeline_status": a.get("pipeline_status"), "poste": d.get("poste") or "",
+        "apply_pending": bool(a.get("apply_opened_at")) and a.get("pipeline_status") == "a_postuler",
         "entreprise": d.get("entreprise", ""), "ips": (a.get("ips") or {}).get("score"),
         "priority": (a.get("ips") or {}).get("priority"), "ats": (d.get("ats") or {}).get("score"),
         "version": a.get("current_version", 1), "ips_history": a.get("ips_history", []),
@@ -329,6 +341,8 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
     async def get_app(app_id: str, user: dict = Depends(current_user)):
         a = await _own(app_id, user)
         a["decision_report"] = _report(a)
+        a["offer_link"] = _offer_link(a)
+        a["offer_source"] = (a.get("origin") or {}).get("source") or ""
         a["versions"] = [_version_summary(v) async for v in db.application_versions.find(
             {"application_id": app_id}, {"_id": 0, "inputs": 0}).sort("version", 1)]
         return a
@@ -409,6 +423,41 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
             "$set": upd, "$push": {"timeline": {"at": _now(), "type": "status", "detail": body.pipeline_status, "note": body.note or ""}}})
         await recompute_career_score(user["id"], "status_changed")
         return {"ok": True, "pipeline_status": body.pipeline_status}
+
+    class LinkBody(BaseModel):
+        url: str = Field(max_length=2000)
+
+    @router.put("/applications/{app_id}/offer-link")
+    async def set_offer_link(app_id: str, body: LinkBody, user: dict = Depends(current_user)):
+        await _own(app_id, user)
+        url = body.url.strip()
+        if not re.match(r"^https?://\S+\.\S+", url):
+            raise HTTPException(status_code=400, detail="Lien invalide : collez l'adresse complète de l'offre (https://…).")
+        await db.applications.update_one({"id": app_id}, {"$set": {"offer_link": url, "updated_at": _now()}})
+        return {"ok": True, "offer_link": url}
+
+    @router.post("/applications/{app_id}/apply-opened")
+    async def apply_opened(app_id: str, user: dict = Depends(current_user)):
+        a = await _own(app_id, user)
+        if a.get("pipeline_status") == "a_postuler":
+            await db.applications.update_one({"id": app_id}, {"$set": {"apply_opened_at": _now()},
+                                                              "$push": {"timeline": {"at": _now(), "type": "apply_opened", "detail": "Offre ouverte pour postuler", "note": ""}}})
+        return {"ok": True}
+
+    @router.post("/applications/{app_id}/applied")
+    async def applied(app_id: str, user: dict = Depends(current_user)):
+        await _own(app_id, user)
+        now = _now()
+        await db.applications.update_one({"id": app_id}, {"$set": {"pipeline_status": "postule", "applied_at": now, "updated_at": now}, "$unset": {"apply_opened_at": ""},
+                                                          "$push": {"timeline": {"at": now, "type": "status", "detail": "postule", "note": "Candidature envoyée (confirmée par le membre)"}}})
+        await recompute_career_score(user["id"], "status_changed")
+        return {"ok": True, "pipeline_status": "postule", "applied_at": now}
+
+    @router.post("/applications/{app_id}/apply-not-yet")
+    async def apply_not_yet(app_id: str, user: dict = Depends(current_user)):
+        await _own(app_id, user)
+        await db.applications.update_one({"id": app_id}, {"$unset": {"apply_opened_at": ""}})
+        return {"ok": True}
 
     @router.delete("/applications/{app_id}")
     async def archive_app(app_id: str, user: dict = Depends(current_user)):

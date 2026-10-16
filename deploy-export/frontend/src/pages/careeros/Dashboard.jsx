@@ -28,6 +28,7 @@ const Row = ({ a }) => (
     <div className="flex items-center gap-4">
       <span className="hidden font-mono text-xs text-slate-400 sm:block">IPS {(a.ips_history || []).map((h) => h.score).join(" → ") || "—"} · ATS {a.ats ?? "—"}</span>
       {a.status === "generating" && <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] text-indigo-300">génération</span>}
+      {a.apply_pending && <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-300" data-testid={`row-apply-pending-${a.id}`}>Candidature à confirmer</span>}
       <ChevronRight className="h-4 w-4 text-slate-600 transition-transform group-hover:translate-x-0.5" />
     </div>
   </Link>
