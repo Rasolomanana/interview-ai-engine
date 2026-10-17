@@ -20,6 +20,7 @@ from . import radar_sources as S
 from . import radar_discovery as D
 from . import radar_auto as AU
 from . import knowledge as KB
+from . import zone as Z
 from .decision_report import build_decision_report
 from .ips import compute_ips
 from .prompts import SYSTEM
@@ -161,6 +162,22 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         roles = [r.strip() for r in re.split(r"[,;/]", profile.get("target_roles") or "") if r.strip()]
         return {"user_id": user_id, **RadarSettings(keywords=roles[:5], location=profile.get("location") or profile.get("city") or profile.get("province") or "Québec").model_dump()}
 
+    async def _apply_zone(user_id: str, location: str) -> None:
+        """Re-evaluate the member's stored offers when the zone rules or the Radar location change (reversible)."""
+        sig = Z.signature(location)
+        mark = await db.radar_settings.find_one({"user_id": user_id}, {"_id": 0, "zone_for": 1}) or {}
+        if mark.get("zone_for") == sig:
+            return
+        async for o in db.radar_offers.find({"user_id": user_id, "status": {"$ne": "pack"}}, {"_id": 0, "id": 1, "location": 1, "status": 1, "status_before_zone": 1}):
+            ok, why = Z.check(o.get("location"), location)
+            if not ok and o["status"] != "hors_zone":
+                await db.radar_offers.update_one({"id": o["id"]}, {"$set": {"status": "hors_zone", "status_before_zone": o["status"], "zone_reason": why}})
+            elif not ok:
+                await db.radar_offers.update_one({"id": o["id"]}, {"$set": {"zone_reason": why}})
+            elif o["status"] == "hors_zone":
+                await db.radar_offers.update_one({"id": o["id"]}, {"$set": {"status": o.get("status_before_zone") or "nouvelle", "zone_reason": why}, "$unset": {"status_before_zone": ""}})
+        await db.radar_settings.update_one({"user_id": user_id}, {"$set": {"zone_for": sig}}, upsert=True)
+
     def _active_sources(st: dict) -> list:
         conf = S.configured()
         return [x for x in st["sources"] if conf.get(x)]
@@ -269,7 +286,9 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 await KB.record_run(db, st["companies"], run["portals"])
             except Exception:  # noqa: BLE001
                 logger.exception("knowledge record_run")
+            await _apply_zone(user_id, st["location"])
             seen, fresh = set(), []
+            run["out_zone"] = 0
             for o in offers:
                 k = _key(o)
                 if k in seen:
@@ -284,8 +303,14 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 doc = {"id": str(uuid.uuid4()), "user_id": user_id, "dedupe_key": k, **o, "first_seen": _now().isoformat(),
                        "last_seen": _now().isoformat(), "run_id": run["id"], "seen_runs": [run["id"]], "status": "nouvelle", "ips": None, "decision_report": None,
                        "analyzed_at": None, "application_id": None}
+                ok, why = Z.check(o.get("location"), st["location"])
+                doc["zone_reason"] = why
+                if not ok:
+                    doc["status"], doc["status_before_zone"] = "hors_zone", "nouvelle"
+                    run["out_zone"] += 1
                 await db.radar_offers.insert_one(dict(doc))
-                fresh.append(doc)
+                if ok:
+                    fresh.append(doc)
             run["fetched"], run["new"] = len(seen), len(fresh)
             budget = max(0, DAILY_LIMIT - await _analyzed_today(user_id))
             fresh_ids = {d["id"] for d in fresh}
@@ -525,7 +550,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         return [r async for r in db.radar_runs.find({"user_id": user["id"], "at": {"$gte": since}}, proj).sort("at", -1).limit(300)]
 
     @router.get("/runs/{run_id}/offers")
-    async def run_offers(run_id: str, kind: str = Query("found", pattern="^(found|new|analyzed|skipped|src_jooble|src_workday|src_boards|src_adzuna)$"),
+    async def run_offers(run_id: str, kind: str = Query("found", pattern="^(found|new|analyzed|skipped|out_zone|src_jooble|src_workday|src_boards|src_adzuna)$"),
                          user: dict = Depends(current_user)):
         run = await db.radar_runs.find_one({"id": run_id, "user_id": user["id"]}, {"_id": 0, "tracked": 1, "at": 1, "finished_at": 1})
         if run is None:
@@ -537,6 +562,10 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             q = {"user_id": user["id"], "analyzed_at": {"$gte": run["at"], "$lte": end}, "source": {"$ne": "externe"}}
         elif kind == "skipped":  # deferred by the daily limit, including those analysed by a later run
             q = {"user_id": user["id"], "$and": [in_run, {"$or": [{"ips": None}, {"analyzed_at": {"$gt": run.get("finished_at") or run["at"]}}]}]}
+        elif kind == "out_zone":
+            q = {**q, "status": "hors_zone"}
+        if kind == "new":
+            q = {**q, "status": {"$ne": "hors_zone"}}
         proj = {"_id": 0, "description": 0, "dedupe_key": 0, "user_id": 0, "seen_runs": 0}
         offers = [o async for o in db.radar_offers.find(q, proj).sort("first_seen", -1).limit(500)]
         if kind.startswith("src_"):
@@ -546,17 +575,22 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
     @router.get("/dashboard")
     async def dashboard(user: dict = Depends(current_user)):
         q = {"user_id": user["id"]}
+        st = await _settings(user["id"], {})
+        await _apply_zone(user["id"], st["location"])
         proj = {"_id": 0, "description": 0, "dedupe_key": 0, "user_id": 0}
+        out_zone = [o async for o in db.radar_offers.find({**q, "status": "hors_zone"}, proj).sort("first_seen", -1).limit(300)]
+        q = {**q, "status": {"$ne": "hors_zone"}}
         offers = [o async for o in db.radar_offers.find(q, proj).sort("first_seen", -1).limit(400)]
-        last = await db.radar_runs.find_one(q, {"_id": 0, "user_id": 0}, sort=[("at", -1)])
+        last = await db.radar_runs.find_one({"user_id": user["id"]}, {"_id": 0, "user_id": 0}, sort=[("at", -1)])
         active = [o for o in offers if o["status"] not in ("ignoree", "pack") and o.get("ips")]
         top = lambda p: sorted([o for o in active if o["ips"]["priority"] == p], key=lambda o: -o["ips"]["score"])[:20]  # noqa: E731
-        st = await _settings(user["id"], {})
         day = _day_start()
         known = [o async for o in db.radar_offers.find({**q, "run_id": {"$ne": last["id"]}, "last_seen": {"$gte": last["at"]}}, proj).sort("last_seen", -1).limit(200)] if last else []
         analyzed = [o async for o in db.radar_offers.find({**q, "analyzed_at": {"$gte": day}}, proj).sort("analyzed_at", -1).limit(100)]
         return {
             "known_last_run": known, "analyzed_today_list": analyzed,
+            "out_zone": out_zone, "out_zone_count": await db.radar_offers.count_documents({"user_id": user["id"], "status": "hors_zone"}),
+            "zone": {"location": st["location"], "radius_km": Z.RADIUS_KM},
             "sources_status": {"configured": S.configured(), "selected": st["sources"], "portals": {
                 "workday": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") == "workday"),
                 "boards": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") and c.get("kind") != "workday")}},

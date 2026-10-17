@@ -4,9 +4,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { radar } from "@/lib/careeros";
 
-const LABEL = { new: "Nouvelles offres", found: "Offres trouvées", analyzed: "Offres analysées pendant ce passage", skipped: "Offres reportées (pas encore analysées)",
+const LABEL = { new: "Nouvelles offres", found: "Offres trouvées", analyzed: "Offres analysées pendant ce passage", skipped: "Offres reportées (pas encore analysées)", out_zone: "Offres hors zone (masquées automatiquement)",
   src_jooble: "Offres Jooble", src_workday: "Offres Workday", src_boards: "Offres des sites carrières", src_adzuna: "Offres Adzuna" };
-const STATUS = { nouvelle: "Nouvelle", ignoree: "Ignorée", pack: "Pack généré" };
+const STATUS = { nouvelle: "Nouvelle", ignoree: "Ignorée", pack: "Pack généré", hors_zone: "Hors zone" };
 
 const OfferLine = ({ o }) => (
   <li className="flex items-start gap-3 border-t border-white/[0.05] py-2.5" data-testid={`run-offer-${o.id}`}>
@@ -14,6 +14,7 @@ const OfferLine = ({ o }) => (
     <div className="min-w-0 flex-1">
       <p className="truncate text-sm font-medium text-white">{o.title}</p>
       <p className="truncate text-xs text-slate-500">{o.company} · {o.location} · {o.source}{o.status && o.status !== "nouvelle" ? ` · ${STATUS[o.status] || o.status}` : ""}</p>
+      {o.status === "hors_zone" && o.zone_reason && <p className="text-[11px] text-amber-300" data-testid={`run-offer-zone-${o.id}`}>{o.zone_reason}</p>}
     </div>
     <span className="whitespace-nowrap font-mono text-xs text-slate-300">{o.ips ? `IPS ${o.ips.score}` : "à analyser"}</span>
     {o.url && <a href={o.url} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-white" title="Voir l'offre" data-testid={`run-offer-open-${o.id}`}><ExternalLink className="h-4 w-4" /></a>}

@@ -2,7 +2,7 @@ import { ChevronDown } from "lucide-react";
 import { usePersistedToggle } from "@/lib/usePersistedToggle";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardPaste, ExternalLink, GitCompare, TriangleAlert, Wrench, Zap, EyeOff, ListChecks, Loader2, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
+import { ClipboardPaste, ExternalLink, GitCompare, TriangleAlert, Wrench, Zap, EyeOff, ListChecks, Loader2, MapPinOff, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
@@ -38,6 +38,7 @@ const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, deepId, busy }) => 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-white">{o.title}</p>
         <p className="truncate text-xs text-slate-500">{o.company} · {o.location} · {o.source}{o.posted_at ? ` · ${postedAge(o.posted_at)}` : ""}</p>
+        {o.status === "hors_zone" && <p className="mt-1 text-[11px] text-amber-300" data-testid={`radar-zone-reason-${o.id}`}>Hors zone : {o.zone_reason || "lieu hors de votre zone"}</p>}
       </div>
       {o.ips ? <button type="button" onClick={() => onExplain(o)} className="whitespace-nowrap rounded-md px-1 font-mono text-xs text-indigo-300 underline decoration-indigo-400/40 underline-offset-2 hover:bg-indigo-500/10" title="IPS Radar provisoire : cliquez pour le détail du score" data-testid={`radar-ips-${o.id}`}>IPS Radar {o.ips.score}</button>
         : <span className="whitespace-nowrap font-mono text-xs text-slate-300" data-testid={`radar-ips-${o.id}`}>IPS Radar —</span>}
@@ -136,6 +137,7 @@ export default function Radar() {
     new: ["Nouvelles (dernier passage)", d.new_today || []],
     known: ["Déjà connues (dernier passage)", d.known_last_run || []],
     a: ["Priorité A", d.top_a],
+    out_zone: [`Hors zone — masquées (rayon ${d.zone?.radius_km ?? 100} km autour de « ${d.zone?.location || ""} »)`, d.out_zone || []],
   } : {};
   const lastOffers = d ? [...new Map([...(d.new_today || []), ...(d.known_last_run || [])].map((o) => [o.id, o])).values()] : [];
   const SRC = { jooble: "Jooble", workday: "Workday", boards: "Sites carrières", adzuna: "Adzuna" };
@@ -185,6 +187,7 @@ export default function Radar() {
           <PortalHealth status={d.sources_status} run={lr} active={f?.startsWith("co:") ? f.slice(3) : null} onPick={(n) => pick(`co:${n}`)} />
           <CompanySuggestions refreshKey={lr?.id} onFollowed={load} />
           {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
+          {d.out_zone_count > 0 && <button type="button" onClick={() => pick("out_zone")} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${f === "out_zone" ? "border-amber-400/50 bg-amber-500/15 text-amber-100" : "border-amber-400/25 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10"}`} title="Offres situées hors de votre zone de recherche : masquées automatiquement, consultables ici" data-testid="radar-out-zone-btn"><MapPinOff className="h-3.5 w-3.5" /><span className="font-semibold tabular-nums" data-testid="radar-out-zone-count">{d.out_zone_count}</span> hors zone masquée(s) · rayon {d.zone?.radius_km} km autour de {d.zone?.location}</button>}
           {errs.length > 0 && <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-200" data-testid="radar-errors">{errs.map(([k, v]) => <p key={k}>{k} : {v}</p>)}</div>}
           {f ? <>
             <FilterBanner label={FILTERS[f][0]} count={FILTERS[f][1].length} onClear={() => setF(null)} testid="radar-filter-banner" />

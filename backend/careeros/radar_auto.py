@@ -124,7 +124,7 @@ async def undo(db, user_id: str, notice_id: str) -> bool:
 async def suggestions(db, user_id: str, roles: list, followed: list) -> list:
     since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
     groups = {}
-    async for o in db.radar_offers.find({"user_id": user_id, "last_seen": {"$gte": since}, "source": {"$ne": "externe"}},
+    async for o in db.radar_offers.find({"user_id": user_id, "last_seen": {"$gte": since}, "source": {"$ne": "externe"}, "status": {"$ne": "hors_zone"}},
                                         {"_id": 0, "company": 1, "title": 1, "ips": 1, "source": 1}):
         pr = (o.get("ips") or {}).get("priority")
         rel = RR.title_relevance(o.get("title", ""), roles)
