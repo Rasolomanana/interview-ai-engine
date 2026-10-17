@@ -5,7 +5,7 @@ import re
 from careeros.geo import COUNTRIES, PROVINCES, _has, _n
 
 RADIUS_KM = 100
-VERSION = 1
+VERSION = 2
 # city -> (lat, lon, province or "", country)
 PLACES = {
     "Montréal": (45.50, -73.57, "Québec", "Canada"), "Laval": (45.57, -73.69, "Québec", "Canada"), "Longueuil": (45.53, -73.52, "Québec", "Canada"),
@@ -35,7 +35,20 @@ PLACES = {
     "Moncton": (46.09, -64.78, "Nouveau-Brunswick", "Canada"), "Fredericton": (45.96, -66.64, "Nouveau-Brunswick", "Canada"),
     "St. John's": (47.56, -52.71, "Terre-Neuve-et-Labrador", "Canada"), "Charlottetown": (46.24, -63.13, "Île-du-Prince-Édouard", "Canada"),
     "St-Hyacinthe": (45.63, -72.96, "Québec", "Canada"), "St-Jérôme": (45.78, -74.00, "Québec", "Canada"), "St-Jean-sur-Richelieu": (45.31, -73.26, "Québec", "Canada"),
-    "Sainte-Anne-des-Monts": (49.12, -66.49, "Québec", "Canada"),
+    "Sainte-Anne-des-Monts": (49.12, -66.49, "Québec", "Canada"), "Chicoutimi": (48.43, -71.07, "Québec", "Canada"), "Jonquière": (48.42, -71.25, "Québec", "Canada"),
+    "Alma": (48.55, -71.65, "Québec", "Canada"), "Rouyn-Noranda": (48.24, -79.02, "Québec", "Canada"), "Val-d'Or": (48.10, -77.78, "Québec", "Canada"),
+    "Amos": (48.57, -78.12, "Québec", "Canada"), "Gaspé": (48.83, -64.48, "Québec", "Canada"), "Sept-Îles": (50.22, -66.38, "Québec", "Canada"),
+    "Baie-Comeau": (49.22, -68.15, "Québec", "Canada"), "Matane": (48.85, -67.53, "Québec", "Canada"), "Rivière-du-Loup": (47.83, -69.53, "Québec", "Canada"),
+    "Victoriaville": (46.06, -71.96, "Québec", "Canada"), "Thetford Mines": (46.09, -71.30, "Québec", "Canada"), "Saint-Georges": (46.12, -70.67, "Québec", "Canada"),
+    "Shawinigan": (46.57, -72.75, "Québec", "Canada"), "La Tuque": (47.44, -72.78, "Québec", "Canada"), "Magog": (45.27, -72.15, "Québec", "Canada"),
+    "Cowansville": (45.20, -72.75, "Québec", "Canada"), "Bromont": (45.32, -72.65, "Québec", "Canada"), "Mont-Laurier": (46.55, -75.50, "Québec", "Canada"),
+    "Mont-Tremblant": (46.12, -74.60, "Québec", "Canada"), "Sainte-Agathe-des-Monts": (46.05, -74.28, "Québec", "Canada"), "Lachute": (45.65, -74.33, "Québec", "Canada"),
+    "Saint-Eustache": (45.56, -73.90, "Québec", "Canada"), "Sainte-Thérèse": (45.64, -73.83, "Québec", "Canada"), "Rosemère": (45.64, -73.80, "Québec", "Canada"),
+    "Saint-Constant": (45.37, -73.57, "Québec", "Canada"), "Sainte-Catherine": (45.40, -73.58, "Québec", "Canada"), "Beauharnois": (45.31, -73.87, "Québec", "Canada"),
+    "Saint-Lazare": (45.40, -74.13, "Québec", "Canada"), "Kirkland": (45.45, -73.87, "Québec", "Canada"), "Pointe-aux-Trembles": (45.65, -73.50, "Québec", "Canada"),
+    "Marieville": (45.43, -73.17, "Québec", "Canada"), "Contrecoeur": (45.85, -73.24, "Québec", "Canada"), "Lavaltrie": (45.88, -73.28, "Québec", "Canada"),
+    "L'Assomption": (45.82, -73.43, "Québec", "Canada"), "Berthierville": (46.08, -73.18, "Québec", "Canada"), "Coteau-du-Lac": (45.30, -74.18, "Québec", "Canada"),
+    "Valleyfield": (45.25, -74.13, "Québec", "Canada"), "Vaudreuil": (45.40, -74.03, "Québec", "Canada"), "Saint-Bruno": (45.53, -73.35, "Québec", "Canada"),
     "New York": (40.71, -74.01, "", "États-Unis"), "Chattanooga": (35.05, -85.31, "", "États-Unis"), "Chicago": (41.88, -87.63, "", "États-Unis"),
     "Seattle": (47.61, -122.33, "", "États-Unis"), "Boston": (42.36, -71.06, "", "États-Unis"), "Dallas": (32.78, -96.80, "", "États-Unis"),
     "Atlanta": (33.75, -84.39, "", "États-Unis"), "Los Angeles": (34.05, -118.24, "", "États-Unis"), "Miami": (25.76, -80.19, "", "États-Unis"),

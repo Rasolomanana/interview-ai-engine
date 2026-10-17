@@ -485,3 +485,10 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - lib/usePersistedToggle.js (localStorage) ; PortalHealth : bouton Masquer/Afficher le détail (compteurs toujours visibles) ; Radar : en-têtes A/B/C cliquables (chevron) mémorisés.
 - lib/skillMap.js : regroupement déterministe par domaines (16 domaines + Autres), fusion des formulations proches (Jaccard >= 0.6), poids = variantes + mentions CV/Career Memory.
 - SkillMap.jsx sous le CV maître : bulles flottantes 3D (perspective suit souris/tactile, translateZ selon poids), clic = détail des compétences ; repliable ; prefers-reduced-motion respecté.
+
+## 2026-06 — Masquer/Afficher Career Memory + zone géographique Radar
+- Foldable.jsx : CV maître (masqué par défaut) et compétences détectées repliables, choix mémorisé (localStorage).
+- careeros/zone.py : filtre géographique pour tous les membres et toutes les sources. Si la ville est connue : rayon de 100 km ; sinon même province ; sinon même pays. Les offres « Canada », en télétravail ou sans lieu sont gardées. Les offres hors zone ont le statut `hors_zone` et une `zone_reason`. Le changement est réversible quand la localisation change (`_apply_zone` + signature `zone_for`).
+- Dashboard : `out_zone`, `out_zone_count` et `zone` ; bouton cliquable « hors zone » ; `run.out_zone` + `kind=out_zone` dans l'historique.
+- Tests : iteration_43 (23/23 backend, frontend 100 %).
+- Backlog : élargir la table des villes (PLACES) ; régler le rayon par membre.

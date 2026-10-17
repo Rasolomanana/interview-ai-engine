@@ -1,0 +1,36 @@
+{
+  "summary": "Tested the Career Memory Masquer/Afficher toggles and the Radar geographic zone filter (zone.check, dashboard out_zone, reversible re-evaluation when the location changes, run offers kind=out_zone, Radar UI hors-zone filter, RadarHistory out-zone link and dialog). All requested features work. Backend: 23/23 pytest pass. Frontend: all flows pass. I found a few minor logic gaps (listed below), and none of them blocks anything.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "careeros.zone.check", "issue": "A city missing from the PLACES list but in the member's province is kept as 'Province : Québec (ville non précisée)' even when it is far away. Real data example: 'Canada, Québec, Chicoutimi' (~400 km) is kept because Chicoutimi is not in PLACES (Saguenay is). The same happens with any small Québec city (Rouyn-Noranda, Gaspé...). The user only asked to keep same-province offers that give no city."},
+      {"endpoint": "GET /api/careeros/radar/runs/{id}/offers?kind=out_zone", "issue": "run.out_zone only counts offers newly inserted during the run. The kind=out_zone list also returns already-known offers seen in that run (seen_runs) that are hors_zone. So the number in the history row can be lower than the number of rows in the dialog."},
+      {"endpoint": "POST /api/careeros/radar/external", "issue": "An offer the member pastes is inserted as 'nouvelle' with no zone check. On the next location change, or a zone VERSION bump, _apply_zone re-evaluates it and can hide it as hors_zone. Behaviour is inconsistent; consider excluding source 'externe' from _apply_zone."},
+      {"endpoint": "POST /api/careeros/radar/offers/{id}/ignore", "issue": "Ignoring a hors_zone offer replaces its status with 'ignoree' and leaves a stale status_before_zone (low impact)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Career Memory", "issues": ["The hint for collapsed skills ('· 81 compétences') wraps onto 2 lines next to the Afficher button (left column too narrow). Cosmetic only."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_radar_zone.py", "/app/test_reports/pytest/pytest_radar_zone.xml"],
+  "action_items": [
+    "Optional: for an offer city not in PLACES while the member's city is known, mark it out of zone, or say so explicitly in zone_reason (e.g. Chicoutimi), or add more Québec/Ontario cities to the list",
+    "Optional: make the RadarHistory out_zone count match the kind=out_zone list (count known hors_zone offers seen in the run too, or filter the list by run_id)",
+    "Optional: exclude source 'externe' offers from _apply_zone"
+  ],
+  "critical_code_review_comments": [
+    "_apply_zone skips 'pack' offers, so packed offers in Toronto/Vancouver stay visible. This looks intentional and is fine.",
+    "_apply_zone loops with one update_one per offer. Fine for about 300 offers; a bulk_write would scale better.",
+    "deploy-export copies are identical to /app backend/frontend for all reviewed files."
+  ],
+  "updated_files": ["/app/backend/tests/test_radar_zone.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Temporary radar_offers with id prefix TEST_zone_ (Toronto, Laval, Mississauga/ignoree) were inserted and then deleted. A temporary out_zone=3 on run eff640e1 was used for the UI test and removed. Settings location restored to 'Montréal, Québec' (zone_for 1|montreal quebec, 106 hors_zone offers).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_radar_zone.py covers the zone.check unit cases plus the dashboard, the Toronto<->Montréal reversible re-evaluation and run offers kind=out_zone. Its fixture restores the location to 'Montréal, Québec'. UI checks: profile-cv-block-toggle hidden by default (localStorage cos.profile.cv.open); skills-detected-toggle shown by default (cos.profile.skills.open); radar-out-zone-btn shows 106 and filters 106 radar-zone-reason-* cards; radar-run-outzone-<id> opens the dialog with run-offer-zone-* items. No real Radar run was triggered."
+}

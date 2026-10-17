@@ -168,7 +168,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         mark = await db.radar_settings.find_one({"user_id": user_id}, {"_id": 0, "zone_for": 1}) or {}
         if mark.get("zone_for") == sig:
             return
-        async for o in db.radar_offers.find({"user_id": user_id, "status": {"$ne": "pack"}}, {"_id": 0, "id": 1, "location": 1, "status": 1, "status_before_zone": 1}):
+        async for o in db.radar_offers.find({"user_id": user_id, "status": {"$ne": "pack"}, "source": {"$ne": "externe"}}, {"_id": 0, "id": 1, "location": 1, "status": 1, "status_before_zone": 1}):
             ok, why = Z.check(o.get("location"), location)
             if not ok and o["status"] != "hors_zone":
                 await db.radar_offers.update_one({"id": o["id"]}, {"$set": {"status": "hors_zone", "status_before_zone": o["status"], "zone_reason": why}})
@@ -295,9 +295,10 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                     continue
                 seen.add(k)
                 run["by_source"][S.group(o["source"])]["fetched"] += 1
-                existing = await db.radar_offers.find_one({"user_id": user_id, "dedupe_key": k}, {"_id": 0, "id": 1})
+                existing = await db.radar_offers.find_one({"user_id": user_id, "dedupe_key": k}, {"_id": 0, "id": 1, "status": 1})
                 if existing:
                     run["known"] += 1
+                    run["out_zone"] += existing.get("status") == "hors_zone"
                     await db.radar_offers.update_one({"id": existing["id"]}, {"$set": {"last_seen": _now().isoformat()}, "$addToSet": {"seen_runs": run["id"]}})
                     continue
                 doc = {"id": str(uuid.uuid4()), "user_id": user_id, "dedupe_key": k, **o, "first_seen": _now().isoformat(),
@@ -605,7 +606,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
 
     @router.post("/offers/{offer_id}/ignore")
     async def ignore(offer_id: str, user: dict = Depends(current_user)):
-        r = await db.radar_offers.update_one({"id": offer_id, "user_id": user["id"]}, {"$set": {"status": "ignoree"}})
+        r = await db.radar_offers.update_one({"id": offer_id, "user_id": user["id"]}, {"$set": {"status": "ignoree"}, "$unset": {"status_before_zone": ""}})
         if not r.matched_count:
             raise HTTPException(status_code=404, detail="Offre introuvable")
         return {"ok": True}
