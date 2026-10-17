@@ -26,7 +26,7 @@ export const Pending = ({ label, error, onRetry }) => (
   <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-white/10 p-8 text-sm text-slate-400" data-testid="part-pending">
     {error ? <>
       <XCircle className="h-4 w-4 text-rose-400" />
-      <span data-testid="part-error">{label} n'a pas pu être générée pour le moment. Cliquez sur « Réessayer ».</span>
+      <span data-testid="part-error">{label} : cette section n'a pas pu être générée pour le moment. Cliquez sur « Réessayer ».</span>
       {onRetry && <button onClick={onRetry} data-testid="part-retry-btn" className="rounded-full border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/10">Réessayer</button>}
     </> : <><Loader2 className="h-4 w-4 animate-spin text-indigo-400" /> {label} en cours de génération…</>}
   </div>

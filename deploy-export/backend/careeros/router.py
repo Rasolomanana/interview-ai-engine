@@ -615,7 +615,8 @@ async def _recover_interrupted(db):
     """Background generations die with the process (deploy/restart): flag them so the
     member can relaunch — the partial results already written stay in the version."""
     msg = {"pack": "Génération interrompue (redémarrage du serveur). Relancez une réanalyse."}
-    async for v in db.application_versions.find({"status": "generating"}, {"_id": 0, "application_id": 1, "version": 1}):
+    async for v in db.application_versions.find({"status": "generating"}, {"_id": 0, "application_id": 1, "version": 1, "user_id": 1}):
+        await PE.log_error(db, v.get("user_id") or v["application_id"], "pack", "Pack · génération interrompue", "ia", "Génération interrompue par un redémarrage du serveur")
         await db.application_versions.update_one({"application_id": v["application_id"], "version": v["version"]},
                                                  {"$set": {"status": "error", "errors": msg}})
         await db.applications.update_one({"id": v["application_id"], "current_version": v["version"]},

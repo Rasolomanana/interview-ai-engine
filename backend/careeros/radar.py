@@ -424,7 +424,8 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         """Members never see technical errors (they go to the Admin error journal)."""
         if not r:
             return r
-        r = {k: v for k, v in r.items() if k != "errors"}
+        r = {**{k: v for k, v in r.items() if k != "errors"},
+             "notices": {k: v for k, v in (r.get("errors") or {}).items() if k in ("cv", "limite")}}
         r["portals"] = {n: {k: v for k, v in pv.items() if k not in ("error", "etype")} for n, pv in (r.get("portals") or {}).items()}
         return r
 
@@ -666,7 +667,8 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         analyzed = [o async for o in db.radar_offers.find({**q, "analyzed_at": {"$gte": day}}, proj).sort("analyzed_at", -1).limit(100)]
         return {
             "known_last_run": known, "analyzed_today_list": analyzed,
-            "saved": [o for o in offers if o.get("saved") and o["status"] != "pack"],
+            "saved": [o for o in offers if o.get("saved") and o["status"] not in ("pack", "ignoree")],
+            "radar_a": [o for o in active if o["ips"]["priority"] == "A"],
             "learning": {**(lr := await _learned(user["id"]))["signals"],
                          "liked": [t for t, w in sorted(lr["weights"].items(), key=lambda x: -x[1]) if w > 0][:8],
                          "disliked": [t for t, w in sorted(lr["weights"].items(), key=lambda x: x[1]) if w < 0][:8]},
@@ -698,7 +700,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
 
     @router.post("/offers/{offer_id}/save")
     async def save_offer(offer_id: str, user: dict = Depends(current_user)):
-        o = await db.radar_offers.find_one({"id": offer_id, "user_id": user["id"]}, {"_id": 0, "saved": 1})
+        o = await db.radar_offers.find_one({"id": offer_id, "user_id": user["id"]}, {"_id": 0, "id": 1, "saved": 1})
         if not o:
             raise HTTPException(status_code=404, detail="Offre introuvable")
         await db.radar_offers.update_one({"id": offer_id}, {"$set": {"saved": not o.get("saved"), "saved_at": _now().isoformat()}})

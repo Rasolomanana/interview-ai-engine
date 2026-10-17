@@ -207,11 +207,13 @@ def create_strength_router(db, current_user):
         if not re.fullmatch(r"[a-z_]{2,20}", lever_id):
             raise HTTPException(status_code=422, detail="Levier inconnu")
         cur = await db.strength_follow.find_one({"user_id": user["id"], "lever_id": lever_id, "done": False})
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+        if not cur and lever_id not in {it["id"] for it in levers(profile, compute(profile))["items"]}:
+            raise HTTPException(status_code=422, detail="Levier inconnu")
         if cur:
             await db.strength_follow.delete_one({"_id": cur["_id"]})
             await db.lever_stats.update_one({"lever_id": lever_id}, {"$inc": {"followed": -1}}, upsert=True)
             return {"followed": False}
-        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
         await db.strength_follow.update_one({"user_id": user["id"], "lever_id": lever_id},
                                             {"$set": {"done": False, "at": _now(), "raw_at": compute(profile)["raw"]}}, upsert=True)
         await db.lever_stats.update_one({"lever_id": lever_id}, {"$inc": {"followed": 1}}, upsert=True)

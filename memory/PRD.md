@@ -504,3 +504,12 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - portal_errors.py : collection `portal_errors`, une fiche par employeur, connecteur et type d'erreur, avec membres pseudonymisés. Onglet Admin « Corbeille des erreurs » (section connecteurs). Une correction est testée, puis enregistrée dans la base commune et chez tous les membres qui suivent l'entreprise. Elle peut être annulée (`portal_fix_undo`). Statuts : ouverte, résolue, ignorée.
 - strength.py : GET /api/careeros/strength, IFP sur 100 calculé par règles (6 critères), domaines, postes et secteurs. Historique `strength_history` (un point par jour si le score change). ProStrength.jsx sous la carte des compétences.
 - Tests : iteration_45 (15/15) ; corrections mineures appliquées ensuite.
+
+## 2026-06 — Erreurs cachées aux membres, leviers IFP, cartes du tableau de bord, apprentissage du Radar
+- Membres : aucune erreur technique visible. `_member_run` retire `errors` et ne garde que des `notices` neutres (cv, limite). Plus d'encadré d'alertes ni de colonne « Alertes ». Message de pack neutre avec « Réessayer ». Plus aucun code HTTP dans les badges ni dans la vérification d'offre.
+- Journal des erreurs Admin : `PE.log_error` (catégories portail, source, ia, pack, vérification). Seuls les portails sont corrigibles (`fixable`).
+- « Comment gagner des points ? » : `strength.levers` (catalogue par règles). Le gain est simulé en recalculant l'indice ; chaque levier a une difficulté, un effort et un retour sur effort ; paliers 85 / 90 / 95. Suivi d'un levier : `strength_follow` (par membre) et `lever_stats` (agrégat anonyme). Le critère Compétences inclut maintenant 15 % de résultats chiffrés.
+- Tableau de bord : candidatures + priorités A du Radar (`radar_a`) + offres sauvegardées (`/radar/offers/{id}/save`) + entrevues (`interviews_count`).
+- Apprentissage du Radar : `_learned`, poids des mots des titres. Positif : pack, sauvegarde, candidature, entrevue, priorité A. Négatif : offre ignorée. Ces poids ajustent l'ordre d'analyse et le top 5 analysé par l'IA.
+- Tests : iteration_46 ; corrections mineures appliquées (26 tests passent).
+- Backlog : apprentissage à long terme à partir des entrevues et embauches, entre membres et de façon anonyme.

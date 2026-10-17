@@ -64,3 +64,5 @@ html.light [class*="bg-violet-950"]{background-color:#f5f3ff}
 .bg-indigo-500{background-color:#4f46e5}
 .hover\:bg-indigo-400:hover{background-color:#4338ca}
 html.light [data-sonner-toaster]{--success-text:#047857;--error-text:#b91c1c;--warning-text:#92400e;--info-text:#1d4ed8}
+html.light .text-orange-200,html.light .text-orange-300,html.light .text-orange-400{color:#c2410c}
+html.light .border-orange-400\/40{border-color:rgba(194,65,12,.45)}

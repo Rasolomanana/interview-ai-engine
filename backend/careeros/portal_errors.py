@@ -50,6 +50,7 @@ def _pseudo(user_id: str) -> str:
     return hashlib.sha256(f"careeros-portal-error|{user_id}".encode()).hexdigest()[:16]
 
 
+SOURCE_LABEL = {"jooble": "Jooble", "adzuna": "Adzuna", "careerjet": "Careerjet", "serpapi": "Google Jobs (SerpApi)", "ia": "Service IA", "pack": "Pack"}
 CATEGORY = {"portail": "Portail employeur", "source": "Source d'offres", "ia": "Service IA", "pack": "Génération de pack", "verification": "Vérification d'offre"}
 
 
@@ -85,7 +86,7 @@ async def record_run(db, user_id: str, companies: list, portals: dict):
 def _public(r: dict) -> dict:
     out = {k: r.get(k) for k in ("id", "name", "kind", "slug", "portal_url", "etype", "message", "first_seen", "last_seen", "occurrences", "status", "history", "fix")}
     cat = r.get("category") or "portail"
-    return {**out, "category": cat, "category_label": CATEGORY.get(cat, cat), "fixable": cat == "portail" and r.get("kind") in S.PORTAL_KINDS, "members": len(r.get("members") or []), "type_label": TYPES.get(r.get("etype"), r.get("etype")), "kind_label": KIND_LABEL.get(r.get("kind"), r.get("kind"))}
+    return {**out, "category": cat, "category_label": CATEGORY.get(cat, cat), "fixable": cat == "portail" and r.get("kind") in S.PORTAL_KINDS, "members": len(r.get("members") or []), "type_label": TYPES.get(r.get("etype"), r.get("etype")), "kind_label": KIND_LABEL.get(r.get("kind")) or SOURCE_LABEL.get(r.get("kind"), CATEGORY.get(r.get("kind"), r.get("kind")))}
 
 
 class StatusBody(BaseModel):

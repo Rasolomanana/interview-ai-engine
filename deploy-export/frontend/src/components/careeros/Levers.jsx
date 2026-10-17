@@ -29,7 +29,7 @@ export const Levers = ({ s, setD, onChange }) => {
   const lv = s.levers;
   if (!lv || !lv.items.length) return <p className="text-xs text-slate-500" data-testid="levers-empty">Aucun levier simple détecté : votre profil est déjà très complet.</p>;
   const by = Object.fromEntries(lv.items.map((x) => [x.id, x]));
-  const open = (it) => setD({ title: `${it.title} · ${fmt(it.gain)}`, sub: it.why, rule: `Gain estimé en recalculant l'indice avec cette action. Effet : ${it.impact.join(" ; ") || "—"}. Difficulté ${it.difficulty}, effort ${it.effort}, retour sur effort ${it.roi}.`,
+  const open = (it) => setD({ title: `${it.title} · ${fmt(it.gain)}`, sub: it.why, rule: `Gain estimé en recalculant l'indice avec cette action. Effet : ${it.impact.join(" ; ").replace(/(\d)\.(\d)/g, "$1,$2") || "—"}. Difficulté ${it.difficulty}, effort ${it.effort}, retour sur effort ${it.roi}.`,
     items: [...it.evidence.map((e) => `Preuve : ${e}`), "N'ajoutez que ce que vous avez réellement vécu ou obtenu."] });
   const follow = async (it) => {
     if (busy) return;

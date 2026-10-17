@@ -20,7 +20,7 @@ const FILTERS = {
 const fromRadar = (o) => ({ id: `radar-${o.id}`, radar: true, saved: !!o.saved, priority: o.ips?.priority, ips: o.ips?.score, poste: o.title, entreprise: o.company, created_at: o.first_seen, location: o.location });
 
 const RadarRow = ({ a }) => (
-  <Link to="/careeros/radar" data-testid={`dashboard-radar-row-${a.id}`} className="group grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-white/5 px-2 py-3.5 transition-colors hover:bg-white/[0.02]">
+  <Link to={`/careeros/radar?offer=${a.id.replace("radar-", "")}`} data-testid={`dashboard-radar-row-${a.id}`} className="group grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-white/5 px-2 py-3.5 transition-colors hover:bg-white/[0.02]">
     <PriorityBadge priority={a.priority} testid={`row-priority-${a.id}`} />
     <div className="min-w-0">
       <p className="truncate text-sm font-medium text-white"><span className="mr-2 rounded bg-indigo-500/15 px-1.5 py-0.5 font-mono text-[10px] text-indigo-200">RADAR</span>{a.poste}</p>
@@ -57,7 +57,7 @@ export default function Dashboard() {
   const [apps, setApps] = useState(null);
   const [rd, setRd] = useState(null);
   useEffect(() => { careeros.list().then(setApps).catch(() => setApps([])); radar.dashboard().then(setRd).catch(() => setRd({})); }, []);
-  const radarItems = rd ? [...new Map([...(rd.top_a || []), ...(rd.saved || [])].filter((o) => o.status !== "pack").map((o) => [o.id, fromRadar(o)])).values()] : [];
+  const radarItems = rd ? [...new Map([...(rd.radar_a || rd.top_a || []), ...(rd.saved || [])].filter((o) => o.status !== "pack").map((o) => [o.id, fromRadar(o)])).values()] : [];
   const list = [...(apps || []), ...radarItems];
   const nApps = (apps || []).length;
   const count = (fn) => list.filter(fn).length;

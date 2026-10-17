@@ -116,7 +116,7 @@ export default function Radar() {
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState(false);
   const tour = usePageTour("radarTourDone");
-  const [explainId, setExplainId] = useState(null);
+  const [explainId, setExplainId] = useState(() => new URLSearchParams(window.location.search).get("offer"));
   const [ext, setExt] = useState(false);
   const [cmp, setCmp] = useState(false);
   const load = useCallback(() => radar.dashboard().then(setD).catch((e) => toast.error(e.message)), []);
@@ -193,6 +193,7 @@ export default function Radar() {
           <CompanySuggestions refreshKey={lr?.id} onFollowed={load} />
           <OfferMap zone={d.zone} points={d.map_points || []} />
           {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
+          {Object.values(lr?.notices || {}).map((v, k) => <p key={k} className="text-[11px] text-slate-400" data-testid={`radar-notice-${k}`}>{v}</p>)}
           {d.out_zone_count > 0 && <button type="button" onClick={() => pick("out_zone")} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${f === "out_zone" ? "border-amber-400/50 bg-amber-500/15 text-amber-100" : "border-amber-400/25 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10"}`} title="Offres situées hors de votre zone de recherche : masquées automatiquement, consultables ici" data-testid="radar-out-zone-btn"><MapPinOff className="h-3.5 w-3.5" /><span className="font-semibold tabular-nums" data-testid="radar-out-zone-count">{d.out_zone_count}</span> hors zone masquée(s) · zones : {d.zone?.label}</button>}
           {(d.saved || []).length > 0 && <button type="button" onClick={() => pick("saved")} className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-amber-400/25 px-3 py-1 text-xs text-amber-200 hover:bg-amber-500/10" data-testid="radar-saved-btn"><Bookmark className="h-3.5 w-3.5" />{d.saved.length} sauvegardée(s)</button>}
           {d.learning && <p className="text-[11px] text-slate-500" data-testid="radar-learning" title="Le Radar analyse d'abord les offres proches de celles que vous gardez (packs, sauvegardes, candidatures, entrevues) et s'éloigne de celles que vous ignorez. Données propres à votre compte.">

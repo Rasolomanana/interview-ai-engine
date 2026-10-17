@@ -94,7 +94,7 @@ export default function PackView() {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300"><span data-testid="application-code" className="text-white">{a.code}</span> · Dossier de candidature · v{shownVersion}</p>
-          <h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl" data-testid="pack-title">{d.poste || "Analyse en cours…"}</h1>
+          <h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl" data-testid="pack-title">{d.poste || (a.status === "error" ? "Pack à relancer" : "Analyse en cours…")}</h1>
           <p className="mt-1 text-sm text-slate-400">{d.entreprise}</p>
           <ConceptRow keys={["ips", "priorite", "pack", "suivi", "ics"]} />
         </div>

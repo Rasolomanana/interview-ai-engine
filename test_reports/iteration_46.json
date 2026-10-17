@@ -1,0 +1,46 @@
+{
+  "summary": "Tested iteration 46 end to end (backend + UI). Covered: technical errors hidden from members (Radar dashboard/runs, Radar page, history table, pack errors), the Admin 'Journal des erreurs' categories and the fixable flag, strength levers ('Comment gagner des points ?') with follow toggle and lever_stats, Radar save/unsave and the learning line, the Dashboard counters with Radar items, and applications interviews_count. Found 1 real bug: POST /radar/offers/{id}/save returned 404 on the first save of any offer (projection returned an empty dict). I fixed it and retested. Everything else works as specified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/careeros/radar/offers/{id}/save", "issue": "FIXED BY TESTER: find_one projection {'_id':0,'saved':1} returns {} (falsy) for offers that never had 'saved', so every first save returned 404 'Offre introuvable'. Added 'id':1 to the projection (radar.py save_offer)."},
+      {"endpoint": "POST /api/careeros/strength/levers/{id}/follow", "issue": "Any id matching [a-z_]{2,20} is accepted even if it is not in the member's lever catalog (e.g. 'zzz'). It increments lever_stats.followed, and the next GET /strength immediately marks it 'realised' (done+1, gain counted) because it is not in the current items. This pollutes the anonymous stats. Validate lever_id against levers(profile,res) ids (or a static catalog id set)."},
+      {"endpoint": "router.py startup recovery (~line 618-622)", "issue": "The 'Génération interrompue (redémarrage du serveur)' pack errors are written without PE.log_error, so they never reach the Admin journal."},
+      {"endpoint": "GET /api/careeros/radar/dashboard", "issue": "'saved' includes saved offers that were later ignored (status 'ignoree'); they still count in the Dashboard stat-saved/stat-total. top_a is capped at 20, so Dashboard 'Priorité A' undercounts members with more than 20 Radar A offers."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PackView Pending", "issue": "Neutral text uses feminine 'n'a pas pu être générée' for every tab label, including masculine ones (CV ATS, CV humain, Suivi & agenda).", "selector": "[data-testid=part-error]", "priority": "LOW"},
+      {"component": "PackView header", "issue": "A pack with status 'error' still shows the title 'Analyse en cours…'.", "selector": "h1", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Radar run notices", "issue": "_member_run drops the whole 'errors' map, so useful non-technical notices (errors.cv 'Ajoutez votre CV…', errors.limite) are no longer shown anywhere. skipped_limit is still shown in radar-last-run. Consider a whitelisted 'notices' field.", "affected_selectors": ["radar-last-run"]},
+      {"flow": "Dashboard radar row", "issue": "dashboard-radar-row-* links to /careeros/radar without anchoring or highlighting the clicked offer.", "affected_selectors": ["dashboard-radar-row-*"]}
+    ],
+    "design_issues": [
+      {"screen": "Strength lever dialog", "issues": ["Impact line uses a decimal point ('Leadership : 9.0 → 15/15'), while the rest of the UI uses a French comma ('+2,5 pts')."]},
+      {"screen": "Admin Journal des erreurs", "issues": ["Non-portal cards show the raw kind ('pack') next to the name because kind_label falls back to the raw kind."]},
+      {"screen": "Light theme", "issues": ["Orange 'À postuler rapidement' badge and faded 'Lecture fragile/bloquée' chips have low contrast on light background."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_member_errors_levers_saved.py", "/app/test_reports/pytest/pytest_iter46.xml"],
+  "action_items": [
+    "Validate lever_id against the member's actual lever ids in the follow endpoint (avoid polluting lever_stats)",
+    "Log startup-recovery pack failures to PE.log_error",
+    "Exclude status 'ignoree' from dashboard 'saved' (or unsave on ignore)",
+    "Optional: expose non-technical run notices (missing CV / daily limit) to members via a whitelisted field",
+    "Optional: gender-neutral part-error text; pack title when status=error; French decimal in lever impact"
+  ],
+  "critical_code_review_comments": [
+    "radar.py is 957 lines and router.py is 640 lines: consider splitting radar.py (endpoints vs run engine)",
+    "portal_errors.log_error stores exception text (message) after only stripping query strings. Pack exceptions could contain offer/CV fragments; consider truncating to the exception type plus a generic message.",
+    "strength_follow upsert on {user_id, lever_id} overwrites a previously 'done' record when the member re-follows, losing the realised history."
+  ],
+  "updated_files": ["/app/backend/careeros/radar.py (save_offer projection fix)", "/app/backend/tests/test_member_errors_levers_saved.py"],
+  "success_rate": {"backend": "100% (11/11 after fix; 15/15 regression test_portal_errors_strength.py)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "Temporary portal_errors cards 'TEST_Pack section iter46' and 'TEST_UI pack card' were created and deleted. Radar offer ba9a67a5 was saved and then unsaved (0 saved offers remain). The lever follow was toggled on then off.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Member membre.test has 13 applications (interviews_count values 0-5 from db.interviews), no Radar A offers without a pack, and 0 saved offers. Lever ids seen: lead, cert_pm, tools (+ others). Milestones 85/90/95 render, and 95 is not reachable (92.8). The PackView with a failed section is /careeros/candidature/c92a1921-3577-46e0-9e99-1236eebd0293. RadarHistory opens the first day by default (open=0). The Radar guided tour pops up on every visit ('Passer'). No real Radar runs were triggered."
+}
