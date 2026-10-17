@@ -513,3 +513,10 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Apprentissage du Radar : `_learned`, poids des mots des titres. Positif : pack, sauvegarde, candidature, entrevue, priorité A. Négatif : offre ignorée. Ces poids ajustent l'ordre d'analyse et le top 5 analysé par l'IA.
 - Tests : iteration_46 ; corrections mineures appliquées (26 tests passent).
 - Backlog : apprentissage à long terme à partir des entrevues et embauches, entre membres et de façon anonyme.
+
+## 2026-06 — Carte réelle (CV) vs carte requise (fiche emploi)
+- La carte des compétences existante (SkillMap) n'a pas été modifiée ; skillMap.js expose seulement N et OTHER en plus.
+- lib/skillMatch.js : comparaison par règles (LEX d'environ 60 compétences, mêmes domaines que la carte). Compétences requises ou souhaitées (mots « atout », « un plus »…) ; statut couverte, partielle ou manquante ; score pondéré ; manques classés par importance ; recommandations reliées aux leviers de l'IFP (LEVER_OF) ; constat.
+- SkillCompare.jsx (grande fenêtre) + JobMap.jsx (bulles 3D colorées selon la couverture, point pour les domaines communs). Sources : offre du Radar, pack existant, texte collé (offre, description, profil LinkedIn) ou historique.
+- backend skill_match.py : /api/careeros/skill-match/sources, /source, /history (POST limité à 200 Ko, 200 comparaisons max par membre), GET, DELETE.
+- Tests : iteration_47 (11/11 backend, frontend OK) ; thème clair corrigé ensuite (fond de la fenêtre).

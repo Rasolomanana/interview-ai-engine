@@ -85,7 +85,7 @@ export const SkillCompare = ({ profile }) => {
           <span className="text-[11px] text-slate-400">Compétences réelles (CV) vs compétences requises : score de concordance, compétences manquantes et recommandations.</span></span>
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[92vh] w-[96vw] max-w-7xl overflow-y-auto border-white/10 bg-[#0d1018] text-slate-100" data-testid="skill-compare-dialog">
+        <DialogContent className="max-h-[92vh] w-[96vw] max-w-7xl overflow-y-auto border-white/10 bg-[#121520] text-slate-100" data-testid="skill-compare-dialog">
           <DialogHeader><DialogTitle>Carte des compétences réelles vs compétences requises</DialogTitle>
             <DialogDescription className="text-slate-400">Comparaison par règles CareerOS, gratuite et instantanée. Chaque comparaison est enregistrée dans l'historique.</DialogDescription></DialogHeader>
           <div className="flex flex-wrap gap-1.5">{TABS.map(([k, l]) => <button key={k} type="button" onClick={() => setTab(k)} className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs ${tab === k ? "bg-indigo-500 text-white" : "border border-white/10 text-slate-300"}`} data-testid={`compare-tab-${k}`}>{k === "hist" && <History className="h-3 w-3" />}{l}</button>)}</div>

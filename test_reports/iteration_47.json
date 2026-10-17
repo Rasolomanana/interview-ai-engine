@@ -1,0 +1,40 @@
+{
+  "summary": "Tested the comparison between the CV skill map and a job's skill map (SkillCompare / JobMap / skill_match). Backend: 11 of 11 pytest checks pass (sources, source with 404 and 422, history save/list/get, validation of source_kind and score, per-member isolation). Frontend: everything works end to end. The existing SkillMap still works (bubbles, skill-map-detail). The skill-compare-open card sits just below it. The dialog has 4 tabs. Pasted text with a logistics supervisor offer gives a score of 19 %, the counts, 8 gaps sorted by importance, 6 recommendations, the verdict, the common domains, a job map with 10 bubbles and a detail panel with Couverte/Partielle/Manquante and Requise/Souhaitée (Lean 'un atout' → Souhaitée). A Radar offer gives 82 % with a link to the 'tools' lever. A pack gives 28 %. History lists each comparison and reopens it without saving it again. At 390px the columns stack with no horizontal overflow. Main problem: in the light theme (the default seen) the dialog is almost unreadable.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/careeros/skill-match/history", "issue": "No size limit on 'result' and 'texts' (any dict is accepted). There is no DELETE endpoint for history and no cap on stored documents (the list shows only the last 100)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SkillCompare dialog (light theme)", "issue": "DialogContent hardcodes bg-[#0d1018] (dark), but theme-light.css remaps .text-white/.text-slate-100 to #0f172a and slate-200/300/400 to darker tones. Result: dark text on a near-black background. The score '19 %', the gap labels, the recommendation titles, compare-job-title, the job-map-detail labels and the dialog title are all almost invisible. Confirmed with a screenshot at 1920 and at 390.", "selector": "[data-testid=skill-compare-dialog]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "SkillCompare recommendations", "issues": [
+        "Lever links are too narrow. skill→'kpi', cert→'cert_lean' (for every certificate, so 'Chariot élévateur' would be linked to the Lean Six Sigma lever), tool→'tools'. This member's levers are lead, cert_pm and tools, so a 'Supervision d'équipe' gap is never linked to 'lead' and PMP is never linked to 'cert_pm'. With the logistics offer, 0 of 6 recommendations had a lever.",
+        "The 6 recommendations for the logistics offer were all the same generic 'Mettre en évidence « X » dans le CV maître' text with an identical 'why' line, so they read as repetitive."
+      ]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_skill_match.py", "/app/test_reports/pytest/pytest_skill_match.xml"],
+  "action_items": [
+    "HIGH: make the SkillCompare dialog theme-aware. Use a background class that theme-light remaps (or add an html.light override for the dialog), or scope dark text colours to the dialog, so text is readable in the light theme.",
+    "Map recommendations to the matching levers: Leadership/supervision gaps → 'lead', PMP/CAPM → 'cert_pm', Lean → 'cert_lean' only. Do not link every cert to cert_lean.",
+    "Optional: refine the LEX aliases to avoid false positives. 'union' matches 'credit union' (Desjardins) → 'Relations de travail'. 'normes'/'qualite'/'incident'/'diplome'/'operations' are very broad. ' sap' matches any word starting with 'sap'.",
+    "Optional: cap the size of history result/texts and add a DELETE endpoint for history."
+  ],
+  "critical_code_review_comments": [
+    "SkillCompare.jsx: bg-[#0d1018] is hardcoded, so the light theme breaks contrast (see ui_bugs).",
+    "skillMatch.js RECO: the cert→'cert_lean' mapping is semantically wrong for non-Lean certs, and the leadership domain is not linked to the 'lead' lever.",
+    "skillMatch.js: sentences are split on '-' and '–', which breaks hyphenated phrases and can cut a sentence before its 'atout' qualifier.",
+    "skill_match.py: HistoryIn.result/texts are unbounded dicts. Consider limits."
+  ],
+  "updated_files": ["/app/backend/tests/test_skill_match.py"],
+  "success_rate": {"backend": "100%", "frontend": "90% (all flows work; light-theme readability broken)"},
+  "seed_data_creation": "Comparisons were saved in history for membre.test (logistics pasted text, Desjardins radar, Ville de Montréal pack, plus mobile runs). The TEST_ entry was deleted from Mongo.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login at /careeros/login, page /careeros/memoire. Skill bubbles float (animation), so click them with force=True. The PrivacyBanner sits at the bottom. membre.test has 15 radar A/B offers and 13 packs. Strength levers for membre.test: lead, cert_pm, tools. Rerun tests/test_skill_match.py for regression."
+}

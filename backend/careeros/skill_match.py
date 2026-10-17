@@ -1,10 +1,11 @@
 """Skill map comparison (CV vs job): job text sources + saved comparison history. The rule-based matching runs in the browser (free, instant)."""
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class HistoryIn(BaseModel):
@@ -15,6 +16,13 @@ class HistoryIn(BaseModel):
     score: int = Field(ge=0, le=100)
     result: dict
     texts: dict = Field(default={})
+
+    @field_validator("result", "texts")
+    @classmethod
+    def _size(cls, v):
+        if len(json.dumps(v, default=str)) > 200_000:
+            raise ValueError("Contenu trop volumineux")
+        return v
 
 
 def create_skill_match_router(db, current_user):
@@ -48,6 +56,9 @@ def create_skill_match_router(db, current_user):
     async def save(body: HistoryIn, user: dict = Depends(current_user)):
         doc = {"id": str(uuid.uuid4()), "user_id": user["id"], "at": datetime.now(timezone.utc).isoformat(), **body.model_dump()}
         await db.skill_comparisons.insert_one(dict(doc))
+        old = [h["id"] async for h in db.skill_comparisons.find({"user_id": user["id"]}, {"_id": 0, "id": 1}).sort("at", -1).skip(200)]
+        if old:
+            await db.skill_comparisons.delete_many({"id": {"$in": old}})
         return {"id": doc["id"], "at": doc["at"]}
 
     @router.get("/history")
@@ -61,5 +72,12 @@ def create_skill_match_router(db, current_user):
         if not h:
             raise HTTPException(status_code=404, detail="Comparaison introuvable")
         return h
+
+    @router.delete("/history/{hid}")
+    async def history_delete(hid: str, user: dict = Depends(current_user)):
+        r = await db.skill_comparisons.delete_one({"id": hid, "user_id": user["id"]})
+        if not r.deleted_count:
+            raise HTTPException(status_code=404, detail="Comparaison introuvable")
+        return {"ok": True}
 
     return router

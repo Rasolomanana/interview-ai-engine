@@ -84,11 +84,20 @@ export const extractJobSkills = (text, title = "") => {
   }).filter(Boolean);
 };
 
-const RECO = {
-  cert: (s) => [`Obtenir ou mentionner la certification « ${s.label} »`, "Une certification exigée est souvent un filtre éliminatoire dans les ATS.", "cert_lean"],
-  tool: (s) => [`Suivre une formation courte sur ${s.label}`, "Les logiciels nommés dans l'offre sont recherchés mot pour mot par les recruteurs et les ATS.", "tools"],
-  lang: (s) => [`Préciser votre niveau : ${s.label}`, "Indiquez le niveau (courant, intermédiaire) et un contexte d'usage professionnel.", ""],
-  skill: (s) => [`Mettre en évidence « ${s.label} » dans le CV maître`, "Si vous l'avez déjà pratiquée, ajoutez-la explicitement avec un exemple chiffré : sinon, c'est une compétence à développer.", "kpi"],
+const LEVER_OF = { "Supervision d'équipe": "lead", Leadership: "lead", "Gestion du personnel": "lead", "Coaching et formation des employés": "lead",
+  "Gestion de projet": "cert_pm", "PMP / CAPM": "cert_pm", "Lean Six Sigma": "cert_lean", "Amélioration continue": "cert_lean",
+  "Santé et sécurité au travail (SST)": "cert_sst", CNESST: "cert_sst", "Premiers secours": "cert_sst", "Gestion budgétaire": "budget", "Contrôle des coûts": "budget",
+  "Relations de travail / milieu syndiqué": "union", "Indicateurs de performance (KPI)": "kpi" };
+
+const reco = (s) => {
+  const need = s.required ? "exigée par l'offre" : "présentée comme un atout";
+  if (s.status === "partiel") return [`Renforcer la preuve de « ${s.label} »`, `Votre domaine « ${s.domain} » est déjà présent : citez un exemple précis (contexte, action, résultat chiffré) qui montre cette compétence ${need}.`];
+  if (s.cat === "cert") return [`${s.required ? "Obtenir" : "Envisager"} : ${s.label}`, `Certification ${need} : si vous l'avez déjà, ajoutez-la dans vos certifications (souvent un filtre ATS éliminatoire).`];
+  if (s.cat === "tool") return [`Se former à ${s.label}`, `Logiciel ${need} : une formation en ligne courte permet de l'ajouter honnêtement au CV ; les ATS le cherchent mot pour mot.`];
+  if (s.cat === "lang") return [`Préciser votre niveau : ${s.label}`, "Indiquez votre niveau (courant, intermédiaire) et un contexte d'usage professionnel."];
+  return [s.required ? `Compétence requise à expliciter ou à développer : ${s.label}` : `Atout à mentionner si vous l'avez : ${s.label}`,
+    s.required ? "Si vous l'avez déjà pratiquée, nommez-la explicitement dans le CV maître ; sinon, c'est une priorité de développement pour ce type de poste."
+      : "Pas éliminatoire, mais la mentionner peut vous départager des autres candidats."];
 };
 
 export const compareSkills = (profile, text, title = "", levers = []) => {
@@ -106,8 +115,12 @@ export const compareSkills = (profile, text, title = "", levers = []) => {
   const domains = Object.values(job.reduce((g, s) => { (g[s.domain] ||= { name: s.domain, color: s.color, skills: [], weight: 0 }).skills.push(s); g[s.domain].weight += s.weight; return g; }, {}))
     .map((d) => ({ ...d, coverage: d.skills.reduce((n, s) => n + (s.status === "ok" ? 1 : s.status === "partiel" ? 0.5 : 0), 0) / d.skills.length })).sort((a, b) => b.weight - a.weight);
   const gaps = job.filter((s) => s.status !== "ok").sort((a, b) => b.weight - a.weight || (a.status === "manquant" ? -1 : 1));
-  const leverIds = new Set(levers.map((l) => l.id));
-  const recos = gaps.slice(0, 6).map((s) => { const [t, why, lv] = RECO[s.cat](s); const l = levers.find((x) => x.id === lv && leverIds.has(lv)); return { skill: s.label, title: t, why, lever: l ? { id: l.id, title: l.title, gain: l.gain } : null }; });
+  const recos = gaps.slice(0, 6).map((s) => {
+    const [t, why] = reco(s);
+    const lv = LEVER_OF[s.label] || (s.cat === "tool" ? "tools" : "");
+    const l = levers.find((x) => x.id === lv);
+    return { skill: s.label, title: t, why, lever: l ? { id: l.id, title: l.title, gain: l.gain } : null };
+  });
   const common = domains.filter((d) => myDom[d.name]).map((d) => d.name);
   const weak = domains.filter((d) => d.coverage < 0.5).slice(0, 2).map((d) => d.name);
   const verdict = !job.length ? "Aucune compétence reconnue dans ce texte : collez l'offre complète (exigences et responsabilités)."
