@@ -1,0 +1,169 @@
+"""Indice de Force Professionnelle (IFP): profile-only score /100 by deterministic rules (no AI, no cost), with daily history."""
+import re
+import unicodedata
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends
+
+MONTHS = {"jan": 1, "fev": 2, "feb": 2, "mar": 3, "avr": 4, "apr": 4, "mai": 5, "may": 5, "juin": 6, "jun": 6, "juil": 7, "jul": 7, "aou": 8, "aug": 8,
+          "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+NOW_WORDS = r"(?:a ce jour|ce jour|aujourd hui|present|maintenant|actuel|now|current|today)"
+LEAD = ["supervis", "encadr", "gestion d equipe", "gestion des equipes", "gestion de personnel", "chef d equipe", "leadership", "gestionnaire", "directeur",
+        "directrice", "manager", "coordonnateur", "coordonnatrice", "mentor", "coach", "former les", "formation des employes", "responsable d equipe"]
+CERTS = ["certif", "attestation", "premiers secours", "premier secours", "premiers soins", "cnesst", "sst", "chariot elevateur", "cariste", "sqf", "haccp", "pmp",
+         "itil", "iso", "csst", "simdut", "whmis", "permis classe", "asp construction", "red seal", "cpa", "pl 300", "scrum master", "six sigma", "lean"]
+TOOLS = ["excel", "word", "powerpoint", "outlook", "office 365", "microsoft 365", "power bi", "tableau", "sql", "python", "sap", "oracle", "dayforce", "horasphere",
+         "geobus", "progression live", "jira", "wms", "erp", "salesforce", "sharepoint", "teams", "google workspace", "kronos", "ukg", "workday", "quickbooks",
+         "autocad", "manhattan", "blue yonder", "netsuite", "dynamics", "looker", "zendesk"]
+# domain -> (keywords, compatible roles, competitive sectors)
+DOMAINS = {
+    "Logistique et distribution": (["logisti", "reception", "expedition", "entrepos", "inventaire", "distribution", "chaine d approvisionnement", "supply", "flux", "manutention", "chariot"],
+                                   ["Superviseur des opérations logistiques", "Coordonnateur logistique", "Superviseur d'entrepôt", "Gestionnaire de centre de distribution"],
+                                   ["Entreposage et centres de distribution", "Commerce de détail et épicerie", "Commerce électronique"]),
+    "Transport et livraison": (["transport", "livraison", "flotte", "camion", "dispatch", "repartition", "geobus", "dernier kilometre", "chauffeur"],
+                               ["Répartiteur / dispatcher", "Superviseur transport", "Coordonnateur de la livraison"], ["Transport et messagerie", "Livraison du dernier kilomètre", "Transport scolaire et collectif"]),
+    "Santé et sécurité au travail": (["sst", "cnesst", "securit", "secours", "prevention", "urgence", "incident", "risque", "ergonom"],
+                                     ["Coordonnateur SST", "Agent de prévention", "Superviseur sécurité et conformité"], ["Manufacturier", "Construction", "Entreposage et centres de distribution"]),
+    "Conformité et qualité": (["sqf", "conformit", "qualit", "norme", "iso", "haccp", "audit", "procedure", "politique"],
+                              ["Coordonnateur qualité", "Superviseur conformité", "Technicien assurance qualité"], ["Agroalimentaire", "Manufacturier", "Pharmaceutique"]),
+    "Leadership et gestion d'équipe": (["supervis", "encadr", "leadership", "equipe", "discipline", "gestion de personnel", "mentor", "coach", "multiculturel"],
+                                       ["Superviseur des opérations", "Chef d'équipe", "Gestionnaire des opérations"], ["Services aux entreprises", "Manufacturier", "Commerce de détail et épicerie"]),
+    "Gestion des opérations": (["operation", "quart", "priorit", "planif", "coordination", "production", "amelioration continue", "performance", "kpi", "imprevu"],
+                               ["Gestionnaire des opérations", "Superviseur de production", "Coordonnateur des opérations"], ["Manufacturier", "Logistique tierce partie (3PL)", "Services publics"]),
+    "Données et analyse": (["donnee", "data", "analyse", "power bi", "sql", "python", "tableau de bord", "dashboard", "reporting", "statisti"],
+                           ["Analyste de données", "Analyste BI", "Analyste d'affaires"], ["Services financiers", "Technologies", "Secteur public"]),
+    "Gestion de projet": (["projet", "partie prenante", "agile", "scrum", "pmp", "deploiement", "jalon"], ["Chargé de projet", "Coordonnateur de projets", "Gestionnaire de projet"],
+                          ["Technologies", "Construction", "Services-conseils"]),
+    "Finance et administration": (["budget", "financ", "comptab", "cout", "factur", "paie"], ["Technicien comptable", "Analyste financier", "Adjoint administratif"],
+                                  ["Services financiers", "Secteur public", "Assurances"]),
+    "Service à la clientèle": (["client", "service a la clientele", "relation client", "satisfaction"], ["Superviseur service à la clientèle", "Conseiller service client"],
+                               ["Commerce de détail et épicerie", "Télécommunications", "Centres de contact"]),
+    "Technologies": (["developp", "programm", "cloud", "azure", "aws", "java", "api", "devops", "reseau", "cyber"], ["Développeur", "Analyste TI", "Technicien en informatique"],
+                     ["Technologies", "Services financiers", "Télécommunications"]),
+}
+WEIGHTS = {"experience": 25, "skills": 20, "leadership": 15, "certifications": 10, "tools": 15, "stability": 15}
+LABELS = {"experience": "Expérience", "skills": "Compétences", "leadership": "Leadership", "certifications": "Certifications", "tools": "Outils maîtrisés",
+          "stability": "Stabilité du parcours"}
+
+
+def _n(s: str) -> str:
+    return re.sub(r"[^a-z0-9+#]+", " ", unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()).strip()
+
+
+def _date(tok: str, now: datetime) -> float:
+    if re.fullmatch(NOW_WORDS, tok):
+        return now.year + (now.month - 1) / 12
+    m = re.fullmatch(r"(?:(\d{1,2})\s+|([a-z]{3,})\s+)?((?:19|20)\d{2})(?:\s+(\d{1,2}))?", tok)
+    if not m:
+        return 0
+    month = int(m.group(1) or m.group(4) or 0) or MONTHS.get((m.group(2) or "")[:4], 0) or MONTHS.get((m.group(2) or "")[:3], 1)
+    return int(m.group(3)) + (min(max(month, 1), 12) - 1) / 12
+
+
+def periods(cv: str, now: datetime) -> list:
+    """Job periods [(start, end, label)] from date ranges such as « 2023-11 à ce jour », « mars 2019 - juin 2022 », « 2015 – 2018 »."""
+    t = _n(cv)
+    mon = r"(?:janv?(?:ier)?|fevr?(?:ier)?|feb(?:ruary)?|mars?|march|avr(?:il)?|apr(?:il)?|mai|may|juin|june?|juil(?:let)?|july?|aout|aug(?:ust)?|sept?(?:embre|ember)?|oct(?:obre|ober)?|nov(?:embre|ember)?|dec(?:embre|ember)?)"
+    d = rf"(?:(?:\d{{1,2}}\s+|{mon}\s+)?(?:19|20)\d{{2}}(?:\s+\d{{1,2}})?)"
+    out, prev = [], 0
+    for m in re.finditer(rf"({d})\s+(?:a|au|to|jusqu a)?\s*({d}|{NOW_WORDS})", t):
+        a, b = _date(m.group(1).strip(), now), _date(m.group(2).strip(), now)
+        if a and b and 0 < b - a <= 45 and b <= now.year + 1:
+            ctx = t[max(prev, m.start() - 45):m.start()].strip()
+            prev = m.end()
+            out.append((round(a, 2), round(b + (1 / 12 if not re.fullmatch(NOW_WORDS, m.group(2)) else 0), 2), f"… {ctx} {m.group(0)}"[:90]))
+    return out
+
+
+def _merged_years(ps: list) -> float:
+    total, cur = 0.0, None
+    for a, b, _ in sorted(ps):
+        if cur and a <= cur[1]:
+            cur[1] = max(cur[1], b)
+        else:
+            total += (cur[1] - cur[0]) if cur else 0
+            cur = [a, b]
+    return round(total + ((cur[1] - cur[0]) if cur else 0), 1)
+
+
+def _hits(text: str, words: list) -> list:
+    return [w for w in words if f" {w}" in f" {text}"]
+
+
+def compute(p: dict, now: datetime = None) -> dict:
+    now = now or datetime.now(timezone.utc)
+    cv = p.get("cv_text") or ""
+    corpus = _n(" ".join([cv, p.get("achievements") or "", p.get("headline") or "", " ".join(p.get("skills_detected") or []), " ".join(p.get("skills") or [])]))
+    ps = periods(cv, now)
+    years = _merged_years(ps)
+    m = re.search(r"(?:plus de|over|more than)?\s*(\d{1,2})\s*(?:\+\s*)?(?:ans|annees|years)\s+d\s*experience|(\d{1,2})\s*(?:\+\s*)?(?:years|ans|annees) of experience", _n(cv))
+    declared = int(m.group(1) or m.group(2)) if m else 0
+    years_used = max(years, declared)
+    crit = {}
+    crit["experience"] = (min(1, years_used / 10), f"{years_used:g} an(s) d'expérience retenu(s)",
+                          [f"Périodes détectées : {len(ps)} ({years:g} an(s) sans chevauchement)"] + ([f"Expérience déclarée : {declared} an(s)"] if declared else []) + [x[2] for x in ps[:8]],
+                          "10 ans ou plus = note maximale (proportionnelle en dessous).")
+    skills = list(dict.fromkeys([s.strip() for s in (p.get("skills_detected") or []) + (p.get("skills") or []) if str(s).strip()]))
+    doms = {}
+    for name, (keys, _r, _s) in DOMAINS.items():
+        hit = [s for s in skills if any(k in _n(s) for k in keys)]
+        mentions = sum(corpus.count(k) for k in keys)
+        if hit or mentions >= 3:
+            doms[name] = {"skills": hit, "mentions": mentions, "weight": len(hit) * 3 + mentions}
+    breadth = len([d for d in doms.values() if d["skills"]])
+    crit["skills"] = (min(1, len(skills) / 25 * 0.7 + min(breadth, 5) / 5 * 0.3), f"{len(skills)} compétence(s), {breadth} domaine(s)",
+                      skills[:30], "25 compétences distinctes (70 %) + 5 domaines couverts (30 %) = note maximale.")
+    lead = _hits(corpus, LEAD)
+    lead_n = sum(corpus.count(w) for w in lead)
+    promos = int(p.get("promotions") or 0)
+    crit["leadership"] = (min(1, lead_n / 10 * 0.8 + min(promos, 2) / 2 * 0.2), f"{lead_n} mention(s) de leadership, {promos} promotion(s)",
+                          [f"« {w} »" for w in lead], "10 mentions d'encadrement (80 %) + 2 promotions (20 %) = note maximale.")
+    certs = list(dict.fromkeys([c for c in p.get("certifications") or [] if str(c).strip()] + [f"« {w} » (dans le CV)" for w in _hits(corpus, CERTS)]))
+    crit["certifications"] = (min(1, len(certs) / 4), f"{len(certs)} certification(s) ou attestation(s)", certs, "4 certifications ou attestations = note maximale.")
+    tools = _hits(corpus, TOOLS)
+    crit["tools"] = (min(1, len(tools) / 6), f"{len(tools)} outil(s) détecté(s)", tools, "6 outils ou logiciels distincts = note maximale.")
+    if ps:
+        tenure = round(sum(b - a for a, b, _ in ps) / len(ps), 1)
+        crit["stability"] = (min(1, tenure / 3), f"{tenure:g} an(s) en moyenne par poste", [x[2] for x in ps[:8]], "3 ans en moyenne par poste = note maximale.")
+    else:
+        crit["stability"] = (0.5, "Dates de postes non détectées : note neutre", [], "Ajoutez les dates de vos postes (ex. « 2019-03 à 2022-06 ») dans le CV.")
+    criteria = [{"key": k, "label": LABELS[k], "max": WEIGHTS[k], "score": round(v[0] * WEIGHTS[k], 1), "summary": v[1], "evidence": v[2][:30], "rule": v[3]}
+                for k, v in crit.items()]
+    score = round(sum(c["score"] for c in criteria))
+    top = sorted(doms.items(), key=lambda x: -x[1]["weight"])[:3]
+    lead_level = crit["leadership"][0] >= 0.5
+    roles, sectors = [], {}
+    for name, d in top:
+        _k, rs, ss = DOMAINS[name]
+        roles += [r for r in rs if lead_level or not re.match(r"(Gestionnaire|Directeur)", r)][:2]
+        for i, sct in enumerate(ss):
+            sectors[sct] = sectors.get(sct, 0) + d["weight"] * (3 - i)
+    for r in [x.strip() for x in re.split(r"[,;/\n]", p.get("target_roles") or "") if x.strip()][:2]:
+        if r.lower() not in (x.lower() for x in roles):
+            roles.insert(0, f"{r} (poste visé)")
+    tw = sum(d["weight"] for _, d in top) or 1
+    return {
+        "score": score, "level": "Très fort" if score >= 80 else "Fort" if score >= 65 else "Intermédiaire" if score >= 45 else "En développement",
+        "criteria": criteria,
+        "domains": [{"name": n, "share": round(d["weight"] * 100 / tw), "skills": d["skills"][:8], "mentions": d["mentions"]} for n, d in top],
+        "roles": list(dict.fromkeys(roles))[:6],
+        "sectors": [{"name": n, "score": round(v * 100 / max(sectors.values()))} for n, v in sorted(sectors.items(), key=lambda x: -x[1])[:5]],
+        "note": "Indice calculé uniquement à partir de votre profil (CV maître et Career Memory), par règles CareerOS, sans IA. L'IPS reste la comparaison avec une offre précise.",
+    }
+
+
+def create_strength_router(db, current_user):
+    router = APIRouter(prefix="/api/careeros")
+
+    @router.get("/strength")
+    async def strength(user: dict = Depends(current_user)):
+        profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
+        res = compute(profile)
+        day = datetime.now(timezone.utc).date().isoformat()
+        last = await db.strength_history.find_one({"user_id": user["id"]}, {"_id": 0}, sort=[("day", -1)])
+        if (profile.get("cv_text") or "").strip() and (not last or last["score"] != res["score"] or last["day"] == day):
+            await db.strength_history.update_one({"user_id": user["id"], "day": day}, {"$set": {"score": res["score"], "criteria": {c["key"]: c["score"] for c in res["criteria"]}}}, upsert=True)
+        hist = [h async for h in db.strength_history.find({"user_id": user["id"]}, {"_id": 0, "day": 1, "score": 1, "criteria": 1}).sort("day", 1).limit(365)]
+        return {**res, "history": hist}
+
+    return router

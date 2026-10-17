@@ -8,6 +8,7 @@ import os
 import re
 from datetime import datetime, timezone
 import unicodedata
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -122,16 +123,47 @@ async def successfactors(client, host: str, company: str, keywords: list):
     return list(out.values())
 
 
+MOVED = {}  # (kind, old slug) -> new slug discovered through a redirect during the current process
+ORACLE_PATHS = ("latest", "11.13.18.05")
+
+
+class PortalRedirect(Exception):
+    """Portal answered with a redirect that does not lead to a readable job API (login / maintenance page)."""
+
+
+async def _oracle_get(client, host: str, params: dict):
+    """GET the Oracle job API, following a redirect only towards another Oracle job API; returns (response, host)."""
+    last = ""
+    for ver in ORACLE_PATHS:
+        url = f"https://{host}/hcmRestApi/resources/{ver}/recruitingCEJobRequisitions"
+        for _hop in range(3):
+            r = await client.get(url, headers={**UA, "Accept": "application/json"}, params=params, follow_redirects=False)
+            if not r.is_redirect:
+                break
+            loc = r.headers.get("location") or ""
+            nxt = urlparse(urljoin(url, loc))
+            last = f"{r.status_code} → {nxt.netloc or 'sans adresse'}{nxt.path[:60]}"
+            if not loc or "recruitingCEJobRequisitions" not in nxt.path or not nxt.netloc:
+                r = None
+                break
+            host, url, params = nxt.netloc, urljoin(url, loc), (params if not nxt.query else None)
+        if r is not None and not r.is_redirect:
+            r.raise_for_status()
+            return r, host
+    raise PortalRedirect(f"Redirection Oracle non lisible ({last or '3xx'}) : page de connexion ou de maintenance de l'employeur")
+
+
 async def oracle(client, slug: str, company: str, keywords: list):
     """Oracle Recruiting Cloud (Candidate Experience) public REST search."""
     host, site = slug.split("/", 1)
     out = {}
     for text in (keywords[:3] or [""]):
         kw = f',keyword="{text}"' if text else ""
-        r = await client.get(f"https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions", headers={**UA, "Accept": "application/json"},
-                             params={"onlyData": "true", "expand": "requisitionList.secondaryLocations",
-                                     "finder": f"findReqs;siteNumber={site},limit=25{kw},sortBy=POSTING_DATES_DESC"})
-        r.raise_for_status()
+        r, new_host = await _oracle_get(client, host, {"onlyData": "true", "expand": "requisitionList.secondaryLocations",
+                                                       "finder": f"findReqs;siteNumber={site},limit=25{kw},sortBy=POSTING_DATES_DESC"})
+        if new_host != host:
+            MOVED[("oracle", slug)] = f"{new_host}/{site}"
+            host = new_host
         for it in r.json().get("items") or []:
             for j in it.get("requisitionList") or []:
                 out[j["Id"]] = {"source": "oracle", "external_id": str(j["Id"]), "title": j.get("Title", ""), "company": company,

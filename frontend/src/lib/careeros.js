@@ -70,6 +70,7 @@ export const sharing = {
 export const careeros = {
   meta: () => call("/careeros/meta", { auth: false }),
   getProfile: () => call("/careeros/profile"),
+  strength: () => call("/careeros/strength"),
   saveProfile: (p) => call("/careeros/profile", { method: "PUT", body: p }),
   createPack: (b) => call("/careeros/packs", { method: "POST", body: b }),
   list: () => call("/careeros/applications"),

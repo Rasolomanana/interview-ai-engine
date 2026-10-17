@@ -56,6 +56,10 @@ export const adminSaveFinanceSettings = (pwd, body) => adminCall("/finance-setti
 export const adminMembers = (pwd) => adminCall("/members", pwd);
 export const adminConnectors = (pwd) => adminCall("/connectors", pwd);
 export const adminKnowledge = (pwd) => adminCall("/knowledge", pwd);
+export const adminPortalErrors = (pwd) => adminCall("/portal-errors", pwd);
+export const adminPortalErrorStatus = (pwd, id, status) => adminCall(`/portal-errors/${id}/status`, pwd, { method: "POST", body: JSON.stringify({ status }) });
+export const adminPortalErrorFix = (pwd, id, portal_url) => adminCall(`/portal-errors/${id}/fix`, pwd, { method: "POST", body: JSON.stringify({ portal_url }) });
+export const adminPortalErrorUndo = (pwd, id) => adminCall(`/portal-errors/${id}/undo`, pwd, { method: "POST" });
 export const adminCronLog = (pwd) => adminCall("/radar-cron-log", pwd);
 export const adminFinanceCatalog = (pwd) => adminCall("/finance-catalog", pwd);
 export const adminFinanceAudit = (pwd, id) => adminCall(`/finance-audit${id ? `?entity_id=${id}` : ""}`, pwd);

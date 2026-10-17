@@ -21,6 +21,7 @@ from . import radar_discovery as D
 from . import radar_auto as AU
 from . import knowledge as KB
 from . import zone as Z
+from . import portal_errors as PE
 from .decision_report import build_decision_report
 from .ips import compute_ips
 from .prompts import SYSTEM
@@ -224,6 +225,17 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 if co.get("kind") and co.get("slug") and ("workday" if co["kind"] == "workday" else "boards") in srcs:
                     tasks += [(f"{co['kind']}:{co['name']}", None, S.board(c, co["kind"], co["slug"], co["name"], kw))]
             res = await asyncio.gather(*(limited(t) for _, _, t in tasks), return_exceptions=True)
+            asked = {n.split(":", 1)[1] for n, _, _ in tasks if n.startswith("jooble:")}
+            failed = [n.split(":", 1)[1] for (n, _, _), r in zip(tasks, res) if n.split(":", 1)[0] in S.PORTAL_KINDS and isinstance(r, Exception)]
+            if S.configured().get("jooble"):  # unreadable portal -> Jooble for this company during this run
+                extra = [(f"jooble:{n}", n, S.jooble(c, "", st["location"], n)) for n in failed if n not in asked]
+                tasks += extra
+                res = list(res) + list(await asyncio.gather(*(limited(t) for _, _, t in extra), return_exceptions=True))
+        moved = {}
+        for co in comps:
+            new = S.MOVED.pop((co.get("kind"), co.get("slug")), None)
+            if new:
+                moved[co["name"]] = {"kind": co["kind"], "old": co["slug"], "new": new}
         jooble_raw, jooble_ok = 0, 0
         portals = {}
         for (name, company, _), r in zip(tasks, res):
@@ -231,11 +243,11 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             if kind in S.PORTAL_KINDS:
                 portals[name.split(":", 1)[1]] = {"kind": kind, "ok": not isinstance(r, Exception), "fetched": 0 if isinstance(r, Exception) else len(r),
                                                   "error": (str(r) or type(r).__name__)[:160] if isinstance(r, Exception) else "",
-                                                  "blocked": isinstance(r, Exception) and D.is_blocked(r)}
+                                                  "blocked": isinstance(r, Exception) and D.is_blocked(r), "etype": PE.classify(r) if isinstance(r, Exception) else ""}
                 pv = portals[name.split(":", 1)[1]]
                 pv["quality"] = S.quality(kind, pv["ok"], pv["blocked"])
             if isinstance(r, Exception):
-                errors[name] = (str(r) or type(r).__name__)[:160]
+                errors[name] = PE.member_message(r, kind in S.PORTAL_KINDS and S.configured().get("jooble")) if kind in S.PORTAL_KINDS else (str(r) or type(r).__name__)[:160]
                 continue
             if name.startswith("jooble"):
                 jooble_raw, jooble_ok = jooble_raw + len(r), jooble_ok + 1
@@ -248,7 +260,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         if jooble_ok and not jooble_raw:
             errors["jooble"] = (f"Jooble ({S.JOOBLE_HOST}) n'a renvoyé aucune offre pour « {st['location']} ». "
                                 f"Vérifiez que la clé a été obtenue sur {S.JOOBLE_HOST}/api/about (les clés Jooble sont propres à chaque pays).")
-        errors["_portals"] = portals
+        errors["_portals"], errors["_moved"] = portals, moved
         return offers, errors
 
     async def _store(doc: dict, d: dict, method: str):
@@ -295,6 +307,19 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         else:
             offers, run["errors"] = await _fetch(st)
             run["portals"] = run["errors"].pop("_portals", {})
+            moved = run["errors"].pop("_moved", {})
+            for cname, mv in moved.items():  # portal moved (redirect): remember the new address for the member and the shared base
+                host = mv["new"].split("/", 1)[0]
+                co = next(c for c in st["companies"] if c["name"] == cname)
+                url = re.sub(r"^https://[^/]+", f"https://{host}", co.get("portal_url") or "")
+                await db.radar_settings.update_one({"user_id": user_id, "companies.name": cname},
+                                                   {"$set": {"companies.$.slug": mv["new"], "companies.$.portal_url": url}})
+                co["slug"], co["portal_url"] = mv["new"], url
+                run["errors"][f"info:{cname}"] = f"Portail déplacé par l'employeur : nouvelle adresse {host} enregistrée, lecture poursuivie."
+            try:
+                await PE.record_run(db, user_id, st["companies"], run["portals"])
+            except Exception:  # noqa: BLE001
+                logger.exception("portal errors record_run")
             for pname, pv in run["portals"].items():
                 pv["matched"] = sum(1 for o in offers if o["source"] == pv["kind"] and o.get("company") == pname)
             try:

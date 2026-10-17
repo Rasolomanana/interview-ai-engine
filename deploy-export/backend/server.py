@@ -801,6 +801,8 @@ from careeros.connectors import create_connectors_router  # noqa: E402
 app.include_router(create_connectors_router(db, _admin_check))
 from careeros.knowledge import create_knowledge_admin_router  # noqa: E402
 app.include_router(create_knowledge_admin_router(db, _admin_check))
+from careeros.portal_errors import create_portal_errors_router  # noqa: E402
+app.include_router(create_portal_errors_router(db, _admin_check))
 auth_router, current_member = create_auth(db)
 app.include_router(auth_router)
 careeros_router = create_careeros_router(db, current_member, _generate_text, _fetch_page_text, _parse_json_object)
@@ -827,6 +829,8 @@ async def _daily_radar_catchup(request, call_next):
         t.add_done_callback(_SCHED_BG.discard)
     return await call_next(request)
 app.include_router(create_journey_router(db, current_member))
+from careeros.strength import create_strength_router  # noqa: E402
+app.include_router(create_strength_router(db, current_member))
 app.include_router(create_followup_router(db, current_member, _generate_text, _parse_json_object, careeros_router))
 from careeros.admin_rbac import create_rbac_router, make_rbac_middleware  # noqa: E402
 from careeros.admin_insights import create_insights_router  # noqa: E402
