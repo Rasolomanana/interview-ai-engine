@@ -492,3 +492,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Dashboard : `out_zone`, `out_zone_count` et `zone` ; bouton cliquable « hors zone » ; `run.out_zone` + `kind=out_zone` dans l'historique.
 - Tests : iteration_43 (23/23 backend, frontend 100 %).
 - Backlog : élargir la table des villes (PLACES) ; régler le rayon par membre.
+
+## 2026-06 — Rayon, plusieurs zones, carte des offres
+- Réglages Radar (ZoneEditor.jsx) : la ville et le rayon sont côte à côte (25/50/100/200 km, toute la province, tout le pays). On peut ajouter jusqu'à 2 villes, chacune avec son propre rayon. Les offres sont réévaluées dès l'enregistrement.
+- Backend : `radius` et `extra_zones` dans RadarSettings ; `zone.zones_of`, `check` sur plusieurs zones, `nearest`. Les recherches Jooble par mots-clés couvrent chaque ville ; les recherches par entreprise et Adzuna restent sur la ville principale (pour limiter le coût).
+- OfferMap.jsx (leaflet + react-leaflet, OpenStreetMap) : zones en cercles, points A/B/C, distance au clic, bloc repliable. `map_points` dans le dashboard.
+- Tests : iteration_44 (30/30 backend, frontend 100 %).

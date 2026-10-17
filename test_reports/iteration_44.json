@@ -1,0 +1,22 @@
+{
+  "summary": "Radar zones v2 (custom radius, up to 3 zones, OpenStreetMap map) tested end-to-end. Backend: new test file test_radar_zones_multi.py (7 tests) + regression test_radar_zone.py (23) = 30/30 pass when run serially (-n 0). Frontend: settings dialog location+radius on same row (y identical), 6 radius options, add button adds rows 1/2 and disappears at 3 zones, remove works, save 50 km + 'Québec, Québec' 25 km persists and out-zone button label shows both zones; map renders OSM tiles, circles and dots, clicking a dot opens radar-map-popup-<id> with '23 km de Montréal'; Masquer/Afficher toggle persisted across reload. Settings restored to Montréal, Québec / 100 / [].",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "radar _fetch", "issue": "Only Jooble keyword queries loop over all zones; Jooble company queries and Adzuna still use only st['location'] (main city). Not testable live: Jooble shows 'Non configuré' in this env."}
+  ]},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": [
+    {"screen": "Radar page", "issues": ["'Visite du Radar' tour card auto-appears bottom-right on every visit for the test user and overlaps content (pre-existing, minor)"]}
+  ]},
+  "test_report_links": ["/app/backend/tests/test_radar_zones_multi.py", "/app/backend/tests/test_radar_zone.py", "/app/test_reports/pytest/pytest_radar_zones_multi.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "test_radar_zone.py and test_radar_zones_multi.py both mutate the same user's radar settings; pytest.ini enables xdist (-n) so running them together in parallel causes a false failure (test_location_change_reversible). Run with -n 0 or mark them xdist_group.",
+    "Jooble company searches / Adzuna use only the main location; consider looping zones there too if intended.",
+    "zones_of: if main location is empty but extra zones exist, first extra becomes main while dashboard radius_km still reflects st['radius'] (edge case)."
+  ],
+  "updated_files": ["/app/backend/tests/test_radar_zones_multi.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "TEST_mz_* offers inserted and deleted by fixture teardown",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run zone tests with `pytest -n 0 tests/test_radar_zones_multi.py tests/test_radar_zone.py`. No real Radar runs were launched. LocalStorage key for map toggle: cos.radar.map.open ('1'/'0'). Settings restored: Montréal, Québec / radius 100 / extra_zones []."
+}
