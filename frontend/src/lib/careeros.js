@@ -90,6 +90,14 @@ export const careeros = {
   dossier: (id) => call(`/careeros/applications/${id}/dossier`),
 };
 
+export const skillMatch = {
+  sources: () => call("/careeros/skill-match/sources"),
+  source: (kind, id) => call(`/careeros/skill-match/source?kind=${kind}&id=${encodeURIComponent(id)}`),
+  save: (b) => call("/careeros/skill-match/history", { method: "POST", body: b }),
+  history: () => call("/careeros/skill-match/history"),
+  get: (id) => call(`/careeros/skill-match/history/${id}`),
+};
+
 export const radar = {
   settings: () => call("/careeros/radar/settings"),
   saveSettings: (b) => call("/careeros/radar/settings", { method: "PUT", body: b }),

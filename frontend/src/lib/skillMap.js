@@ -1,5 +1,5 @@
 // Deterministic skill grouping (free, instant): domain keywords, near-duplicate merge, weight = mentions in CV + Career Memory.
-const N = (s) => (s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+#]+/g, " ").trim();
+export const N = (s) => (s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+#]+/g, " ").trim();
 
 export const DOMAINS = [
   ["Données et analyse", ["donnee", "data", "analyse", "analyt", "power bi", "dax", "sql", "python", "tableau de bord", "dashboard", "reporting", "rapport", "statisti", "bi ", "kpi", "excel avance", "modelis"], "#06b6d4"],
@@ -20,7 +20,7 @@ export const DOMAINS = [
   ["Service client", ["client", "service", "relation"], "#84cc16"],
   ["Certifications", ["certif", "pl 300", "attestation", "diplom"], "#22c55e"],
 ];
-const OTHER = ["Autres compétences", [], "#64748b"];
+export const OTHER = ["Autres compétences", [], "#64748b"];
 
 const tokens = (s) => new Set(N(s).split(" ").filter((t) => t.length > 2));
 const jaccard = (a, b) => { const x = tokens(a), y = tokens(b); const i = [...x].filter((t) => y.has(t)).length; return x.size && y.size ? i / (x.size + y.size - i) : 0; };

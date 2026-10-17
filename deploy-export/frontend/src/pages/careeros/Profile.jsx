@@ -10,6 +10,7 @@ import { SharingPanel } from "@/components/careeros/SharingPanel";
 import { SkillMap } from "@/components/careeros/SkillMap";
 import { Foldable } from "@/components/careeros/Foldable";
 import { ProStrength } from "@/components/careeros/ProStrength";
+import { SkillCompare } from "@/components/careeros/SkillCompare";
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white outline-none focus:border-indigo-400/60";
 const TEXT = [["full_name", "Nom complet"], ["headline", "Titre professionnel"], ["location", "Localisation"], ["country", "Pays"], ["province", "Province / région"], ["city", "Ville"], ["target_roles", "Postes visés"], ["sectors", "Secteurs visés"], ["salary_expectation", "Attentes salariales"]];
@@ -75,6 +76,7 @@ export default function Profile() {
             <textarea rows={26} value={p.cv_text || ""} onChange={set("cv_text")} className={`${inputCls} font-mono text-xs`} data-testid="profile-cv-input" aria-label="CV maître" />
           </Foldable>
           <SkillMap profile={p} />
+          <SkillCompare profile={p} />
           <ProStrength refreshKey={p.updated_at} />
         </section>
       </div>
