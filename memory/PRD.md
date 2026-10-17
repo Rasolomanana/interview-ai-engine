@@ -520,3 +520,8 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - SkillCompare.jsx (grande fenêtre) + JobMap.jsx (bulles 3D colorées selon la couverture, point pour les domaines communs). Sources : offre du Radar, pack existant, texte collé (offre, description, profil LinkedIn) ou historique.
 - backend skill_match.py : /api/careeros/skill-match/sources, /source, /history (POST limité à 200 Ko, 200 comparaisons max par membre), GET, DELETE.
 - Tests : iteration_47 (11/11 backend, frontend OK) ; thème clair corrigé ensuite (fond de la fenêtre).
+
+## 2026-06 — Plein écran, visite du Radar en 7 étapes, vrai fond sombre
+- Fullscreen.jsx (`useFullscreen`) : bouton Plein écran / Quitter sur la fenêtre de comparaison (SkillCompare) et sur « Pourquoi ce score ? ». Utilise l'API Fullscreen du navigateur ; Échap pour quitter.
+- Radar : visite guidée en 7 étapes (ajout d'« Analyser une offre externe » et « Comparer avec LinkedIn ») ; bouton Réglages vert avec pastille animée.
+- theme-light.css : chaque sélecteur porte `:not(.reading-dark, .reading-dark *)`. « Fond sombre » du panneau de score ajoute `reading-dark`, ce qui force le sombre même en thème clair. Vérifié par capture (fond rgb(18,21,32)).

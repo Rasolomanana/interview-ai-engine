@@ -13,6 +13,8 @@ import { PageTour, TourButton, usePageTour } from "@/components/careeros/guide/P
 
 const postedAge = (d) => { const n = Math.floor((Date.now() - new Date(d).getTime()) / 864e5); return Number.isNaN(n) ? d : n <= 0 ? "publiée aujourd'hui" : `publiée il y a ${n} j`; };
 const RADAR_STEPS = [
+  { target: "radar-external-btn", title: "Analyser une offre externe", text: "Collez une offre trouvée ailleurs (Indeed, LinkedIn, site d'employeur) : CareerOS calcule son IPS comme pour une offre du Radar." },
+  { target: "radar-compare-btn", title: "Comparer avec LinkedIn", text: "Collez jusqu'à 10 offres vues sur LinkedIn ou ailleurs (« Entreprise – Titre ») : CareerOS indique si l'entreprise est suivie, si le Radar a trouvé l'offre et ce qui la pénalise." },
   { target: "radar-settings-btn", title: "Réglages", text: "Postes visés, ville, sources et entreprises suivies. C'est ici que vous associez les portails employeurs." },
   { target: "radar-run-btn", title: "Rechercher maintenant", text: "Lance un passage immédiat. Le Radar tourne aussi automatiquement chaque matin." },
   { target: "radar-stats", title: "Compteurs", text: "Cliquez un chiffre pour filtrer la liste : analysées aujourd'hui, nouvelles, déjà connues, priorité A." },
@@ -173,7 +175,8 @@ export default function Radar() {
           <TourButton onClick={tour.open} testid="radar-tour-btn" />
           <button type="button" onClick={() => { tour.close(); setExt(true); }} className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs text-slate-300 hover:text-white" data-testid="radar-external-btn"><ClipboardPaste className="h-3.5 w-3.5" />Analyser une offre externe</button>
           <button type="button" onClick={() => { tour.close(); setCmp(true); }} className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs text-slate-300 hover:text-white" data-testid="radar-compare-btn"><GitCompare className="h-3.5 w-3.5" />Comparer avec LinkedIn</button>
-          <button onClick={() => { tour.close(); setSettings(true); }} data-testid="radar-settings-btn" className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-slate-300 hover:text-white"><Settings2 className="h-4 w-4" />Réglages</button>
+          <button onClick={() => { tour.close(); setSettings(true); }} data-testid="radar-settings-btn" className="relative flex items-center gap-1.5 rounded-full border border-emerald-400/50 bg-emerald-500/15 px-4 py-2 text-xs font-semibold text-emerald-200 shadow-[0_0_18px_-6px_rgba(16,185,129,.7)] transition-colors hover:bg-emerald-500/25">
+            <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5" data-testid="radar-settings-ping"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" /></span><Settings2 className="h-4 w-4" />Réglages</button>
           <button onClick={runNow} disabled={running} data-testid="radar-run-btn" className="flex items-center gap-2 rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <RadarIcon className="h-4 w-4" />}{running ? "Recherche en cours…" : "Rechercher maintenant"}</button>
         </div>

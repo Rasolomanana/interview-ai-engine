@@ -1,3 +1,4 @@
+import { useFullscreen } from "@/components/careeros/Fullscreen";
 import { useEffect, useState } from "react";
 import { Loader2, Sparkles, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -33,10 +34,11 @@ export const ScoreExplain = ({ id, onClose, onDeep }) => {
     try { setO(await radar.deep(o.id)); setO(await radar.explain(o.id)); onDeep?.(); toast.success("Analyse approfondie IA terminée"); } catch (e) { toast.error(e.message); } finally { setDeep(false); }
   };
   const ia = o?.method === "ia";
+  const [full, fsButton] = useFullscreen("explain-fullscreen");
   return (
     <Sheet open={!!id} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className={`w-full overflow-y-auto border-white/10 bg-[#121520] text-slate-100 sm:!max-w-2xl ${read.light ? "reading-light" : ""}`} style={read.big ? { zoom: 1.15 } : undefined} data-testid="explain-panel">
-        <SheetHeader><SheetTitle className="pr-6 text-left font-display text-white">Pourquoi ce score ?</SheetTitle></SheetHeader>
+      <SheetContent side="right" className={`w-full overflow-y-auto border-white/10 bg-[#121520] text-slate-100 ${full ? "sm:!max-w-none" : "sm:!max-w-2xl"} ${read.light ? "reading-light" : "reading-dark"}`} style={read.big ? { zoom: 1.15 } : undefined} data-testid="explain-panel">
+        <SheetHeader><div className="flex flex-wrap items-center gap-3 pr-8"><SheetTitle className="text-left font-display text-white">Pourquoi ce score ?</SheetTitle>{fsButton}</div></SheetHeader>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]" data-testid="explain-reading">
           <span className="text-slate-500">Lecture :</span>
           {[[true, "Fond clair"], [false, "Fond sombre"]].map(([v, l]) => (
