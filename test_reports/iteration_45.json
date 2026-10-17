@@ -1,0 +1,38 @@
+{
+  "summary": "Tested the Oracle 302 handling (unit tests with httpx.MockTransport plus a live read of the real Ville de Montréal portal), the portal_errors classify/member_message/record_run logic (record_run run against a temporary Mongo DB), the admin Corbeille des erreurs API (list, fix with a bad URL then the valid URL, undo, status changes, RBAC for marketing and support), and GET /api/careeros/strength. In the UI I tested the admin tab Corbeille des erreurs (KPIs/filters, history dialog, ignore, reopen, fix, undo, resolve) and the Profile ProStrength block (score, 6 criteria dialogs, domain/role/sector chips, toggle, placement below the skill map). Backend: 15/15 pytest passed. Frontend: all listed flows work. The Ville de Montréal card is back to 'ouverte', and the member settings and knowledge card are back to their original values.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "careeros.radar_sources._oracle_get", "issue": "host/url/params are changed inside the ORACLE_PATHS loop. If the 'latest' path follows a redirect whose Location has a query string, params becomes None and the retry on '11.13.18.05' goes out without the finder params, to the new host. Re-initialise host and params at the start of each path."},
+      {"endpoint": "careeros.radar_sources.MOVED", "issue": "MOVED is a global dict for the whole process, keyed by (kind, slug) and emptied with pop() by whichever run finishes first. When two members following the same company run at the same time, only one of them gets the new address saved; the other picks it up on a later run."},
+      {"endpoint": "POST /api/admin/portal-errors/{id}/undo", "issue": "Undo does not restore companies.$.auto_block (fix $pulls the kind, but 'prev' only keeps kind/slug/portal_url/detected). Undo also always sets status to 'ouverte', even if the card was 'ignore' before the fix."},
+      {"endpoint": "careeros.portal_errors.record_run", "issue": "message has its query string removed, but portal_url is stored as given (query string included). Run the same cleaning on portal_url for consistency."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Career Memory > Indice de Force Professionnelle > Expérience/Stabilité dialog", "issues": ["Period evidence lines use the normalized text (lowercase, no accents, e.g. '… nnees montreal 6 ans d experience desjardins 2020 2025'), so they are hard to read. Show a snippet of the original CV text instead."]},
+      {"screen": "Admin > Corbeille des erreurs history dialog", "issues": ["History actions show raw status keys ('statut : resolue', 'statut : ignore') instead of the labels Résolue/Ignorée", "'Dernière occurrence' always comes last even when it is older than later fix/status actions (list not sorted by date)"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_portal_errors_strength.py", "/app/test_reports/pytest/pytest_portal_strength.xml"],
+  "action_items": [
+    "Reset host/params for each ORACLE_PATHS attempt in _oracle_get",
+    "Undo: also restore auto_block and the status the card had before the fix",
+    "Clean the portal_url query string in record_run",
+    "Strength evidence: show original CV snippets, not normalized text",
+    "Admin history: show status labels and sort rows by date"
+  ],
+  "critical_code_review_comments": [
+    "MOVED as a global process dict is fragile when runs happen at the same time. Consider writing the move straight to the DB/KB inside the connector flow, or keying it per run.",
+    "fix endpoint: applies to every radar_settings doc via AU.same_company in a Python loop. Fine at current scale; with many users, consider filtering in the query first."
+  ],
+  "updated_files": ["/app/backend/tests/test_portal_errors_strength.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. The support-role test grants admin_roles=['support'] to conseiller.test for the duration of the test and then restores the previous value. The record_run test used the temporary DB tmp_pe_test, which was dropped afterwards.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The Ville de Montréal oracle card (id fd60d5b6-...) is 'ouverte' after several fix/undo cycles, and its history contains test actions. Its fix reads about 5 offers and applies to 1 member (membre.test). No real Radar runs were triggered. Strength history for membre.test has a single point for today (score 82), so the chart shows the empty state."
+}

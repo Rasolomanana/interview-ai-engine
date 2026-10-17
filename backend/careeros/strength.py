@@ -60,18 +60,28 @@ def _date(tok: str, now: datetime) -> float:
     return int(m.group(3)) + (min(max(month, 1), 12) - 1) / 12
 
 
+def _n_same_len(s: str) -> str:
+    """Accent-free lowercase text with the same length as s (positions map back to the original CV)."""
+    out = []
+    for ch in s or "":
+        c = unicodedata.normalize("NFKD", ch).encode("ascii", "ignore").decode().lower()[:1]
+        out.append(c if c and re.match(r"[a-z0-9+#]", c) else " ")
+    return "".join(out)
+
+
 def periods(cv: str, now: datetime) -> list:
     """Job periods [(start, end, label)] from date ranges such as « 2023-11 à ce jour », « mars 2019 - juin 2022 », « 2015 – 2018 »."""
-    t = _n(cv)
+    t = _n_same_len(cv)
     mon = r"(?:janv?(?:ier)?|fevr?(?:ier)?|feb(?:ruary)?|mars?|march|avr(?:il)?|apr(?:il)?|mai|may|juin|june?|juil(?:let)?|july?|aout|aug(?:ust)?|sept?(?:embre|ember)?|oct(?:obre|ober)?|nov(?:embre|ember)?|dec(?:embre|ember)?)"
     d = rf"(?:(?:\d{{1,2}}\s+|{mon}\s+)?(?:19|20)\d{{2}}(?:\s+\d{{1,2}})?)"
     out, prev = [], 0
     for m in re.finditer(rf"({d})\s+(?:a|au|to|jusqu a)?\s*({d}|{NOW_WORDS})", t):
-        a, b = _date(m.group(1).strip(), now), _date(m.group(2).strip(), now)
+        g1, g2 = " ".join(m.group(1).split()), " ".join(m.group(2).split())
+        a, b = _date(g1, now), _date(g2, now)
         if a and b and 0 < b - a <= 45 and b <= now.year + 1:
-            ctx = t[max(prev, m.start() - 45):m.start()].strip()
+            snip = " ".join(cv[max(prev, m.start() - 45):m.end()].split())
             prev = m.end()
-            out.append((round(a, 2), round(b + (1 / 12 if not re.fullmatch(NOW_WORDS, m.group(2)) else 0), 2), f"… {ctx} {m.group(0)}"[:90]))
+            out.append((round(a, 2), round(b + (1 / 12 if not re.fullmatch(NOW_WORDS, g2) else 0), 2), f"… {snip}"[-95:]))
     return out
 
 

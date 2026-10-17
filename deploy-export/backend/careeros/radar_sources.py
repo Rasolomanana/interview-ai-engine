@@ -133,8 +133,9 @@ class PortalRedirect(Exception):
 
 async def _oracle_get(client, host: str, params: dict):
     """GET the Oracle job API, following a redirect only towards another Oracle job API; returns (response, host)."""
-    last = ""
+    last, host0, params0 = "", host, params
     for ver in ORACLE_PATHS:
+        host, params = host0, params0
         url = f"https://{host}/hcmRestApi/resources/{ver}/recruitingCEJobRequisitions"
         for _hop in range(3):
             r = await client.get(url, headers={**UA, "Accept": "application/json"}, params=params, follow_redirects=False)

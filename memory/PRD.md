@@ -498,3 +498,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Backend : `radius` et `extra_zones` dans RadarSettings ; `zone.zones_of`, `check` sur plusieurs zones, `nearest`. Les recherches Jooble par mots-clés couvrent chaque ville ; les recherches par entreprise et Adzuna restent sur la ville principale (pour limiter le coût).
 - OfferMap.jsx (leaflet + react-leaflet, OpenStreetMap) : zones en cercles, points A/B/C, distance au clic, bloc repliable. `map_points` dans le dashboard.
 - Tests : iteration_44 (30/30 backend, frontend 100 %).
+
+## 2026-06 — Oracle 302, corbeille des erreurs, Indice de Force Professionnelle
+- Oracle : `_oracle_get` suit une redirection seulement si elle mène à une autre API d'offres Oracle. Dans ce cas, la nouvelle adresse est notée dans `MOVED` puis enregistrée dans les réglages du membre. Sinon, il essaie le second chemin `11.13.18.05`, puis lève `PortalRedirect`. Un portail illisible bascule sur Jooble pour ce passage, avec un message clair (`PE.member_message`).
+- portal_errors.py : collection `portal_errors`, une fiche par employeur, connecteur et type d'erreur, avec membres pseudonymisés. Onglet Admin « Corbeille des erreurs » (section connecteurs). Une correction est testée, puis enregistrée dans la base commune et chez tous les membres qui suivent l'entreprise. Elle peut être annulée (`portal_fix_undo`). Statuts : ouverte, résolue, ignorée.
+- strength.py : GET /api/careeros/strength, IFP sur 100 calculé par règles (6 critères), domaines, postes et secteurs. Historique `strength_history` (un point par jour si le score change). ProStrength.jsx sous la carte des compétences.
+- Tests : iteration_45 (15/15) ; corrections mineures appliquées ensuite.

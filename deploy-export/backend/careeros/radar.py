@@ -233,7 +233,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 res = list(res) + list(await asyncio.gather(*(limited(t) for _, _, t in extra), return_exceptions=True))
         moved = {}
         for co in comps:
-            new = S.MOVED.pop((co.get("kind"), co.get("slug")), None)
+            new = S.MOVED.get((co.get("kind"), co.get("slug")))
             if new:
                 moved[co["name"]] = {"kind": co["kind"], "old": co["slug"], "new": new}
         jooble_raw, jooble_ok = 0, 0

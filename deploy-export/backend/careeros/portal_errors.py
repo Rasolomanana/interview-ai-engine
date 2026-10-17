@@ -61,7 +61,7 @@ async def record_run(db, user_id: str, companies: list, portals: dict):
         k = f"{KB.key(name)}|{pv['kind']}|{etype}"
         cur = await db.portal_errors.find_one({"key": k}, {"_id": 0, "status": 1})
         status = "ignore" if cur and cur.get("status") == "ignore" else "ouverte"
-        await db.portal_errors.update_one({"key": k}, {"$set": {"name": name, "kind": pv["kind"], "slug": c.get("slug", ""), "portal_url": c.get("portal_url", ""),
+        await db.portal_errors.update_one({"key": k}, {"$set": {"name": name, "kind": pv["kind"], "slug": c.get("slug", ""), "portal_url": _clean(c.get("portal_url", "")),
                                                                 "etype": etype, "message": _clean(pv.get("error")), "last_seen": now, "status": status},
                                                        "$inc": {"occurrences": 1}, "$addToSet": {"members": _pseudo(user_id)},
                                                        "$setOnInsert": {"id": str(uuid.uuid4()), "first_seen": now, "history": []}}, upsert=True)
@@ -105,7 +105,7 @@ def create_portal_errors_router(db, check_admin):
         check_admin(x_admin_password)
         await _get(eid)
         await db.portal_errors.update_one({"id": eid}, {"$set": {"status": body.status}})
-        await _log(eid, f"statut : {body.status}")
+        await _log(eid, {"ouverte": "Rouverte", "resolue": "Marquée résolue", "ignore": "Ignorée"}[body.status])
         return {"ok": True}
 
     @router.post("/{eid}/fix")
@@ -127,13 +127,13 @@ def create_portal_errors_router(db, check_admin):
         async for st in db.radar_settings.find({"companies.name": {"$exists": True}}, {"_id": 0, "user_id": 1, "companies": 1}):
             for co in st.get("companies") or []:
                 if isinstance(co, dict) and AU.same_company(co.get("name", ""), r["name"]):
-                    applied.append({"user_id": st["user_id"], "name": co["name"], "prev": {k: co.get(k, "") for k in ("kind", "slug", "portal_url", "detected")}})
+                    applied.append({"user_id": st["user_id"], "name": co["name"], "prev": {**{k: co.get(k, "") for k in ("kind", "slug", "portal_url", "detected")}, "auto_block": co.get("auto_block") or []}})
                     await db.radar_settings.update_one({"user_id": st["user_id"], "companies.name": co["name"]},
                                                        {"$set": {"companies.$.kind": kind, "companies.$.slug": slug, "companies.$.portal_url": body.portal_url.strip(),
                                                                  "companies.$.detected": "Portail corrigé par l'équipe CareerOS"},
                                                         "$pull": {"companies.$.auto_block": kind}})
         fix_id = str(uuid.uuid4())
-        await db.portal_fix_undo.insert_one({"id": fix_id, "error_id": eid, "applied": applied, "prev_card": prev_card, "at": _now()})
+        await db.portal_fix_undo.insert_one({"id": fix_id, "error_id": eid, "applied": applied, "prev_card": prev_card, "prev_status": r.get("status") or "ouverte", "at": _now()})
         fx = {"id": fix_id, "at": _now(), "kind": kind, "portal_url": body.portal_url.strip(), "offers": len(offers), "members": len(applied), "undone": False}
         await db.portal_errors.update_one({"id": eid}, {"$set": {"status": "resolue", "fix": fx}})
         await _log(eid, "portail corrigé", f"{KIND_LABEL.get(kind, kind)} · {len(offers)} offre(s) lue(s) · {len(applied)} membre(s)")
@@ -155,7 +155,7 @@ def create_portal_errors_router(db, check_admin):
             await db.portal_knowledge.update_one({"key": card["key"]}, {"$set": card}, upsert=True)
         else:
             await db.portal_knowledge.delete_one({"key": KB.key(r["name"])})
-        await db.portal_errors.update_one({"id": eid}, {"$set": {"status": "ouverte", "fix.undone": True}})
+        await db.portal_errors.update_one({"id": eid}, {"$set": {"status": u.get("prev_status") or "ouverte", "fix.undone": True}})
         await db.portal_fix_undo.delete_one({"id": u["id"]})
         await _log(eid, "correction annulée", f"{len(u['applied'])} membre(s) restauré(s)")
         return {"ok": True}

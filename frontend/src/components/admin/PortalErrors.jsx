@@ -6,6 +6,7 @@ import { ClickNum, DetailDialog } from "./DetailDialog";
 
 const ST = { ouverte: ["Ouverte", "text-rose-300"], resolue: ["Résolue", "text-emerald-300"], ignore: ["Ignorée", "text-slate-400"] };
 const date = (s) => (s ? new Date(s).toLocaleString("fr-CA", { dateStyle: "medium", timeStyle: "short" }) : "—");
+const LBL = { "statut : ouverte": "Rouverte", "statut : resolue": "Marquée résolue", "statut : ignore": "Ignorée" };
 const pwd = () => sessionStorage.getItem("adminPwd");
 
 const FixRow = ({ r, onDone }) => {
@@ -59,7 +60,8 @@ export const PortalErrors = () => {
             <p className="break-all text-slate-400">{r.message}</p>
             <p className="text-slate-500">
               <ClickNum testid={`perr-occ-${r.id}`} onClick={() => setDetail({ title: `${r.name} · historique`, cols: [["at", "Date"], ["action", "Action"], ["detail", "Détail"]],
-                rows: [{ at: date(r.first_seen), action: "Première occurrence", detail: r.type_label }, ...(r.history || []).map((h) => ({ ...h, at: date(h.at) })), { at: date(r.last_seen), action: "Dernière occurrence", detail: r.message }] })}>{r.occurrences} occurrence(s)</ClickNum>
+                rows: [{ at: r.first_seen, action: "Première occurrence", detail: r.type_label }, ...(r.history || []).map((h) => ({ ...h, action: LBL[h.action] || h.action })), { at: r.last_seen, action: "Dernière occurrence", detail: r.message }]
+                  .sort((a, b) => (a.at || "").localeCompare(b.at || "")).map((x) => ({ ...x, at: date(x.at) })) })}>{r.occurrences} occurrence(s)</ClickNum>
               {" · "}{r.members} membre(s) touché(s) · depuis {date(r.first_seen)}
               {r.fix && !r.fix.undone && <span className="text-emerald-300"> · corrigé le {date(r.fix.at)} ({r.fix.offers} offre(s), {r.fix.members} membre(s))</span>}
             </p>
