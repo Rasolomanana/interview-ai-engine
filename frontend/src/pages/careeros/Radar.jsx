@@ -30,6 +30,7 @@ import { ExternalOffer } from "@/components/careeros/explain/ExternalOffer";
 import { CompareDialog } from "@/components/careeros/explain/CompareDialog";
 import { AutoNotices } from "@/components/careeros/AutoNotices";
 import { CompanySuggestions } from "@/components/careeros/CompanySuggestions";
+import { OfferMap } from "@/components/careeros/OfferMap";
 
 const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, deepId, busy }) => (
   <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4 min-w-0 break-words" data-testid={`radar-offer-${o.id}`}>
@@ -137,7 +138,7 @@ export default function Radar() {
     new: ["Nouvelles (dernier passage)", d.new_today || []],
     known: ["Déjà connues (dernier passage)", d.known_last_run || []],
     a: ["Priorité A", d.top_a],
-    out_zone: [`Hors zone — masquées (rayon ${d.zone?.radius_km ?? 100} km autour de « ${d.zone?.location || ""} »)`, d.out_zone || []],
+    out_zone: [`Hors zone — masquées (zones : ${d.zone?.label || ""})`, d.out_zone || []],
   } : {};
   const lastOffers = d ? [...new Map([...(d.new_today || []), ...(d.known_last_run || [])].map((o) => [o.id, o])).values()] : [];
   const SRC = { jooble: "Jooble", workday: "Workday", boards: "Sites carrières", adzuna: "Adzuna" };
@@ -186,8 +187,9 @@ export default function Radar() {
           <AutoNotices refreshKey={lr?.id} onChange={load} onEdit={() => setSettings(true)} />
           <PortalHealth status={d.sources_status} run={lr} active={f?.startsWith("co:") ? f.slice(3) : null} onPick={(n) => pick(`co:${n}`)} />
           <CompanySuggestions refreshKey={lr?.id} onFollowed={load} />
+          <OfferMap zone={d.zone} points={d.map_points || []} />
           {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
-          {d.out_zone_count > 0 && <button type="button" onClick={() => pick("out_zone")} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${f === "out_zone" ? "border-amber-400/50 bg-amber-500/15 text-amber-100" : "border-amber-400/25 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10"}`} title="Offres situées hors de votre zone de recherche : masquées automatiquement, consultables ici" data-testid="radar-out-zone-btn"><MapPinOff className="h-3.5 w-3.5" /><span className="font-semibold tabular-nums" data-testid="radar-out-zone-count">{d.out_zone_count}</span> hors zone masquée(s) · rayon {d.zone?.radius_km} km autour de {d.zone?.location}</button>}
+          {d.out_zone_count > 0 && <button type="button" onClick={() => pick("out_zone")} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${f === "out_zone" ? "border-amber-400/50 bg-amber-500/15 text-amber-100" : "border-amber-400/25 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10"}`} title="Offres situées hors de votre zone de recherche : masquées automatiquement, consultables ici" data-testid="radar-out-zone-btn"><MapPinOff className="h-3.5 w-3.5" /><span className="font-semibold tabular-nums" data-testid="radar-out-zone-count">{d.out_zone_count}</span> hors zone masquée(s) · zones : {d.zone?.label}</button>}
           {errs.length > 0 && <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-200" data-testid="radar-errors">{errs.map(([k, v]) => <p key={k}>{k} : {v}</p>)}</div>}
           {f ? <>
             <FilterBanner label={FILTERS[f][0]} count={FILTERS[f][1].length} onClear={() => setF(null)} testid="radar-filter-banner" />

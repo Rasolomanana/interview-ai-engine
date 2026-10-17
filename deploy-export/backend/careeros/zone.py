@@ -5,7 +5,8 @@ import re
 from careeros.geo import COUNTRIES, PROVINCES, _has, _n
 
 RADIUS_KM = 100
-VERSION = 2
+VERSION = 3
+RADII = ("25", "50", "100", "200", "province", "country")
 # city -> (lat, lon, province or "", country)
 PLACES = {
     "Montréal": (45.50, -73.57, "Québec", "Canada"), "Laval": (45.57, -73.69, "Québec", "Canada"), "Longueuil": (45.53, -73.52, "Québec", "Canada"),
@@ -102,9 +103,37 @@ def place(text: str) -> dict:
     return out
 
 
-def check(offer_location: str, member_location: str) -> tuple:
+def zones_of(st: dict) -> list:
+    """Member zones [(location, radius)] : main Radar location + up to 2 extra cities."""
+    out = [(st.get("location") or "", str(st.get("radius") or RADIUS_KM))]
+    out += [(z.get("location") or "", str(z.get("radius") or RADIUS_KM)) for z in (st.get("extra_zones") or [])[:2]]
+    return [(loc.strip(), r if r in RADII else str(RADIUS_KM)) for loc, r in out if loc.strip()]
+
+
+def label(radius: str) -> str:
+    return {"province": "toute la province", "country": "tout le pays"}.get(radius, f"{radius} km")
+
+
+def check(offer_location: str, zones) -> tuple:
+    """(in_zone, reason) — kept if inside any of the member's zones."""
+    zones = [(zones, str(RADIUS_KM))] if isinstance(zones, str) else zones
+    reason = ""
+    for loc, radius in zones or [("", str(RADIUS_KM))]:
+        ok, why = _check_one(offer_location, loc, radius)
+        if ok:
+            return True, why
+        reason = reason or why
+    return False, reason or "Hors zone"
+
+
+def _check_one(offer_location: str, member_location: str, radius: str) -> tuple:
     """(in_zone, reason) — any segment of a multi-location offer inside the zone keeps it."""
     m = place(member_location)
+    if radius in ("province", "country") and m["city"]:
+        m = {**m, "city": "", "coords": None}
+    if radius == "country":
+        m["province"] = ""
+    km = int(radius) if radius.isdigit() else RADIUS_KM
     if not (m["city"] or m["province"] or m["country"]):
         return True, ""
     loc = (offer_location or "").strip()
@@ -125,9 +154,9 @@ def check(offer_location: str, member_location: str) -> tuple:
             continue
         if m["coords"] and o["coords"]:
             d = round(_km(m["coords"], o["coords"]))
-            if d <= RADIUS_KM:
+            if d <= km:
                 return True, f"{d} km de {m['city']}"
-            reason = reason or f"{o['city']} est à {d} km de {m['city']} (rayon {RADIUS_KM} km)"
+            reason = reason or f"{o['city']} est à {d} km de {m['city']} (rayon {km} km)"
             continue
         if m["province"] and o["province"]:
             if o["province"] == m["province"] and not (m["coords"] and o["coords"]):
@@ -142,5 +171,22 @@ def check(offer_location: str, member_location: str) -> tuple:
     return False, reason or "Hors zone"
 
 
-def signature(member_location: str) -> str:
-    return f"{VERSION}|{_n(member_location)}"
+def signature(zones: list) -> str:
+    return f"{VERSION}|" + ";".join(f"{_n(loc)}@{r}" for loc, r in zones)
+
+
+def nearest(offer_location: str, zones: list) -> dict:
+    """Map point of an offer: coordinates of its first recognised city and distance to the closest zone centre."""
+    for seg in re.split(r"\s*[;|/]\s*", offer_location or ""):
+        o = place(seg)
+        if o["coords"]:
+            best = None
+            for loc, _r in zones:
+                c = place(loc)["coords"]
+                if c:
+                    d = round(_km(c, o["coords"]))
+                    if best is None or d < best[0]:
+                        best = (d, place(loc)["city"])
+            return {"lat": o["coords"][0], "lon": o["coords"][1], "city": o["city"],
+                    "distance_km": best[0] if best else None, "from": best[1] if best else ""}
+    return {}

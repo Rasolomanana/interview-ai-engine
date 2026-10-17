@@ -80,6 +80,19 @@ class RadarSettings(BaseModel):
     companies: List[Company] = Field(default=[], max_length=100)
     sources: List[str] = DEFAULT_SOURCES
     expand: bool = True  # recherche élargie : famille de titres FR/EN générée à partir des mots-clés
+    radius: str = "100"  # 25/50/100/200 km, province or country around the main location
+    extra_zones: List[dict] = Field(default=[], max_length=2)  # up to 2 more cities [{location, radius}]
+
+    @field_validator("radius", mode="before")
+    @classmethod
+    def _radius(cls, v):
+        return str(v) if str(v) in Z.RADII else "100"
+
+    @field_validator("extra_zones", mode="before")
+    @classmethod
+    def _zones(cls, v):
+        return [{"location": str(z.get("location") or "").strip()[:120], "radius": str(z.get("radius")) if str(z.get("radius")) in Z.RADII else "100"}
+                for z in (v or [])[:2] if isinstance(z, dict) and str(z.get("location") or "").strip()]
 
     @field_validator("companies", mode="before")
     @classmethod
@@ -162,8 +175,9 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         roles = [r.strip() for r in re.split(r"[,;/]", profile.get("target_roles") or "") if r.strip()]
         return {"user_id": user_id, **RadarSettings(keywords=roles[:5], location=profile.get("location") or profile.get("city") or profile.get("province") or "Québec").model_dump()}
 
-    async def _apply_zone(user_id: str, location: str) -> None:
-        """Re-evaluate the member's stored offers when the zone rules or the Radar location change (reversible)."""
+    async def _apply_zone(user_id: str, st: dict) -> None:
+        """Re-evaluate the member's stored offers when the zone rules or the Radar zones change (reversible)."""
+        location = Z.zones_of(st)
         sig = Z.signature(location)
         mark = await db.radar_settings.find_one({"user_id": user_id}, {"_id": 0, "zone_for": 1}) or {}
         if mark.get("zone_for") == sig:
@@ -203,7 +217,8 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 tasks += [("adzuna", None, S.adzuna(c, " ".join(terms[:2]), st["location"]))]
                 tasks += [(f"adzuna:{co['name']}", co["name"], S.adzuna(c, " ".join(terms[:2]), st["location"], co["name"])) for co in comps[:JOOBLE_COMPANY_LIMIT]]
             if "jooble" in srcs:
-                tasks += [(f"jooble:{t}#{pg}", None, S.jooble(c, t, st["location"], page=pg)) for t in terms for pg in (1, 2)]
+                tasks += [(f"jooble:{t}#{pg}" + (f"@{loc}" if i else ""), None, S.jooble(c, t, loc, page=pg))
+                          for i, (loc, _r) in enumerate(Z.zones_of(st) or [(st["location"], "100")]) for t in terms for pg in (1, 2)]
                 tasks += [(f"jooble:{co['name']}", co["name"], S.jooble(c, "", st["location"], co["name"])) for co in comps[:JOOBLE_COMPANY_LIMIT]]
             for co in comps:
                 if co.get("kind") and co.get("slug") and ("workday" if co["kind"] == "workday" else "boards") in srcs:
@@ -286,7 +301,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 await KB.record_run(db, st["companies"], run["portals"])
             except Exception:  # noqa: BLE001
                 logger.exception("knowledge record_run")
-            await _apply_zone(user_id, st["location"])
+            await _apply_zone(user_id, st)
             seen, fresh = set(), []
             run["out_zone"] = 0
             for o in offers:
@@ -304,7 +319,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 doc = {"id": str(uuid.uuid4()), "user_id": user_id, "dedupe_key": k, **o, "first_seen": _now().isoformat(),
                        "last_seen": _now().isoformat(), "run_id": run["id"], "seen_runs": [run["id"]], "status": "nouvelle", "ips": None, "decision_report": None,
                        "analyzed_at": None, "application_id": None}
-                ok, why = Z.check(o.get("location"), st["location"])
+                ok, why = Z.check(o.get("location"), Z.zones_of(st))
                 doc["zone_reason"] = why
                 if not ok:
                     doc["status"], doc["status_before_zone"] = "hors_zone", "nouvelle"
@@ -577,7 +592,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
     async def dashboard(user: dict = Depends(current_user)):
         q = {"user_id": user["id"]}
         st = await _settings(user["id"], {})
-        await _apply_zone(user["id"], st["location"])
+        await _apply_zone(user["id"], st)
         proj = {"_id": 0, "description": 0, "dedupe_key": 0, "user_id": 0}
         out_zone = [o async for o in db.radar_offers.find({**q, "status": "hors_zone"}, proj).sort("first_seen", -1).limit(300)]
         q = {**q, "status": {"$ne": "hors_zone"}}
@@ -585,13 +600,19 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         last = await db.radar_runs.find_one({"user_id": user["id"]}, {"_id": 0, "user_id": 0}, sort=[("at", -1)])
         active = [o for o in offers if o["status"] not in ("ignoree", "pack") and o.get("ips")]
         top = lambda p: sorted([o for o in active if o["ips"]["priority"] == p], key=lambda o: -o["ips"]["score"])[:20]  # noqa: E731
+        zones = Z.zones_of(st)
         day = _day_start()
         known = [o async for o in db.radar_offers.find({**q, "run_id": {"$ne": last["id"]}, "last_seen": {"$gte": last["at"]}}, proj).sort("last_seen", -1).limit(200)] if last else []
         analyzed = [o async for o in db.radar_offers.find({**q, "analyzed_at": {"$gte": day}}, proj).sort("analyzed_at", -1).limit(100)]
         return {
             "known_last_run": known, "analyzed_today_list": analyzed,
             "out_zone": out_zone, "out_zone_count": await db.radar_offers.count_documents({"user_id": user["id"], "status": "hors_zone"}),
-            "zone": {"location": st["location"], "radius_km": Z.RADIUS_KM},
+            "zone": {"location": st["location"], "radius_km": int(st["radius"]) if st["radius"].isdigit() else None,
+                     "label": " · ".join(f"{loc} ({Z.label(r)})" for loc, r in zones),
+                     "zones": [{"location": loc, "radius": r, "label": Z.label(r), **({"lat": c[0], "lon": c[1]} if (c := Z.place(loc)["coords"]) else {})} for loc, r in zones]},
+            "map_points": [{"id": o["id"], "title": o["title"], "company": o.get("company", ""), "location": o.get("location", ""), "url": o.get("url", ""),
+                            "priority": o["ips"]["priority"], "score": o["ips"]["score"], **pt}
+                           for o in offers if o.get("ips") and o["status"] != "ignoree" and (pt := Z.nearest(o.get("location"), zones))][:300],
             "sources_status": {"configured": S.configured(), "selected": st["sources"], "portals": {
                 "workday": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") == "workday"),
                 "boards": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") and c.get("kind") != "workday")}},

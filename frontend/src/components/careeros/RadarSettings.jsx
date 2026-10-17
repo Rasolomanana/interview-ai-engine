@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { radar } from "@/lib/careeros";
 import { CompanyManager } from "@/components/careeros/CompanyManager";
 import { SOURCES } from "@/components/careeros/SourceStatus";
+import { ZoneEditor } from "@/components/careeros/ZoneEditor";
 import { PageTour, TourButton, usePageTour } from "@/components/careeros/guide/PageTour";
 
 const SETTINGS_STEPS = [
@@ -32,8 +33,9 @@ export const RadarSettingsDialog = ({ onClose }) => {
   const save = async () => {
     setBusy(true);
     try {
-      const { enabled, keywords, location, companies, sources, expand } = s;
-      const r = await radar.saveSettings({ enabled, keywords, location, companies: companies.filter((c) => c.name.trim()), sources, expand: expand !== false });
+      const { enabled, keywords, location, companies, sources, expand, radius, extra_zones } = s;
+      const r = await radar.saveSettings({ enabled, keywords, location, companies: companies.filter((c) => c.name.trim()), sources, expand: expand !== false,
+        radius: radius || "100", extra_zones: (extra_zones || []).filter((z) => z.location.trim()) });
       const n = (f) => r.companies.filter((c) => c.enabled && f(c)).length;
       const bad = r.companies.filter((c) => c.portal_url && !c.kind).map((c) => c.name);
       toast.success(`Réglages enregistrés : ${n((c) => c.kind === "workday")} portail(s) Workday, ${n((c) => c.kind && c.kind !== "workday")} autre(s) portail(s) employeur, ${n((c) => !c.kind)} entreprise(s) via Jooble.`);
@@ -58,7 +60,7 @@ export const RadarSettingsDialog = ({ onClose }) => {
               {s.expand !== false && s.expanded?.length > 0 && <p className="mt-2 flex flex-wrap gap-1" data-testid="radar-expanded-terms">{s.expanded.map((t) => <span key={t} className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-slate-300">{t}</span>)}</p>}
               <p className="mt-1 text-[11px] text-slate-500">Calculé à partir de vos mots-clés enregistrés. Seules les 50 offres aux titres les plus proches de vos postes visés sont analysées chaque jour.</p>
             </div>
-            <label className="block text-slate-400">Localisation<input value={s.location} onChange={(e) => setS({ ...s, location: e.target.value })} className={`${inputCls} mt-1`} data-testid="radar-location-input" /></label>
+            <ZoneEditor s={s} setS={setS} />
             <div className="flex flex-wrap gap-2" data-testid="radar-sources">
               {SOURCES.map(([k, l]) => {
                 const off = !s.configured?.[k];
