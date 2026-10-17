@@ -56,11 +56,11 @@ async def check_url(url: str) -> dict:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True, headers=UA) as c:
             r = await c.get(url)
     except Exception as e:  # noqa: BLE001
-        return {"status": "unknown", "detail": f"Site injoignable ({type(e).__name__}).", "checked_at": now}
+        return {"status": "unknown", "detail": "Site momentanément injoignable : vérifiez en ouvrant le lien.", "checked_at": now}
     if r.status_code in (404, 410):
-        return {"status": "expired", "detail": f"Page supprimée (HTTP {r.status_code}).", "checked_at": now, "http": r.status_code}
+        return {"status": "expired", "detail": "La page de l'offre a été supprimée.", "checked_at": now, "http": r.status_code}
     if r.status_code in (401, 403, 429) or r.status_code >= 500:
-        return {"status": "unknown", "detail": f"Site protégé ou indisponible (HTTP {r.status_code}) : vérifiez en ouvrant le lien.", "checked_at": now, "http": r.status_code}
+        return {"status": "unknown", "detail": "Site protégé ou indisponible : vérifiez en ouvrant le lien.", "checked_at": now, "http": r.status_code}
     text = _n(r.text[:400000])
     hit = next((p for p in EXPIRED if _n(p) in text), None)
     if hit:

@@ -96,7 +96,7 @@ async def verify(client, kind: str, slug: str, name: str) -> dict:
         if is_blocked(e):
             return {"ok": False, "blocked": True, "count": 0,
                     "message": f"Portail {KIND_LABEL.get(kind, kind)} détecté mais bloqué volontairement par l'employeur (403 / protection anti-robot) : suivi via Jooble."}
-        return {"ok": False, "count": 0, "message": f"Portail {KIND_LABEL.get(kind, kind)} détecté mais illisible ({(str(e) or type(e).__name__)[:70]}) : Jooble reste utilisé en repli."}
+        return {"ok": False, "count": 0, "message": f"Portail {KIND_LABEL.get(kind, kind)} détecté mais illisible : Jooble reste utilisé en repli."}
 
 
 async def _sitemap(client, host: str) -> str:

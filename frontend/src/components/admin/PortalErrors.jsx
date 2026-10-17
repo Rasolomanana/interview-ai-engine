@@ -38,8 +38,8 @@ export const PortalErrors = () => {
     <section className="space-y-4 rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:p-5" data-testid="admin-portal-errors">
       <DetailDialog detail={detail} onClose={() => setDetail(null)} />
       <div>
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-200"><Trash2 className="h-4 w-4 text-rose-400" />Corbeille des erreurs de portails</h3>
-        <p className="text-[11px] text-slate-500">Une fiche par employeur et type d'erreur, tous membres confondus. Aucune donnée personnelle : seuls le nombre de membres touchés et les dates sont conservés. Une correction est testée avant d'être appliquée, et peut être annulée.</p>
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-200"><Trash2 className="h-4 w-4 text-rose-400" />Journal des erreurs</h3>
+        <p className="text-[11px] text-slate-500">Toutes les erreurs techniques du système (portails, Jooble, Adzuna, IA, packs), masquées aux membres. Une fiche par source et type d'erreur, tous membres confondus. Aucune donnée personnelle : seuls le nombre de membres touchés et les dates sont conservés. Une correction est testée avant d'être appliquée, et peut être annulée.</p>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[["ouverte", "Ouvertes"], ["resolue", "Résolues"], ["ignore", "Ignorées"], ["", "Toutes"]].map(([k, l]) => (
@@ -53,7 +53,7 @@ export const PortalErrors = () => {
         <div className="space-y-2">{rows.map((r) => (
           <article key={r.id} className="space-y-2 rounded-xl border border-white/10 p-3 text-xs" data-testid={`perr-row-${r.id}`}>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-semibold text-white">{r.name}</span><span className="text-slate-400">{r.kind_label}</span>
+              <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-slate-400" data-testid={`perr-cat-${r.id}`}>{r.category_label}</span><span className="font-semibold text-white">{r.name}</span><span className="text-slate-400">{r.kind_label}</span>
               <span className="text-amber-300">{r.type_label}</span><span className={ST[r.status]?.[1]} data-testid={`perr-status-${r.id}`}>{ST[r.status]?.[0]}</span>
               <span className="ml-auto text-slate-500">Dernière : {date(r.last_seen)}</span>
             </div>
@@ -65,7 +65,7 @@ export const PortalErrors = () => {
               {" · "}{r.members} membre(s) touché(s) · depuis {date(r.first_seen)}
               {r.fix && !r.fix.undone && <span className="text-emerald-300"> · corrigé le {date(r.fix.at)} ({r.fix.offers} offre(s), {r.fix.members} membre(s))</span>}
             </p>
-            {r.status !== "resolue" && <FixRow r={r} onDone={load} />}
+            {r.fixable && r.status !== "resolue" && <FixRow r={r} onDone={load} />}
             <div className="flex flex-wrap gap-2">
               {r.status !== "resolue" && <button type="button" onClick={() => act(() => adminPortalErrorStatus(pwd(), r.id, "resolue"), "Marquée résolue")} className="rounded-full border border-white/10 px-2.5 py-0.5 hover:text-white" data-testid={`perr-resolve-${r.id}`}>Marquer résolue</button>}
               {r.status !== "ignore" && <button type="button" onClick={() => act(() => adminPortalErrorStatus(pwd(), r.id, "ignore"), "Erreur ignorée")} className="rounded-full border border-white/10 px-2.5 py-0.5 hover:text-white" data-testid={`perr-ignore-${r.id}`}>Ignorer</button>}

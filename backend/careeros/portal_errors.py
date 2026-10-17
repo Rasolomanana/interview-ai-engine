@@ -13,7 +13,7 @@ from . import radar_auto as AU
 from . import radar_sources as S
 from .radar_discovery import KIND_LABEL, is_blocked
 
-TYPES = {"redirection": "Redirection non lisible (3xx)", "bloque": "Bloqué par l'employeur (403 / anti-robot)", "introuvable": "Portail introuvable (404)",
+TYPES = {"ia": "Service IA indisponible ou réponse invalide", "source": "Erreur de la source d'offres", "verification": "Vérification impossible", "redirection": "Redirection non lisible (3xx)", "bloque": "Bloqué par l'employeur (403 / anti-robot)", "introuvable": "Portail introuvable (404)",
          "serveur": "Erreur du serveur de l'employeur (5xx)", "http": "Refus HTTP (4xx)", "delai": "Délai dépassé", "lecture": "Réponse illisible"}
 
 
@@ -50,6 +50,21 @@ def _pseudo(user_id: str) -> str:
     return hashlib.sha256(f"careeros-portal-error|{user_id}".encode()).hexdigest()[:16]
 
 
+CATEGORY = {"portail": "Portail employeur", "source": "Source d'offres", "ia": "Service IA", "pack": "Génération de pack", "verification": "Vérification d'offre"}
+
+
+async def log_error(db, user_id: str, category: str, name: str, etype: str, message: str, kind: str = ""):
+    """Generic anonymous journal entry (one card per name + kind + type)."""
+    k = f"{KB.key(name)}|{kind or category}|{etype}"
+    now = _now()
+    cur = await db.portal_errors.find_one({"key": k}, {"_id": 0, "status": 1})
+    status = "ignore" if cur and cur.get("status") == "ignore" else "ouverte"
+    await db.portal_errors.update_one({"key": k}, {"$set": {"name": name, "kind": kind or category, "category": category, "etype": etype, "message": _clean(message),
+                                                            "last_seen": now, "status": status},
+                                                   "$inc": {"occurrences": 1}, "$addToSet": {"members": _pseudo(user_id)},
+                                                   "$setOnInsert": {"id": str(uuid.uuid4()), "first_seen": now, "history": []}}, upsert=True)
+
+
 async def record_run(db, user_id: str, companies: list, portals: dict):
     by_name = {c["name"]: c for c in companies if c.get("kind")}
     now = _now()
@@ -61,7 +76,7 @@ async def record_run(db, user_id: str, companies: list, portals: dict):
         k = f"{KB.key(name)}|{pv['kind']}|{etype}"
         cur = await db.portal_errors.find_one({"key": k}, {"_id": 0, "status": 1})
         status = "ignore" if cur and cur.get("status") == "ignore" else "ouverte"
-        await db.portal_errors.update_one({"key": k}, {"$set": {"name": name, "kind": pv["kind"], "slug": c.get("slug", ""), "portal_url": _clean(c.get("portal_url", "")),
+        await db.portal_errors.update_one({"key": k}, {"$set": {"name": name, "kind": pv["kind"], "category": "portail", "slug": c.get("slug", ""), "portal_url": _clean(c.get("portal_url", "")),
                                                                 "etype": etype, "message": _clean(pv.get("error")), "last_seen": now, "status": status},
                                                        "$inc": {"occurrences": 1}, "$addToSet": {"members": _pseudo(user_id)},
                                                        "$setOnInsert": {"id": str(uuid.uuid4()), "first_seen": now, "history": []}}, upsert=True)
@@ -69,7 +84,8 @@ async def record_run(db, user_id: str, companies: list, portals: dict):
 
 def _public(r: dict) -> dict:
     out = {k: r.get(k) for k in ("id", "name", "kind", "slug", "portal_url", "etype", "message", "first_seen", "last_seen", "occurrences", "status", "history", "fix")}
-    return {**out, "members": len(r.get("members") or []), "type_label": TYPES.get(r.get("etype"), r.get("etype")), "kind_label": KIND_LABEL.get(r.get("kind"), r.get("kind"))}
+    cat = r.get("category") or "portail"
+    return {**out, "category": cat, "category_label": CATEGORY.get(cat, cat), "fixable": cat == "portail" and r.get("kind") in S.PORTAL_KINDS, "members": len(r.get("members") or []), "type_label": TYPES.get(r.get("etype"), r.get("etype")), "kind_label": KIND_LABEL.get(r.get("kind"), r.get("kind"))}
 
 
 class StatusBody(BaseModel):

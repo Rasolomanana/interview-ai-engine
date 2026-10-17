@@ -40,7 +40,7 @@ export const CompanySummary = ({ companies }) => {
       <Group title="Via portail employeur" items={portal} tone="border-emerald-400/25 bg-emerald-500/5" testid="summary-portal" render={(c) => `${c.name} · ${KIND[c.kind] || c.kind}`} />
       <Group title="Suivies via Jooble" items={jooble} tone="border-white/10 bg-white/[0.02]" testid="summary-jooble" render={(c) => `${c.name}${c.detected ? ` · ${c.detected}` : " · non détectée"}`} />
       <Group title="Détectées mais non prises en charge" items={unsupported} tone="border-amber-400/25 bg-amber-500/5" testid="summary-unsupported" render={(c) => `${c.name} · ${c.detected.replace(/^(Non pris en charge|Illisible) : /, "")} (repli Jooble)`} />
-      <Group title="Bloquées par l'employeur (403 / anti-robot)" items={blocked} tone="border-rose-400/25 bg-rose-500/5" testid="summary-blocked" render={(c) => `${c.name} · ${c.detected.replace(/^Bloqué \(anti-robot\) : /, "")} · protection volontaire, suivi via Jooble`} />
+      <Group title="Bloquées par l'employeur" items={blocked} tone="border-rose-400/25 bg-rose-500/5" testid="summary-blocked" render={(c) => `${c.name} · ${c.detected.replace(/^Bloqué \(anti-robot\) : /, "")} · protection volontaire, suivi via Jooble`} />
     </div>
   );
 };

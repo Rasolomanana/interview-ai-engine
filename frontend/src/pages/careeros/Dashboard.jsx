@@ -6,15 +6,29 @@ import { Plus, Brain, ChevronRight } from "lucide-react";
 import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { useAuth } from "@/components/careeros/AuthProvider";
-import { careeros, PIPELINE_LABELS } from "@/lib/careeros";
+import { careeros, radar, PIPELINE_LABELS } from "@/lib/careeros";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
 import { FilterBanner, StatFilter } from "@/components/careeros/StatFilter";
 
 const FILTERS = {
-  a: ["Priorité A", (a) => a.priority === "A"],
-  entrevue: ["Entrevues", (a) => a.pipeline_status === "entrevue"],
-  offre: ["Offres", (a) => a.pipeline_status === "offre"],
+  a: ["Priorité A (candidatures + Radar)", (a) => a.priority === "A"],
+  entrevue: ["Entrevues obtenues", (a) => a.pipeline_status === "entrevue" || (a.interviews_count || 0) > 0],
+  offre: ["Offres d'emploi reçues", (a) => a.pipeline_status === "offre"],
+  saved: ["Offres sauvegardées", (a) => a.radar && a.saved],
 };
+
+const fromRadar = (o) => ({ id: `radar-${o.id}`, radar: true, saved: !!o.saved, priority: o.ips?.priority, ips: o.ips?.score, poste: o.title, entreprise: o.company, created_at: o.first_seen, location: o.location });
+
+const RadarRow = ({ a }) => (
+  <Link to="/careeros/radar" data-testid={`dashboard-radar-row-${a.id}`} className="group grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-white/5 px-2 py-3.5 transition-colors hover:bg-white/[0.02]">
+    <PriorityBadge priority={a.priority} testid={`row-priority-${a.id}`} />
+    <div className="min-w-0">
+      <p className="truncate text-sm font-medium text-white"><span className="mr-2 rounded bg-indigo-500/15 px-1.5 py-0.5 font-mono text-[10px] text-indigo-200">RADAR</span>{a.poste}</p>
+      <p className="truncate text-xs text-slate-500">{a.entreprise || "—"} · {a.location || ""} · {a.saved ? "Sauvegardée" : "Priorité A détectée par le Radar"} · pas encore de pack</p>
+    </div>
+    <div className="flex items-center gap-4"><span className="hidden font-mono text-xs text-slate-400 sm:block">IPS Radar {a.ips ?? "—"}</span><ChevronRight className="h-4 w-4 text-slate-600 transition-transform group-hover:translate-x-0.5" /></div>
+  </Link>
+);
 
 const Row = ({ a }) => (
   <Link to={`/careeros/candidature/${a.id}`} data-testid={`application-row-${a.id}`}
@@ -41,8 +55,11 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { beginner } = useGuide();
   const [apps, setApps] = useState(null);
-  useEffect(() => { careeros.list().then(setApps).catch(() => setApps([])); }, []);
-  const list = apps || [];
+  const [rd, setRd] = useState(null);
+  useEffect(() => { careeros.list().then(setApps).catch(() => setApps([])); radar.dashboard().then(setRd).catch(() => setRd({})); }, []);
+  const radarItems = rd ? [...new Map([...(rd.top_a || []), ...(rd.saved || [])].filter((o) => o.status !== "pack").map((o) => [o.id, fromRadar(o)])).values()] : [];
+  const list = [...(apps || []), ...radarItems];
+  const nApps = (apps || []).length;
   const count = (fn) => list.filter(fn).length;
   const [f, setF] = useState(null);
   const pick = (k) => setF((cur) => (cur === k ? null : k));
@@ -61,21 +78,23 @@ export default function Dashboard() {
           <Plus className="h-4 w-4" /> Nouveau pack candidature
         </Link>
       </div>
-      <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <p className="mb-2 text-[11px] text-slate-500" data-testid="dashboard-breakdown">{nApps} candidature(s) · {radarItems.filter((x) => x.priority === "A").length} priorité(s) A du Radar sans pack · {count(FILTERS.saved[1])} offre(s) sauvegardée(s)</p>
+      <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-5">
         <StatFilter label="Opportunités" value={list.length} testid="stat-total" active={!f} onClick={() => setF(null)} />
+        <StatFilter label="Sauvegardées" value={count(FILTERS.saved[1])} testid="stat-saved" active={f === "saved"} onClick={() => pick("saved")} />
         <StatFilter label="Priorité A" value={count(FILTERS.a[1])} testid="stat-priority-a" active={f === "a"} onClick={() => pick("a")} />
         <StatFilter label="Entrevues" value={count(FILTERS.entrevue[1])} testid="stat-interviews" active={f === "entrevue"} onClick={() => pick("entrevue")} />
         <StatFilter label="Offres" value={count(FILTERS.offre[1])} testid="stat-offers" active={f === "offre"} onClick={() => pick("offre")} />
       </div>
       <section className="rounded-2xl border border-white/[0.07] bg-[#121520]/60 p-3 sm:p-5">
-        <h2 className="mb-2 px-2 text-sm font-semibold text-slate-200">Historique des candidatures</h2>
+        <h2 className="mb-2 px-2 text-sm font-semibold text-slate-200">Candidatures et opportunités</h2>
         {f && <div className="mb-3"><FilterBanner label={FILTERS[f][0]} count={shown.length} onClear={() => setF(null)} testid="dashboard-filter-banner" /></div>}
         {apps === null ? <p className="px-2 py-6 text-sm text-slate-500">Chargement…</p> : list.length === 0 ? (
           <div className="flex flex-col items-start gap-3 px-2 py-10" data-testid="empty-history">
             <Brain className="h-6 w-6 text-indigo-300" />
             <p className="text-sm text-slate-400">Aucune candidature pour l'instant. Commencez par une offre qui vous intéresse.</p>
           </div>
-        ) : shown.length === 0 ? <p className="px-2 py-6 text-sm text-slate-500" data-testid="filter-empty">Aucune candidature pour ce filtre.</p> : <div data-testid="applications-list">{[...shown].sort((x, y) => (x.priority || "Z").localeCompare(y.priority || "Z") || (y.ips || 0) - (x.ips || 0)).map((a) => <Row key={a.id} a={a} />)}</div>}
+        ) : shown.length === 0 ? <p className="px-2 py-6 text-sm text-slate-500" data-testid="filter-empty">Aucune candidature pour ce filtre.</p> : <div data-testid="applications-list">{[...shown].sort((x, y) => (x.priority || "Z").localeCompare(y.priority || "Z") || (y.ips || 0) - (x.ips || 0)).map((a) => (a.radar ? <RadarRow key={a.id} a={a} /> : <Row key={a.id} a={a} />))}</div>}
       </section>
     </Shell>
   );

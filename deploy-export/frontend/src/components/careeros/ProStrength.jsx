@@ -3,6 +3,7 @@ import { Gauge, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { careeros } from "@/lib/careeros";
 import { usePersistedToggle } from "@/lib/usePersistedToggle";
+import { Levers } from "@/components/careeros/Levers";
 
 const tone = (r) => (r >= 0.8 ? "bg-emerald-400" : r >= 0.55 ? "bg-indigo-400" : r >= 0.35 ? "bg-amber-400" : "bg-rose-400");
 
@@ -37,7 +38,8 @@ export const ProStrength = ({ refreshKey }) => {
   const [s, setS] = useState(null);
   const [d, setD] = useState(null);
   const [open, toggle] = usePersistedToggle("cos.strength.open", true);
-  useEffect(() => { careeros.strength().then(setS).catch(() => setS({ error: true })); }, [refreshKey]);
+  const load = () => careeros.strength().then(setS).catch(() => setS({ error: true }));
+  useEffect(() => { load(); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!s) return <Loader2 className="mt-4 h-4 w-4 animate-spin text-indigo-400" />;
   if (s.error) return null;
   return (
@@ -63,6 +65,7 @@ export const ProStrength = ({ refreshKey }) => {
             </button>))}
         </div>
         <Chips title="Domaines les plus forts" items={s.domains} testid="strength-domains" onPick={(x) => setD({ title: x.name, sub: `${x.share} % du poids des domaines forts · ${x.mentions} mention(s) dans le profil`, items: x.skills })} />
+        <Levers s={s} setD={setD} onChange={load} />
         <Chips title="Postes les plus compatibles" items={s.roles} testid="strength-roles" onPick={(x) => setD({ title: x, sub: "Déduit de vos domaines les plus forts et de votre niveau de leadership (et de vos postes visés).", items: s.domains.map((m) => `${m.name} : ${m.share} %`) })} />
         <Chips title="Secteurs où le profil est le plus compétitif" items={s.sectors} testid="strength-sectors" onPick={(x) => setD({ title: x.name, sub: `Indice relatif ${x.score}/100 (100 = secteur le plus favorable pour votre profil).`, items: s.domains.map((m) => `${m.name} : ${m.share} %`) })} />
         <p className="text-[11px] text-slate-500">{s.note}</p>

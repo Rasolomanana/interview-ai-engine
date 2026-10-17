@@ -39,30 +39,8 @@ export const Num = ({ n, onClick, testid }) => (n ? (
     className="rounded-md px-1.5 py-0.5 font-semibold text-indigo-300 underline decoration-indigo-400/40 underline-offset-2 transition-colors hover:bg-indigo-500/10 hover:text-indigo-200">{n}</button>
 ) : <span className="px-1.5">0</span>);
 
-const ERR = (k) => (k === "limite" ? "Limite quotidienne d'analyses" : k === "cv" ? "Career Memory incomplète" : k === "ia" ? "Service IA"
-  : k.startsWith("jooble") ? `Jooble · recherche « ${k.split(":")[1]?.split("#")[0] || ""} »` : k.startsWith("adzuna") ? "Adzuna"
-  : k.includes(":") ? `Portail employeur · ${k.split(":").slice(1).join(":")}` : k);
-const TODO = (k) => (k === "limite" ? "Rien à faire : les offres reportées seront analysées au prochain passage (les plus proches de vos postes d'abord). Vous pouvez aussi lancer une « Analyse approfondie » sur une offre précise."
-  : k === "cv" ? "Ajoutez votre CV dans la Career Memory." : k === "ia" ? "Les offres restent notées par règles ; réessayez plus tard." : "Source momentanément indisponible : l'entreprise reste couverte par Jooble.");
-
-const AlertsDialog = ({ run, onClose }) => (
-  <Dialog open={!!run} onOpenChange={(o) => !o && onClose()}>
-    <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto border-white/10 bg-[#121520] text-slate-100" data-testid="run-alerts-dialog">
-      <DialogHeader><DialogTitle>Alertes · {run && `${day(run.at)} à ${hour(run.at)}`}</DialogTitle>
-        <DialogDescription className="text-slate-400">{run && Object.keys(run.errors || {}).length} alerte(s) enregistrée(s) pendant ce passage</DialogDescription></DialogHeader>
-      <ul className="space-y-2">{run && Object.entries(run.errors || {}).map(([k, v]) => (
-        <li key={k} className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs" data-testid={`run-alert-${k.replace(/[^a-z0-9]/gi, "-")}`}>
-          <p className="font-semibold text-amber-200">{ERR(k)}</p>
-          <p className="mt-1 text-slate-300">{/403|forbidden/i.test(String(v)) ? "Accès refusé par le portail (HTTP 403 : protection anti-robot)." : String(v).replace(/\s*For more information check:.*$/i, "")}</p>
-          <p className="mt-1 text-slate-500">Que faire : {/403|forbidden|anti-robot/i.test(String(v)) ? "Portail protégé volontairement par l'employeur (anti-robot) : aucune action requise, l'entreprise reste suivie via Jooble." : TODO(k)}</p>
-        </li>))}</ul>
-    </DialogContent>
-  </Dialog>
-);
-
-const RunRow = ({ r, onShow, onAlerts }) => {
+const RunRow = ({ r, onShow }) => {
   const bs = r.by_source || {};
-  const errs = Object.keys(r.errors || {}).length;
   return (
     <tr className="border-t border-white/[0.05] text-slate-300" data-testid={`radar-run-${r.id}`}>
       <td className="py-2 pr-3 font-mono">{hour(r.at)}</td>
@@ -72,7 +50,6 @@ const RunRow = ({ r, onShow, onAlerts }) => {
       <td className="pr-3"><Num n={r.new} onClick={() => onShow(r, "new")} testid={`radar-run-new-${r.id}`} /></td>
       <td className="pr-3"><Num n={r.analyzed} onClick={() => onShow(r, "analyzed")} testid={`radar-run-analyzed-${r.id}`} />{r.skipped_limit ? <span className="text-slate-500"> (+<Num n={r.skipped_limit} onClick={() => onShow(r, "skipped")} testid={`radar-run-skipped-${r.id}`} /> reportées)</span> : ""}{r.out_zone ? <span className="text-amber-300/80"> (<Num n={r.out_zone} onClick={() => onShow(r, "out_zone")} testid={`radar-run-outzone-${r.id}`} /> hors zone)</span> : ""}</td>
       <td className="pr-3 text-slate-400">J <Num n={bs.jooble?.fetched} onClick={() => onShow(r, "src_jooble")} testid={`radar-run-src-jooble-${r.id}`} /> · W <Num n={bs.workday?.fetched} onClick={() => onShow(r, "src_workday")} testid={`radar-run-src-workday-${r.id}`} /> · S <Num n={bs.boards?.fetched} onClick={() => onShow(r, "src_boards")} testid={`radar-run-src-boards-${r.id}`} /></td>
-      <td>{errs ? <button type="button" onClick={() => onAlerts(r)} className="rounded-md px-1.5 py-0.5 font-semibold text-amber-300 underline decoration-amber-400/40 underline-offset-2 hover:bg-amber-500/10" data-testid={`radar-run-alerts-${r.id}`}>{errs} alerte(s)</button> : <span className="text-slate-500">—</span>}</td>
     </tr>
   );
 };
@@ -80,7 +57,6 @@ const RunRow = ({ r, onShow, onAlerts }) => {
 export const RadarHistory = ({ runs }) => {
   const [open, setOpen] = useState(0);
   const [sel, setSel] = useState(null);
-  const [alerts, setAlerts] = useState(null);
   const onShow = (run, kind) => setSel({ run, kind, when: `${day(run.at)} à ${hour(run.at)}` });
   if (!runs) return null;
   const groups = Object.values(runs.reduce((g, r) => { (g[dayKey(r.at)] ||= { key: dayKey(r.at), label: day(r.at), runs: [] }).runs.push(r); return g; }, {}));
@@ -100,15 +76,14 @@ export const RadarHistory = ({ runs }) => {
             {open === i && (
               <div className="overflow-x-auto px-4 pb-3">
                 <table className="w-full min-w-[640px] text-left text-xs">
-                  <thead className="text-slate-500"><tr><th className="py-1">Heure</th><th>Type</th><th>Statut</th><th>Trouvées</th><th>Nouvelles</th><th>Analysées</th><th>Par source</th><th>Alertes</th></tr></thead>
-                  <tbody>{g.runs.map((r) => <RunRow key={r.id} r={r} onShow={onShow} onAlerts={setAlerts} />)}</tbody>
+                  <thead className="text-slate-500"><tr><th className="py-1">Heure</th><th>Type</th><th>Statut</th><th>Trouvées</th><th>Nouvelles</th><th>Analysées</th><th>Par source</th></tr></thead>
+                  <tbody>{g.runs.map((r) => <RunRow key={r.id} r={r} onShow={onShow} />)}</tbody>
                 </table>
               </div>)}
           </div>
         ))}
       </div>
       <RunOffersDialog sel={sel} onClose={() => setSel(null)} />
-      <AlertsDialog run={alerts} onClose={() => setAlerts(null)} />
     </section>
   );
 };

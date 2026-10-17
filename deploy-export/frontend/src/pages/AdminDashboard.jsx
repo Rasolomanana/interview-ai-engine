@@ -179,7 +179,7 @@ export default function AdminDashboard() {
   const has = (sec) => (me?.sections || []).includes(sec);
   const tabs = [["overview", "Tableau de bord", "overview", "overview"], ["geo", "Géographie", "geo", "geo"], ["business", "Analyse métier", "business", "business"],
     ["activite", "Activité", "activity", "activite"], ["rentabilite", "Rentabilité CareerOS", "finance", "finance"], ["connecteurs", "Connecteurs", "connectors", "connecteurs"],
-    ["base", "Base commune", "knowledge", "connecteurs"], ["erreurs", "Corbeille des erreurs", "portal-errors", "connecteurs"], ["roles", "Rôles", "roles", "roles"]].filter((x) => has(x[3]));
+    ["base", "Base commune", "knowledge", "connecteurs"], ["erreurs", "Journal des erreurs", "portal-errors", "connecteurs"], ["roles", "Rôles", "roles", "roles"]].filter((x) => has(x[3]));
   const t = stats?.totals || {};
   const llm = stats?.llm || { calls: 0, tokens_in: 0, tokens_out: 0, cost: 0, by_provider: {} };
 

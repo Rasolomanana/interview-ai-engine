@@ -11,7 +11,7 @@ const COLS = [["name", "Entreprise"], ["kind", "Plateforme"], ["quality", "Quali
 
 const note = (p) => {
   if (p.blocked) return "Bloqué par l'employeur (anti-robot) · repli Jooble";
-  if (!p.ok) return `Échec de lecture · repli Jooble${p.error ? ` (${p.error.slice(0, 80)})` : ""}`;
+  if (!p.ok) return "Lecture impossible lors du dernier passage · suivi via Jooble";
   if (!p.fetched) return "Aucune offre publiée actuellement";
   if (!p.matched) return "Aucune offre ne correspond à vos postes / ville";
   return qualityOf(p) === "fragile" ? "Lecture au mieux : résultats possiblement partiels" : "OK";

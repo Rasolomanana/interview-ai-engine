@@ -24,6 +24,7 @@ from pymongo import ReturnDocument
 
 from . import knowledge as KB
 from . import radar_sources as S
+from . import portal_errors as PE
 from . import prompts as PR
 from .ips import compute_ips
 from .decision_report import build_decision_report
@@ -267,6 +268,8 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
             for k, r in results.items():
                 if isinstance(r, Exception) and not isinstance(r, PartError):
                     logger.error("pack %s v%s part %s failed: %r", app_id, version, k, r)
+                if isinstance(r, Exception):
+                    await PE.log_error(db, user_id, "pack", f"Pack · section {k}", "ia", f"{type(r).__name__}: {r}")
             errors = {**{k: e for k, e in (existing.get("errors") or {}).items() if k not in results},
                       **{k: _friendly(r) for k, r in results.items() if isinstance(r, Exception)}}
             done_parts = {**(existing.get("parts") or {}), **{k: r for k, r in results.items() if not isinstance(r, Exception)}}
@@ -290,6 +293,7 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
             await recompute_career_score(user_id, f"pack_v{version}")
         except Exception as e:  # noqa: BLE001
             logger.exception("pack %s v%s failed", app_id, version)
+            await PE.log_error(db, user_id, "pack", "Pack · génération complète", "ia", f"{type(e).__name__}: {e}")
             await _write(app_id, version, "errors", {"pack": _friendly(e)})
             await _write(app_id, version, "status", "error")
 
@@ -341,7 +345,12 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
     @router.get("/applications")
     async def list_apps(user: dict = Depends(current_user)):
         cur = db.applications.find({"user_id": user["id"], "archived": {"$ne": True}}, {"_id": 0, "inputs": 0}).sort("created_at", -1).limit(300)
-        return [_summary(a) async for a in cur]
+        out = [_summary(a) async for a in cur]
+        counts = {r["_id"]: r["n"] async for r in db.interviews.aggregate([{"$match": {"application_id": {"$in": [a["id"] for a in out]}}},
+                                                                            {"$group": {"_id": "$application_id", "n": {"$sum": 1}}}])}
+        for a in out:
+            a["interviews_count"] = counts.get(a["id"], 0)
+        return out
 
     @router.get("/applications/{app_id}")
     async def get_app(app_id: str, user: dict = Depends(current_user)):

@@ -2,7 +2,7 @@ import { ChevronDown } from "lucide-react";
 import { usePersistedToggle } from "@/lib/usePersistedToggle";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardPaste, ExternalLink, GitCompare, TriangleAlert, Wrench, Zap, EyeOff, ListChecks, Loader2, MapPinOff, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
+import { ClipboardPaste, ExternalLink, GitCompare, TriangleAlert, Wrench, Zap, EyeOff, ListChecks, Loader2, MapPinOff, Bookmark, Radar as RadarIcon, Settings2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
 import { PriorityBadge } from "@/components/careeros/Ips";
@@ -17,7 +17,7 @@ const RADAR_STEPS = [
   { target: "radar-run-btn", title: "Rechercher maintenant", text: "Lance un passage immédiat. Le Radar tourne aussi automatiquement chaque matin." },
   { target: "radar-stats", title: "Compteurs", text: "Cliquez un chiffre pour filtrer la liste : analysées aujourd'hui, nouvelles, déjà connues, priorité A." },
   { target: "radar-source-status", title: "Sources", text: "Offres trouvées par source au dernier passage : Jooble, Workday, autres sites carrières, Adzuna." },
-  { target: "radar-portal-health", title: "Portails employeurs", text: "Lecture de chaque portail : fiable, fragile, bloquée (403) ou repli Jooble. Survolez une ligne pour voir le détail." },
+  { target: "radar-portal-health", title: "Portails employeurs", text: "Lecture de chaque portail : fiable, fragile, bloquée ou suivie via Jooble. Survolez une ligne pour voir le détail." },
 ];
 import { SourceStatus } from "@/components/careeros/SourceStatus";
 import { PortalHealth } from "@/components/careeros/PortalHealth";
@@ -32,7 +32,7 @@ import { AutoNotices } from "@/components/careeros/AutoNotices";
 import { CompanySuggestions } from "@/components/careeros/CompanySuggestions";
 import { OfferMap } from "@/components/careeros/OfferMap";
 
-const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, deepId, busy }) => (
+const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, onSave, deepId, busy }) => (
   <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4 min-w-0 break-words" data-testid={`radar-offer-${o.id}`}>
     <div className="flex items-start gap-3">
       <PriorityBadge priority={o.ips?.priority} testid={`radar-priority-${o.id}`} />
@@ -64,6 +64,9 @@ const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, deepId, busy }) => 
         {deepId === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Analyse approfondie</button>}
       {o.ips && <button onClick={() => onExplain(o)} data-testid={`radar-explain-btn-${o.id}`} className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:border-indigo-400/40 hover:text-white">
         <ListChecks className="h-3.5 w-3.5" />Pourquoi ce score ?</button>}
+      {o.status !== "pack" && onSave && <button type="button" onClick={() => onSave(o)} data-testid={`radar-save-btn-${o.id}`} title="Sauvegarder : l'offre compte dans vos opportunités et aide le Radar à apprendre vos préférences"
+        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs ${o.saved ? "border-amber-400/50 bg-amber-500/10 text-amber-200" : "border-white/10 text-slate-300 hover:text-white"}`}>
+        <Bookmark className={`h-3.5 w-3.5 ${o.saved ? "fill-current" : ""}`} />{o.saved ? "Sauvegardée" : "Sauvegarder"}</button>}
       <MoreMenu testid={`radar-more-${o.id}`} items={[
         o.url && { label: "Voir l'offre", icon: ExternalLink, href: o.url, testid: `radar-open-${o.id}` },
         o.status !== "ignoree" && o.status !== "pack" && { label: "Ignorer cette offre", icon: EyeOff, onClick: () => onIgnore(o), danger: true, testid: `radar-ignore-${o.id}` },
@@ -126,6 +129,7 @@ export default function Radar() {
   const runNow = async () => { try { await radar.run(); toast.success("Recherche lancée"); setTimeout(load, 1200); } catch (e) { toast.error(e.message); } };
   const onPack = async (o) => { setBusy(true); try { const r = await radar.pack(o.id); nav(`/careeros/candidature/${r.id}`); } catch (e) { toast.error(e.message); setBusy(false); } };
   const onIgnore = async (o) => { await radar.ignore(o.id); load(); };
+  const onSave = async (o) => { try { const r = await radar.save(o.id); toast.success(r.saved ? "Offre sauvegardée : le Radar apprend vos préférences." : "Offre retirée des sauvegardes."); load(); } catch (e) { toast.error(e.message); } };
   const [deepId, setDeepId] = useState(null);
   const onDeep = async (o) => {
     setDeepId(o.id);
@@ -138,6 +142,7 @@ export default function Radar() {
     new: ["Nouvelles (dernier passage)", d.new_today || []],
     known: ["Déjà connues (dernier passage)", d.known_last_run || []],
     a: ["Priorité A", d.top_a],
+    saved: ["Offres sauvegardées", d.saved || []],
     out_zone: [`Hors zone — masquées (zones : ${d.zone?.label || ""})`, d.out_zone || []],
   } : {};
   const lastOffers = d ? [...new Map([...(d.new_today || []), ...(d.known_last_run || [])].map((o) => [o.id, o])).values()] : [];
@@ -153,7 +158,6 @@ export default function Radar() {
     setF((cur) => (cur === k ? null : k));
     if (k.includes(":")) setTimeout(() => document.querySelector('[data-testid="radar-filter-banner"]')?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
-  const errs = Object.entries(lr?.errors || {});
 
   return (
     <Shell>
@@ -190,14 +194,16 @@ export default function Radar() {
           <OfferMap zone={d.zone} points={d.map_points || []} />
           {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
           {d.out_zone_count > 0 && <button type="button" onClick={() => pick("out_zone")} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${f === "out_zone" ? "border-amber-400/50 bg-amber-500/15 text-amber-100" : "border-amber-400/25 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10"}`} title="Offres situées hors de votre zone de recherche : masquées automatiquement, consultables ici" data-testid="radar-out-zone-btn"><MapPinOff className="h-3.5 w-3.5" /><span className="font-semibold tabular-nums" data-testid="radar-out-zone-count">{d.out_zone_count}</span> hors zone masquée(s) · zones : {d.zone?.label}</button>}
-          {errs.length > 0 && <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-200" data-testid="radar-errors">{errs.map(([k, v]) => <p key={k}>{k} : {v}</p>)}</div>}
+          {(d.saved || []).length > 0 && <button type="button" onClick={() => pick("saved")} className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-amber-400/25 px-3 py-1 text-xs text-amber-200 hover:bg-amber-500/10" data-testid="radar-saved-btn"><Bookmark className="h-3.5 w-3.5" />{d.saved.length} sauvegardée(s)</button>}
+          {d.learning && <p className="text-[11px] text-slate-500" data-testid="radar-learning" title="Le Radar analyse d'abord les offres proches de celles que vous gardez (packs, sauvegardes, candidatures, entrevues) et s'éloigne de celles que vous ignorez. Données propres à votre compte.">
+            Apprentissage du Radar : {d.learning.pos} offre(s) retenue(s) · {d.learning.neg} ignorée(s){d.learning.liked?.length ? ` · privilégie : ${d.learning.liked.slice(0, 5).join(", ")}` : ""}{d.learning.disliked?.length ? ` · évite : ${d.learning.disliked.slice(0, 4).join(", ")}` : ""}</p>}
           {f ? <>
             <FilterBanner label={FILTERS[f][0]} count={FILTERS[f][1].length} onClear={() => setF(null)} testid="radar-filter-banner" />
-            <Section title={FILTERS[f][0]} items={FILTERS[f][1]} testid="radar-filtered" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title={FILTERS[f][0]} items={FILTERS[f][1]} testid="radar-filtered" onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
           </> : <>
-            <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" tone="a" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
-            <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" tone="b" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
-            <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" tone="c" onPack={onPack} onIgnore={onIgnore} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" tone="a" onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" tone="b" onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" tone="c" onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
           </>}
           <RadarHistory runs={runs} />
         </div>

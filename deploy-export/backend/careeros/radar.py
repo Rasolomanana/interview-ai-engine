@@ -318,6 +318,11 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                 run["errors"][f"info:{cname}"] = f"Portail déplacé par l'employeur : nouvelle adresse {host} enregistrée, lecture poursuivie."
             try:
                 await PE.record_run(db, user_id, st["companies"], run["portals"])
+                for k, v in run["errors"].items():
+                    src = k.split(":", 1)[0]
+                    if src in S.PORTAL_KINDS or src in ("limite", "info"):
+                        continue
+                    await PE.log_error(db, user_id, "source", f"{src} · {k.split(':', 1)[-1].split('#')[0][:60]}" if ":" in k else src, "source", str(v), kind=src)
             except Exception:  # noqa: BLE001
                 logger.exception("portal errors record_run")
             for pname, pv in run["portals"].items():
@@ -358,7 +363,8 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             backlog = [d async for d in db.radar_offers.find({"user_id": user_id, "ips": None, "status": "nouvelle"}, {"_id": 0}).sort("first_seen", -1).limit(DAILY_LIMIT * 4)
                        if d["id"] not in fresh_ids]  # offers deferred by an earlier daily limit
             roles = (st.get("keywords") or []) + [r for r in re.split(r"[,;/\n]", profile.get("target_roles") or "") if r.strip()]
-            rank = lambda d: (-round(RR.title_relevance(d.get("title", ""), roles), 1), _source_rank(d))  # noqa: E731 - closest titles analysed first
+            learned = await _learned(user_id)  # member's own feedback: closer to the offers they kept, away from the ones they ignored
+            rank = lambda d: (-round(RR.title_relevance(d.get("title", ""), roles) + _learn_bonus(d.get("title", ""), learned), 1), _source_rank(d))  # noqa: E731
             queue = sorted(fresh, key=rank) + sorted(backlog, key=rank)
             todo, run["skipped_limit"] = queue[:budget], max(0, len(queue) - budget)
             run["budget"] = budget
@@ -373,7 +379,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             start = _day_start()
             pool = [d async for d in db.radar_offers.find({"user_id": user_id, "method": "regles", "analyzed_at": {"$gte": start},
                                                            "ips.knockout": False, "status": "nouvelle"}, {"_id": 0}).sort("ips.score", -1)]
-            pool.sort(key=lambda d: (-d["ips"]["score"], _source_rank(d)))
+            pool.sort(key=lambda d: (-(d["ips"]["score"] + 10 * _learn_bonus(d.get("title", ""), learned)), _source_rank(d)))
             ai_todo = pool[:max(0, AI_TOP - await _ai_today(user_id))]
             fails, run["ai_analyzed"] = {"n": 0}, 0
             for doc in ai_todo:  # AI confirmation of the best offers of the day only
@@ -387,11 +393,40 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                     fails["n"] += 1
                     logger.warning("radar AI analyze %s failed: %s", doc["id"], e)
             if fails["n"] >= 3:
+                await PE.log_error(db, user_id, "ia", "Radar · analyse IA du top 5", "ia", "3 échecs consécutifs de l'analyse IA (voir logs serveur)")
                 run["errors"]["ia"] = ("Service IA du serveur indisponible : les meilleures offres restent pré-analysées par règles ; "
                                        "relancez l'analyse approfondie plus tard.")
         run["status"], run["finished_at"] = "done", _now().isoformat()
         await db.radar_runs.update_one({"id": run["id"]}, {"$set": run})
         return run
+
+    async def _learned(user_id: str) -> dict:
+        """Title-word weights learned from the member's own actions: pack / saved / applied / interview (+), ignored (-)."""
+        apps = {a["id"]: a.get("pipeline_status") async for a in db.applications.find({"user_id": user_id}, {"_id": 0, "id": 1, "pipeline_status": 1})}
+        pos, neg, n = {}, {}, {"pos": 0, "neg": 0}
+        async for o in db.radar_offers.find({"user_id": user_id, "$or": [{"status": {"$in": ["pack", "ignoree"]}}, {"saved": True}]},
+                                            {"_id": 0, "title": 1, "status": 1, "saved": 1, "application_id": 1, "ips.priority": 1}):
+            good = o.get("saved") or o["status"] == "pack"
+            w = 1 + (apps.get(o.get("application_id")) in ("postule", "entrevue", "offre")) + (apps.get(o.get("application_id")) in ("entrevue", "offre")) + ((o.get("ips") or {}).get("priority") == "A")
+            bucket = pos if good else neg
+            n["pos" if good else "neg"] += 1
+            for t in RR._words(o.get("title", "")):
+                bucket[t] = bucket.get(t, 0) + (w if good else 1)
+        weights = {t: round((pos.get(t, 0) - 0.7 * neg.get(t, 0)) / (1 + pos.get(t, 0) + neg.get(t, 0)) * min(1, (pos.get(t, 0) + neg.get(t, 0)) / 2), 3)
+                   for t in set(pos) | set(neg)}
+        return {"weights": {t: w for t, w in weights.items() if abs(w) >= 0.1}, "signals": n}
+
+    def _learn_bonus(title: str, learned: dict) -> float:
+        ws = [learned["weights"].get(t, 0) for t in RR._words(title)]
+        return max(-0.5, min(0.5, sum(ws) / max(3, len(ws)))) if ws else 0
+
+    def _member_run(r):
+        """Members never see technical errors (they go to the Admin error journal)."""
+        if not r:
+            return r
+        r = {k: v for k, v in r.items() if k != "errors"}
+        r["portals"] = {n: {k: v for k, v in pv.items() if k not in ("error", "etype")} for n, pv in (r.get("portals") or {}).items()}
+        return r
 
     # ---------------- Member endpoints ----------------
     @router.get("/settings")
@@ -573,7 +608,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                     offers = await S.board(c, kind, slug, body.name or slug, [])
             return {"kind": kind, "slug": slug, "ok": True, "count": len(offers), "message": f"Portail {D.KIND_LABEL.get(kind, kind)} vérifié."}
         except Exception as e:  # noqa: BLE001
-            return {"kind": kind, "slug": slug, "ok": False, "count": 0, "message": f"Portail {kind} injoignable ({(str(e) or type(e).__name__)[:80]})."}
+            return {"kind": kind, "slug": slug, "ok": False, "count": 0, "message": f"Portail {D.KIND_LABEL.get(kind, kind)} momentanément illisible : l'entreprise reste suivie via Jooble."}
 
     @router.post("/run")
     async def run_now(user: dict = Depends(current_user)):
@@ -588,7 +623,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
     async def runs(days: int = Query(30, ge=1, le=90), user: dict = Depends(current_user)):
         since = (_now() - timedelta(days=days)).isoformat()
         proj = {"_id": 0, "user_id": 0, "sources": 0, "selected_sources": 0}
-        return [r async for r in db.radar_runs.find({"user_id": user["id"], "at": {"$gte": since}}, proj).sort("at", -1).limit(300)]
+        return [_member_run(r) async for r in db.radar_runs.find({"user_id": user["id"], "at": {"$gte": since}}, proj).sort("at", -1).limit(300)]
 
     @router.get("/runs/{run_id}/offers")
     async def run_offers(run_id: str, kind: str = Query("found", pattern="^(found|new|analyzed|skipped|out_zone|src_jooble|src_workday|src_boards|src_adzuna)$"),
@@ -631,6 +666,10 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         analyzed = [o async for o in db.radar_offers.find({**q, "analyzed_at": {"$gte": day}}, proj).sort("analyzed_at", -1).limit(100)]
         return {
             "known_last_run": known, "analyzed_today_list": analyzed,
+            "saved": [o for o in offers if o.get("saved") and o["status"] != "pack"],
+            "learning": {**(lr := await _learned(user["id"]))["signals"],
+                         "liked": [t for t, w in sorted(lr["weights"].items(), key=lambda x: -x[1]) if w > 0][:8],
+                         "disliked": [t for t, w in sorted(lr["weights"].items(), key=lambda x: x[1]) if w < 0][:8]},
             "out_zone": out_zone, "out_zone_count": await db.radar_offers.count_documents({"user_id": user["id"], "status": "hors_zone"}),
             "zone": {"location": st["location"], "radius_km": int(st["radius"]) if st["radius"].isdigit() else None,
                      "label": " · ".join(f"{loc} ({Z.label(r)})" for loc, r in zones),
@@ -641,7 +680,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             "sources_status": {"configured": S.configured(), "selected": st["sources"], "portals": {
                 "workday": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") == "workday"),
                 "boards": sum(1 for c in st["companies"] if c.get("enabled", True) and c.get("kind") and c.get("kind") != "workday")}},
-            "last_run": last, "analyzed_today": await _analyzed_today(user["id"]), "daily_limit": DAILY_LIMIT,
+            "last_run": _member_run(last), "analyzed_today": await _analyzed_today(user["id"]), "daily_limit": DAILY_LIMIT,
             "ai_today": await _ai_today(user["id"]), "ai_top": AI_TOP, "deep_limit": AI_TOP + DEEP_LIMIT,
             "new_today": [o for o in offers if last and o.get("run_id") == last.get("id")][:50],
             "top_a": top("A"), "top_b": top("B"),
@@ -656,6 +695,14 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         if not r.matched_count:
             raise HTTPException(status_code=404, detail="Offre introuvable")
         return {"ok": True}
+
+    @router.post("/offers/{offer_id}/save")
+    async def save_offer(offer_id: str, user: dict = Depends(current_user)):
+        o = await db.radar_offers.find_one({"id": offer_id, "user_id": user["id"]}, {"_id": 0, "saved": 1})
+        if not o:
+            raise HTTPException(status_code=404, detail="Offre introuvable")
+        await db.radar_offers.update_one({"id": offer_id}, {"$set": {"saved": not o.get("saved"), "saved_at": _now().isoformat()}})
+        return {"saved": not o.get("saved")}
 
     @router.post("/offers/{offer_id}/deep")
     async def deep(offer_id: str, user: dict = Depends(current_user)):
