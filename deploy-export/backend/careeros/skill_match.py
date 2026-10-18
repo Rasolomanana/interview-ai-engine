@@ -52,6 +52,31 @@ def create_skill_match_router(db, current_user):
         d = (a.get("parts") or {}).get("decision") or {}
         return {"title": d.get("poste") or a.get("code", ""), "company": d.get("entreprise", ""), "text": f"{d.get('poste') or ''}\n{(a.get('inputs') or {}).get('offer_text') or ''}"}
 
+    @router.get("/copilot")
+    async def copilot(kind: str = Query(pattern="^(radar|pack|memoire)$"), id: str = Query(default="", max_length=80), user: dict = Depends(current_user)):
+        """Interview copilot context prefilled from Career Memory + a pack or a Radar offer (nothing to retype)."""
+        prof = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0, "cv_text": 1, "sectors": 1}) or {}
+        out = {"title": "Entrevue", "cv": prof.get("cv_text") or "", "poste": "", "entreprise": "", "atsCv": "", "score": None, "missingKeywords": [], "gaps": [], "coverLetter": ""}
+        if kind == "memoire":
+            return out
+        if kind == "pack":
+            a = await db.applications.find_one({"id": id, "user_id": user["id"]}, {"_id": 0, "inputs": 1, "parts": 1, "ips": 1, "code": 1})
+            if not a:
+                raise HTTPException(status_code=404, detail="Pack introuvable")
+            parts, d = a.get("parts") or {}, (a.get("parts") or {}).get("decision") or {}
+            ats = d.get("ats") if isinstance(d.get("ats"), dict) else {}
+            miss = next((v for k, v in ats.items() if ("manq" in k or "missing" in k) and isinstance(v, list)), [])
+            return {**out, "title": f"Entrevue · {d.get('poste') or a.get('code', '')}"[:120], "cv": (a.get("inputs") or {}).get("cv_text") or out["cv"],
+                    "poste": f"{d.get('poste') or ''}\n{(a.get('inputs') or {}).get('offer_text') or ''}".strip(), "entreprise": d.get("entreprise", ""),
+                    "atsCv": parts.get("cv_ats") if isinstance(parts.get("cv_ats"), str) else "", "coverLetter": parts.get("letter") if isinstance(parts.get("letter"), str) else "",
+                    "score": (a.get("ips") or {}).get("score"), "missingKeywords": [str(x) for x in miss][:15],
+                    "gaps": [str(x) for x in (d.get("reasons_avoid") or [])][:8] if isinstance(d.get("reasons_avoid"), list) else []}
+        o = await db.radar_offers.find_one({"id": id, "user_id": user["id"]}, {"_id": 0, "title": 1, "company": 1, "description": 1, "ips": 1})
+        if not o:
+            raise HTTPException(status_code=404, detail="Offre introuvable")
+        return {**out, "title": f"Entrevue · {o.get('title', '')}"[:120], "poste": f"{o.get('title', '')}\n{o.get('description') or ''}".strip(),
+                "entreprise": o.get("company", ""), "score": (o.get("ips") or {}).get("score")}
+
     @router.post("/history")
     async def save(body: HistoryIn, user: dict = Depends(current_user)):
         doc = {"id": str(uuid.uuid4()), "user_id": user["id"], "at": datetime.now(timezone.utc).isoformat(), **body.model_dump()}

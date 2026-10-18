@@ -96,6 +96,7 @@ export const skillMatch = {
   save: (b) => call("/careeros/skill-match/history", { method: "POST", body: b }),
   history: () => call("/careeros/skill-match/history"),
   get: (id) => call(`/careeros/skill-match/history/${id}`),
+  copilot: (kind, id = "") => call(`/careeros/skill-match/copilot?kind=${kind}&id=${encodeURIComponent(id)}`),
 };
 
 export const radar = {

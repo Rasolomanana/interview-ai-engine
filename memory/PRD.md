@@ -525,3 +525,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Fullscreen.jsx (`useFullscreen`) : bouton Plein écran / Quitter sur la fenêtre de comparaison (SkillCompare) et sur « Pourquoi ce score ? ». Utilise l'API Fullscreen du navigateur ; Échap pour quitter.
 - Radar : visite guidée en 7 étapes (ajout d'« Analyser une offre externe » et « Comparer avec LinkedIn ») ; bouton Réglages vert avec pastille animée.
 - theme-light.css : chaque sélecteur porte `:not(.reading-dark, .reading-dark *)`. « Fond sombre » du panneau de score ajoute `reading-dark`, ce qui force le sombre même en thème clair. Vérifié par capture (fond rgb(18,21,32)).
+
+## 2026-06 — Copilote d'entrevue prérempli (option C)
+- GET /api/careeros/skill-match/copilot?kind=pack|radar|memoire&id= : renvoie le CV, l'offre, l'entreprise, le CV ATS, la lettre, l'IPS, les mots-clés manquants et les lacunes.
+- ContextPanel : CopilotImport.jsx, avec les boutons « Importer depuis un pack / le Radar » et « CV maître ».
+- PackView : « Préparer l'entrevue » ouvre /careeros/copilote?pack=ID, qui crée une session déjà remplie et ouvre le Contexte (InterviewConsole). ?radar=ID est aussi accepté.
+- Vérifié par capture d'écran : lien depuis un pack (titre, CV, offre, CV ATS, score 62, mots-clés) et import depuis le Radar (13 packs, 16 offres).

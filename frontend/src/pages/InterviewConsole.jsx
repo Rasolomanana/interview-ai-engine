@@ -11,6 +11,7 @@ import { useVoice } from "@/lib/useVoice";
 import { useAutoListen } from "@/lib/useAutoListen";
 import SessionSidebar from "@/components/console/SessionSidebar";
 import ContextPanel from "@/components/console/ContextPanel";
+import { skillMatch } from "@/lib/careeros";
 import SettingsPanel from "@/components/console/SettingsPanel";
 import VoicePanel from "@/components/console/VoicePanel";
 import MessageBubble from "@/components/console/MessageBubble";
@@ -92,6 +93,21 @@ export default function InterviewConsole() {
       const st = await api.getSettings();
       setSettings(st);
       if (st.provider !== "server" && !st.geminiKey) setSettingsOpen(true);
+      const q = new URLSearchParams(window.location.search);
+      const kind = q.get("pack") ? "pack" : q.get("radar") ? "radar" : "";
+      if (kind) {  // « Préparer l'entrevue » from a pack / Radar offer: new session already filled
+        window.history.replaceState(null, "", window.location.pathname);
+        try {
+          const c = await skillMatch.copilot(kind, q.get(kind));
+          const { title, ...context } = c;
+          const s = await api.createSession({ title, debug: false, context: { secteur: "Autre", ...context } });
+          await refreshSessions();
+          await selectSession(s.id);
+          setCtxOpen(true);
+          toast.success("Session d'entrevue préparée avec le contexte du pack");
+          return;
+        } catch (e) { toast.error(e.message); }
+      }
       const list = await refreshSessions();
       if (list.length) selectSession(list[0].id);
       else await handleNew();
