@@ -531,3 +531,10 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - ContextPanel : CopilotImport.jsx, avec les boutons « Importer depuis un pack / le Radar » et « CV maître ».
 - PackView : « Préparer l'entrevue » ouvre /careeros/copilote?pack=ID, qui crée une session déjà remplie et ouvre le Contexte (InterviewConsole). ?radar=ID est aussi accepté.
 - Vérifié par capture d'écran : lien depuis un pack (titre, CV, offre, CV ATS, score 62, mots-clés) et import depuis le Radar (13 packs, 16 offres).
+
+## 2026-06 — Option C : verdict gratuit puis pack
+- QuickVerdict.jsx : priorité, IPS par règles, forces et faiblesses (`decision_report.strengths/weaknesses`), conseil, « Générer le pack » (radar.pack), « Pourquoi ce score ? ».
+- ExternalOffer (Radar) affiche le verdict au lieu de fermer la fenêtre ; bouton « Analyser une autre offre ».
+- NewPack : « Vérifier d'abord (gratuit) », qui appelle /radar/external ; le verdict s'efface si l'offre est modifiée. PackBody.radar_offer_id relie l'offre du Radar au pack (statut pack, application_id) pour éviter un doublon.
+- CopilotImport « CV maître » n'importe que le CV.
+- Tests : iteration_48 (backend 11/11) ; 3 bugs corrigés ensuite.

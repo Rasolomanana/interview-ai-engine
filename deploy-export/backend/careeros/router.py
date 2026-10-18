@@ -74,6 +74,7 @@ class PackBody(BaseModel):
     posted_date: str = ""
     network: str = "aucun"
     save_cv_to_memory: bool = False
+    radar_offer_id: Optional[str] = Field(default=None, max_length=80)  # offer checked first (free verdict) -> linked to the pack
 
 
 class ReanalyzeBody(BaseModel):
@@ -308,7 +309,11 @@ def create_careeros_router(db, current_user, generate_text, fetch_page_text, par
 
     @router.post("/packs")
     async def create_pack(body: PackBody, user: dict = Depends(current_user)):
-        return await _create_pack(body, user)
+        ro = await db.radar_offers.find_one({"id": body.radar_offer_id, "user_id": user["id"]}, {"_id": 0, "id": 1, "application_id": 1}) if body.radar_offer_id else None
+        res = await _create_pack(body, user, {"type": "radar", "offer_id": ro["id"]} if ro else None)
+        if ro and not ro.get("application_id"):
+            await db.radar_offers.update_one({"id": ro["id"]}, {"$set": {"status": "pack", "application_id": res["id"]}})
+        return res
 
     async def _create_pack(body: PackBody, user: dict, origin: Optional[dict] = None):
         profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}

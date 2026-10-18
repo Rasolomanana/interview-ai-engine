@@ -27,7 +27,7 @@ export default function NewPack() {
     setChecking(true);
     try { setCheck(await radar.external({ title: "", company: "", location: "", url: f.offer_url, text: f.offer_text })); } catch (err) { toast.error(err.message); } finally { setChecking(false); }
   };
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
+  const set = (k) => (e) => { if (k === "offer_text" || k === "offer_url") setCheck(null); setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }); };
 
   useEffect(() => {
     careeros.getProfile().then((p) => { if (p.cv_text) { setF((x) => ({ ...x, cv_text: p.cv_text })); setMemoryCv(true); } }).catch(() => {});
@@ -43,7 +43,7 @@ export default function NewPack() {
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
-    try { const r = await careeros.createPack(f); nav(`/careeros/candidature/${r.id}`); } catch (err) { toast.error(err.message); setBusy(false); }
+    try { const r = await careeros.createPack({ ...f, radar_offer_id: check?.id || null }); nav(`/careeros/candidature/${r.id}`); } catch (err) { toast.error(err.message); setBusy(false); }
   };
 
   return (
@@ -89,7 +89,7 @@ export default function NewPack() {
             {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Vérifier d'abord (gratuit)
           </button>
           <p className="text-[11px] text-slate-500">IPS par règles, instantané, sans IA, calculé avec votre Career Memory, avant de lancer la génération IA.</p>
-          {check && <QuickVerdict o={check} packLabel="Générer le pack complet" onPack={() => document.querySelector('[data-testid="generate-pack-btn"]')?.click()} />}
+          {check && <QuickVerdict o={check} hidePack />}
           <button disabled={busy} data-testid="generate-pack-btn"
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-500 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-colors hover:bg-indigo-400 disabled:opacity-60">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Générer le pack

@@ -108,7 +108,7 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
             <div className="grid flex-1 grid-cols-1 overflow-hidden lg:grid-cols-2">
               {/* LEFT — inputs */}
               <div className="space-y-5 overflow-y-auto border-white/[0.06] px-6 py-5 lg:border-r">
-                <CopilotImport onImport={(c) => setForm((f) => ({ ...f, ...c, cv: c.cv || f.cv, redFlags: [] }))} />
+                <CopilotImport onImport={(c) => setForm((f) => ({ ...f, ...c, cv: c.cv || f.cv, redFlags: c.poste !== undefined ? [] : f.redFlags }))} />
                 <Group icon={<FileText className="h-4 w-4" />} label="Titre de la session">
                   <input data-testid="ctx-title" value={form.title} onChange={(e) => field("title", e.target.value)} className="input" placeholder="ex. Superviseur — Pratt & Whitney" />
                 </Group>

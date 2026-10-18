@@ -1,0 +1,46 @@
+{
+  "summary": "Tested option C (prefilled interview copilot) and the option A QuickVerdict (Radar 'Analyser une offre externe' and NewPack 'Vérifier d'abord (gratuit)'). Backend: 11 of 11 pytest checks pass. They cover GET /api/careeros/skill-match/copilot (memoire, pack and radar kinds, 422 on a bad kind or an id over 80 chars, 404 on an unknown id, per-member isolation, no 500 on any of the 13 packs) and POST /radar/external (shape, dedupe, 422 on short text). Frontend: 'Préparer l'entrevue' on a pack opens /careeros/copilote?pack=<id>, creates a filled session (title 'Entrevue · Analyste TI', CV, offer, company, ATS CV 2881 chars, letter 1976 chars, 62/100, 10 missing keywords) and opens the Context panel automatically. CopilotImport lists 13 packs and 17 A/B Radar offers. Importing a Radar offer fills title, offer, company and score, with empty ATS CV and letter. Importing a pack fills everything. The Radar external offer dialog shows the QuickVerdict (Priorité B, IPS 59, advice, 'Générer le pack', 'Pourquoi ce score ?'). 'Analyser une autre offre' resets the form. NewPack's verify button is disabled until there is text, then shows the QuickVerdict. No overflow at 390px. Found 3 functional bugs (below).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/careeros/radar/external vs GET /api/careeros/radar/offers/{id}/explain", "issue": "The score is inconsistent. external calls _rules(doc, cv, profile, []) with no radar keywords, but explain calls _rules with st.get('keywords'). The same offer shows IPS 59 in the QuickVerdict, then IPS 68 in 'Pourquoi ce score ?'. Submitting the offer again resets it to 59. Reproduced via the API and the UI.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/careeros/skill-match/copilot?kind=pack", "issue": "missingKeywords comes from the first ats key containing 'manq' or 'missing', and gaps comes from decision.reasons_avoid. Both depend on the AI JSON shape and silently fall back to []. This works for the tested pack."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "QuickVerdict", "issue": "It reads decision_report.reasons_apply / reasons_avoid, but the rule-based decision_report keys are summary, why_priority, strengths, weaknesses, actions, ... (strengths and weaknesses are {critere, raison} objects). So the +/– lists are always empty, which leaves a blank gap in the card on both Radar and NewPack.", "selector": "[data-testid=quick-verdict]", "priority": "HIGH"},
+      {"component": "CopilotImport 'CV maître (Career Memory)'", "issue": "It is described as importing only the master CV, but onImport merges the whole memoire payload ({...f, ...c}). So it overwrites title → 'Entrevue', poste → '', entreprise → '', atsCv/coverLetter → '', score → null, missingKeywords/gaps → []. Data loss: clicking it on a filled session cleared the offer (verified in the UI). Fix: for memoire, merge only { cv }.", "selector": "[data-testid=ctx-import-memoire]", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "NewPack 'Vérifier d'abord' → 'Générer le pack complet'", "issue": "The verify step creates a Radar offer, but the pack is then generated through the NewPack path. The Radar offer is never linked (no application_id, status stays 'nouvelle'), so a second pack could be generated from the Radar later. The verdict also stays visible after the offer text is edited, so it can be stale.", "affected_selectors": ["[data-testid=verify-first-btn]", "[data-testid=quick-verdict-pack-btn]"]}
+    ],
+    "design_issues": [
+      {"screen": "NewPack sidebar", "issues": ["'Générer le pack complet' (QuickVerdict) and 'Générer le pack' sit directly on top of each other and do the same thing."]},
+      {"screen": "Copilote first visit via 'Préparer l'entrevue'", "issues": ["When there is no Gemini key, the Réglages IA modal opens on top of the newly opened Context panel. Two stacked modals."]},
+      {"screen": "Copilote Context panel (light theme)", "issues": ["The ctx-cv, ctx-poste, ats-cv and title textareas render dark grey with dark text. Contrast is low and placeholders are barely visible."]},
+      {"screen": "Copilote prefill", "issues": ["The toast always says 'avec le contexte du pack' even for ?radar=. Each click on 'Préparer l'entrevue' creates a new duplicate session."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_copilot_prefill.py", "/app/test_reports/pytest/pytest_copilot_prefill.xml"],
+  "action_items": [
+    "HIGH: in radar.py external(), pass the member's radar settings keywords to _rules (same as explain), so the QuickVerdict IPS matches 'Pourquoi ce score ?'.",
+    "HIGH: in QuickVerdict, use decision_report.strengths/weaknesses (map x.raison or x.critere), or hide the grid when it is empty.",
+    "HIGH: in CopilotImport/ContextPanel, the 'memoire' import must only set cv and must not clear the other fields.",
+    "MEDIUM: in NewPack verify-first, link the pack to the created radar offer (or reuse radar.pack(o.id)), and clear the verdict when offer_text changes.",
+    "LOW: merge the duplicate generate buttons, use a radar-aware toast text, and avoid stacking the Settings modal over the Context panel."
+  ],
+  "critical_code_review_comments": [
+    "QuickVerdict.jsx: the field names (reasons_apply/reasons_avoid) do not match the rule decision_report schema.",
+    "ContextPanel onImport: {...f, ...c} with the memoire payload wipes user data.",
+    "NewPack onPack uses document.querySelector(...).click(). This is a fragile DOM coupling; call the submit handler directly.",
+    "InterviewConsole uses window.history.replaceState, which bypasses react-router. useLocation keeps the stale ?pack= search. It is harmless now but fragile."
+  ],
+  "updated_files": ["/app/backend/tests/test_copilot_prefill.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "~75% (core flows work; 3 functional bugs)"},
+  "seed_data_creation": "Created TEST_QV* external Radar offers for membre.test and deleted them afterwards. Copilot sessions are stored in browser localStorage only.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Pack a793f26d-ecb6-465c-b3f3-5ca25a1d78f1 (Analyste TI, 62/100) has an ATS CV and a letter. Radar offer 9302111a-... (Desjardins, A 79). Copilot sessions are local (lib/api.js). Close the Gemini settings modal with 'Fermer'. Set localStorage privacyAcceptedV2=1 to hide the banner. Run pytest with -n0 to see prints."
+}

@@ -11,7 +11,7 @@ export const CopilotImport = ({ onImport }) => {
   useEffect(() => { if (open && !src) skillMatch.sources().then(setSrc).catch(() => setSrc({ radar: [], packs: [] })); }, [open, src]);
   const pick = async (kind, id = "") => {
     setBusy(kind + id);
-    try { onImport(await skillMatch.copilot(kind, id)); toast.success("Contexte importé depuis CareerOS"); setOpen(false); } catch (e) { toast.error(e.message); } finally { setBusy(""); }
+    try { const c = await skillMatch.copilot(kind, id); onImport(kind === "memoire" ? { cv: c.cv } : c); toast.success("Contexte importé depuis CareerOS"); setOpen(false); } catch (e) { toast.error(e.message); } finally { setBusy(""); }
   };
   const Chip = ({ kind, x }) => (
     <button type="button" onClick={() => pick(kind, x.id)} disabled={!!busy} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-left text-xs text-slate-200 hover:border-indigo-400/50" data-testid={`ctx-import-${kind}-${x.id}`}>
