@@ -26,6 +26,7 @@ from careeros.journey import create_journey_router
 from careeros.followup import create_followup_router
 from careeros.finance import create_finance_router, ensure_finance_indexes, log_ai_call
 import state_machine as sm
+from careeros import ai_budget as AB
 import prompt as P
 from admin import (
     create_admin_router, ensure_indexes, record_event,
@@ -52,14 +53,21 @@ SERVER_ACCESS_PASSWORD = os.environ.get("SERVER_ACCESS_PASSWORD")
 def _build_server_chain():
     """Economical chain for analyses (label, provider, model), cheapest-first:
     Gemini Flash (free tier) -> OpenRouter free -> OpenRouter DeepSeek. No Anthropic. Entries need their key."""
-    chain = []
+    chain = []  # free first: Gemini Flash -> Groq -> OpenRouter free -> Mistral ; paid entries are gated by the Admin (ai_budget)
     if os.environ.get("GEMINI_API_KEY"):
         chain.append(("gemini", "gemini", os.environ.get("GEMINI_SERVER_MODEL") or "gemini-flash-latest"))
+    if os.environ.get("GROQ_API_KEY", "").strip():
+        chain.append(("groq", "groq", os.environ.get("GROQ_MODEL") or "openai/gpt-oss-120b"))
     if OPENROUTER_API_KEY:
         free = os.environ.get("OPENROUTER_FREE_MODEL", "openrouter/free").strip()
         if free:
             chain.append(("openrouter_free", "openrouter", free))
-        chain.append(("openrouter", "openrouter", os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")))
+    if os.environ.get("MISTRAL_API_KEY", "").strip():
+        chain.append(("mistral", "mistral", os.environ.get("MISTRAL_MODEL") or "mistral-small-latest"))
+    if OPENROUTER_API_KEY and os.environ.get("OPENROUTER_MODEL"):
+        chain.append(("openrouter", "openrouter", os.environ["OPENROUTER_MODEL"]))
+    if ANTHROPIC_API_KEY:
+        chain.append(("anthropic", "anthropic", os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")))
     return chain
 
 
@@ -69,9 +77,7 @@ def _build_premium_chain():
     chain = []
     if OPENROUTER_API_KEY:
         chain.append(("openrouter_premium", "openrouter", os.environ.get("OPENROUTER_PREMIUM_MODEL") or "~google/gemini-pro-latest"))
-    chain += [c for c in SERVER_CHAIN if c[0] != "openrouter_free"]
-    if ANTHROPIC_API_KEY:
-        chain.append(("anthropic", "anthropic", os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")))
+    chain += list(SERVER_CHAIN)
     return chain
 
 
@@ -336,6 +342,8 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
     errors = []
     if PREMIUM_CHAIN:
         for label, provider, model in PREMIUM_CHAIN:
+            if await AB.skip(db, label):
+                continue
             try:
                 chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
                 fc = [ImageContent(image_base64=_strip_data_url(i)) for i in imgs] if imgs else None
@@ -355,6 +363,8 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
             except Exception as e:  # noqa: BLE001
                 errors.append(f"{label}: {str(e)[:160]}")
                 logger.warning("Provider %s (%s) failed, trying next: %s", label, model, e)
+                if AB.is_quota_error(e):
+                    await AB.mark_exhausted(db, label, str(e))
                 if emitted:
                     yield _sse("done", {"provider": label, "model": model})
                     return
@@ -364,12 +374,14 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
     yield _sse("done", {})
 
 
-async def _generate_text(system_message: str, user_text: str, tier: str = "eco") -> str:
+async def _generate_text_raw(system_message: str, user_text: str, tier: str = "eco") -> str:
     """Non-streaming aggregate generation. tier='eco' (analyses) or 'premium' (letters)."""
     errors = []
     chain = PREMIUM_CHAIN if tier == "premium" else SERVER_CHAIN
     if chain:
         for label, provider, model in chain:
+            if await AB.skip(db, label):
+                continue
             try:
                 chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system_message).with_model(provider, model)
                 out = []
@@ -386,8 +398,13 @@ async def _generate_text(system_message: str, user_text: str, tier: str = "eco")
             except Exception as e:  # noqa: BLE001
                 errors.append(f"{label}: {str(e)[:160]}")
                 logger.warning("analyze provider %s (%s) failed: %s", label, model, e)
+                if AB.is_quota_error(e):
+                    await AB.mark_exhausted(db, label, str(e))
     logger.error("all server LLM providers failed: %s", " | ".join(errors) or "aucun fournisseur configuré")
     raise HTTPException(status_code=502, detail="Analyse indisponible (fournisseurs LLM)")
+
+
+_generate_text = AB.governed(db, _generate_text_raw, lambda: [c[0] for c in SERVER_CHAIN if c[0] in AB.FREE])
 
 
 async def _llm_health() -> list:
@@ -797,6 +814,7 @@ app.include_router(create_admin_router(db, _llm_health))
 from admin import _check_admin as _admin_check  # noqa: E402
 from careeros.ai_credits import openrouter_credits as _or_credits  # noqa: E402
 app.include_router(create_finance_router(db, _admin_check, _or_credits))
+app.include_router(AB.create_ai_budget_router(db, _admin_check, lambda: [c[0] for c in PREMIUM_CHAIN]))
 from careeros.connectors import create_connectors_router  # noqa: E402
 app.include_router(create_connectors_router(db, _admin_check))
 from careeros.knowledge import create_knowledge_admin_router  # noqa: E402
@@ -863,6 +881,7 @@ async def _admin_startup():
         await ensure_careeros_indexes(db)
         await ensure_radar_indexes(db)
         await ensure_finance_indexes(db)
+        await AB.ensure_indexes(db)
     except Exception:
         logger.exception("careeros index setup failed")
     t = asyncio.create_task(radar_router.scheduler_loop())  # daily 06:00 Toronto run, independent of cron-job.org

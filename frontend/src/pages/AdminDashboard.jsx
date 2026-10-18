@@ -20,6 +20,7 @@ import { ClickNum, DetailDialog } from "@/components/admin/DetailDialog";
 import { Connectors } from "@/components/admin/Connectors";
 import { KnowledgeBase } from "@/components/admin/KnowledgeBase";
 import { PortalErrors } from "@/components/admin/PortalErrors";
+import { AiBudget } from "@/components/admin/AiBudget";
 import { useTrace } from "@/components/admin/TraceDialog";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(4)}`;
@@ -178,7 +179,7 @@ export default function AdminDashboard() {
 
   const has = (sec) => (me?.sections || []).includes(sec);
   const tabs = [["overview", "Tableau de bord", "overview", "overview"], ["geo", "Géographie", "geo", "geo"], ["business", "Analyse métier", "business", "business"],
-    ["activite", "Activité", "activity", "activite"], ["rentabilite", "Rentabilité CareerOS", "finance", "finance"], ["connecteurs", "Connecteurs", "connectors", "connecteurs"],
+    ["activite", "Activité", "activity", "activite"], ["rentabilite", "Rentabilité CareerOS", "finance", "finance"], ["ia", "IA & quotas", "ai-budget", "finance"], ["connecteurs", "Connecteurs", "connectors", "connecteurs"],
     ["base", "Base commune", "knowledge", "connecteurs"], ["erreurs", "Journal des erreurs", "portal-errors", "connecteurs"], ["roles", "Rôles", "roles", "roles"]].filter((x) => has(x[3]));
   const t = stats?.totals || {};
   const llm = stats?.llm || { calls: 0, tokens_in: 0, tokens_out: 0, cost: 0, by_provider: {} };
@@ -228,6 +229,7 @@ export default function AdminDashboard() {
         {has("connecteurs") && <TabsContent value="erreurs"><PortalErrors /></TabsContent>}
         {has("connecteurs") && <TabsContent value="connecteurs"><Connectors /></TabsContent>}
         {has("finance") && <TabsContent value="rentabilite"><FinanceDashboard /></TabsContent>}
+        {has("finance") && <TabsContent value="ia"><AiBudget /></TabsContent>}
         {has("activite") && <TabsContent value="activite">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard icon={Users} label="Visiteurs" value={num(t.visitors)} accent="text-indigo-400" onClick={() => trace("a_visitors")} />

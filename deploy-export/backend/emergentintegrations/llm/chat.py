@@ -100,6 +100,12 @@ class LlmChat:
                 # Free entries keep their model: openrouter/free auto-picks a vision-capable free model.
                 if imgs and not (model.endswith(":free") or model == "openrouter/free"):
                     model = OPENROUTER_VISION_MODEL
+            elif self.provider == "groq":  # GroqCloud, OpenAI-compatible (free tier)
+                client = AsyncOpenAI(api_key=os.environ["GROQ_API_KEY"].strip(), base_url="https://api.groq.com/openai/v1")
+                model = self.model or "openai/gpt-oss-120b"
+            elif self.provider == "mistral":  # Mistral La Plateforme, OpenAI-compatible (Experiment plan)
+                client = AsyncOpenAI(api_key=os.environ["MISTRAL_API_KEY"].strip(), base_url="https://api.mistral.ai/v1")
+                model = self.model or "mistral-small-latest"
             elif self.provider == "gemini":  # Google AI Studio, OpenAI-compatible endpoint
                 client = AsyncOpenAI(api_key=os.environ["GEMINI_API_KEY"], base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
                 model = self.model or "gemini-flash-latest"

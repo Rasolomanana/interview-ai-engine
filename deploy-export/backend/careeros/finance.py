@@ -19,12 +19,13 @@ FAMILIES = {"infrastructure": "Infrastructure", "ia": "IA", "developpement": "DÃ
 OPS_FAMILIES = ("infrastructure", "ia", "marketing", "autres")
 BUCKETS = {
     "gemini_flash": "Gemini Flash", "gemini_pro": "Gemini Pro", "openrouter": "OpenRouter (DeepSeekâ€¦)",
-    "openrouter_free": "OpenRouter gratuit", "anthropic": "Anthropic", "autre": "Autres",
+    "openrouter_free": "OpenRouter gratuit", "groq": "Groq (gratuit)", "mistral": "Mistral (gratuit)", "anthropic": "Anthropic", "autre": "Autres",
 }
 AI_KEYS = {"google": "Gemini (Google)", "openrouter": "OpenRouter", "anthropic": "Anthropic", "autre": "Autres (journal IA)"}
 DEFAULT_PRICING = {
     "gemini_flash": {"in": 0.0, "out": 0.0}, "gemini_pro": {"in": 1.25, "out": 10.0},
     "openrouter": {"in": 0.27, "out": 1.10}, "openrouter_free": {"in": 0.0, "out": 0.0},
+    "groq": {"in": 0.0, "out": 0.0}, "mistral": {"in": 0.0, "out": 0.0},
     "anthropic": {"in": 3.0, "out": 15.0}, "autre": {"in": 1.25, "out": 10.0},
 }
 SEED = {
@@ -68,6 +69,8 @@ def classify(label: str, provider: str, model: str):
         b = "openrouter"
     elif provider == "anthropic":
         b = "anthropic"
+    elif provider in ("groq", "mistral"):
+        b = provider
     else:
         b = "autre"
     billing = "google" if provider == "gemini" else provider if provider in ("openrouter", "anthropic") else "autre"

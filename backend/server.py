@@ -26,6 +26,7 @@ from careeros.journey import create_journey_router
 from careeros.followup import create_followup_router
 from careeros.finance import create_finance_router, ensure_finance_indexes, log_ai_call
 import state_machine as sm
+from careeros import ai_budget as AB
 import prompt as P
 from admin import (
     create_admin_router, ensure_indexes, record_event,
@@ -355,7 +356,7 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
     yield _sse("done", {})
 
 
-async def _generate_text(system_message: str, user_text: str, tier: str = "eco") -> str:
+async def _generate_text_raw(system_message: str, user_text: str, tier: str = "eco") -> str:
     """Non-streaming aggregate generation with the same fallback chain."""
     if EMERGENT_LLM_KEY:
         for provider, model in SERVER_CHAIN:
@@ -387,6 +388,9 @@ async def _generate_text(system_message: str, user_text: str, tier: str = "eco")
             logger.exception("deepseek analyze failed")
     raise HTTPException(status_code=502, detail="Analyse indisponible (fournisseurs LLM)")
 
+
+
+_generate_text = AB.governed(db, _generate_text_raw, [])
 
 async def _llm_health() -> list:
     """Admin diagnostic: one tiny call per provider of the server chain."""
@@ -794,6 +798,7 @@ app.include_router(create_admin_router(db, _llm_health))
 from admin import _check_admin as _admin_check  # noqa: E402
 from careeros.ai_credits import openrouter_credits as _or_credits  # noqa: E402
 app.include_router(create_finance_router(db, _admin_check, _or_credits))
+app.include_router(AB.create_ai_budget_router(db, _admin_check, lambda: [p for p, _ in SERVER_CHAIN]))
 from careeros.connectors import create_connectors_router  # noqa: E402
 app.include_router(create_connectors_router(db, _admin_check))
 from careeros.knowledge import create_knowledge_admin_router  # noqa: E402
@@ -860,6 +865,7 @@ async def _admin_startup():
         await ensure_careeros_indexes(db)
         await ensure_radar_indexes(db)
         await ensure_finance_indexes(db)
+        await AB.ensure_indexes(db)
     except Exception:
         logger.exception("careeros index setup failed")
     t = asyncio.create_task(radar_router.scheduler_loop())  # daily 06:00 Toronto run, independent of cron-job.org
