@@ -2,10 +2,11 @@ import { DateField } from "@/components/careeros/DateField";
 import { ConceptRow } from "@/components/careeros/guide/InfoTip";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Sparkles, Upload } from "lucide-react";
+import { Loader2, ShieldCheck, Sparkles, Upload } from "lucide-react";
+import { QuickVerdict } from "@/components/careeros/QuickVerdict";
 import { toast } from "sonner";
 import { Shell } from "@/components/careeros/Shell";
-import { careeros } from "@/lib/careeros";
+import { careeros, radar } from "@/lib/careeros";
 import { extractPdf } from "@/lib/api";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
 
@@ -20,6 +21,12 @@ export default function NewPack() {
   const [f, setF] = useState({ offer_text: "", offer_url: "", company_url: "", cv_text: "", posted_date: "", network: "aucun", save_cv_to_memory: true });
   const [memoryCv, setMemoryCv] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [check, setCheck] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const verify = async () => {
+    setChecking(true);
+    try { setCheck(await radar.external({ title: "", company: "", location: "", url: f.offer_url, text: f.offer_text })); } catch (err) { toast.error(err.message); } finally { setChecking(false); }
+  };
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
 
   useEffect(() => {
@@ -77,6 +84,12 @@ export default function NewPack() {
         <aside className="h-fit space-y-4 rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-5 lg:sticky lg:top-24">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-slate-500">Généré automatiquement</p>
           <ul className="space-y-2">{OUTPUTS.map((o) => <li key={o} className="flex gap-2 text-xs text-slate-300"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-indigo-400" />{o}</li>)}</ul>
+          <button type="button" onClick={verify} disabled={checking || (!f.offer_text.trim() && !f.offer_url.trim())} data-testid="verify-first-btn"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/40 bg-emerald-500/10 py-2.5 text-sm font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:opacity-50">
+            {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Vérifier d'abord (gratuit)
+          </button>
+          <p className="text-[11px] text-slate-500">IPS par règles, instantané, sans IA, calculé avec votre Career Memory, avant de lancer la génération IA.</p>
+          {check && <QuickVerdict o={check} packLabel="Générer le pack complet" onPack={() => document.querySelector('[data-testid="generate-pack-btn"]')?.click()} />}
           <button disabled={busy} data-testid="generate-pack-btn"
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-500 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition-colors hover:bg-indigo-400 disabled:opacity-60">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Générer le pack

@@ -215,7 +215,7 @@ export default function Radar() {
       {d && !settings && <PageTour tour={tour} steps={RADAR_STEPS} label="Visite du Radar" testid="radar-tour" />}
       <ScoreExplain id={explainId} onClose={() => { setExplainId(null); load(); }} onDeep={load} />
       <CompareDialog open={cmp} onClose={() => setCmp(false)} onExplain={(id) => { setCmp(false); setExplainId(id); }} />
-      <ExternalOffer open={ext} onClose={() => setExt(false)} onDone={(o) => { setExt(false); load(); setExplainId(o.id); }} />
+      <ExternalOffer open={ext} onClose={() => setExt(false)} onRefresh={load} onDone={(o) => { setExt(false); load(); setExplainId(o.id); }} />
       {settings && <RadarSettingsDialog onClose={() => { setSettings(false); load(); }} />}
     </Shell>
   );
