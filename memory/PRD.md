@@ -563,3 +563,10 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Correctif deploy-export/server.py : si les quotas gratuits s'épuisent pendant un appel et payant interdit → QuotaReached (mode règles) au lieu de 502.
 - Cache vérifié en réel sur la preview : 2e brouillon identique (>10 min) = 0 appel IA, +1 réponse servie par le cache.
 - Preview utilise la clé Emergent (chaîne Anthropic/OpenAI, non gouvernée par allow_paid) ; la chaîne gratuite n'existe qu'en production (Render).
+
+## Backlog reporté par l'utilisateur (2026-06) — NE PAS implémenter sans demande
+- Quota IA par membre et par jour (passage en mode règles au-delà).
+- Liste des plus gros consommateurs IA (anonymisée hors super-admin).
+- Appliquer le plafond global / quota membre / « Règles uniquement » au Copilote (bloquer seulement les nouvelles sessions).
+- Info : le Copilote en mode Serveur utilise la chaîne premium (OpenRouter premium payant → chaîne gratuite), est compté dans IA & quotas mais non bloqué par plafond/règles ; avec clé Gemini du membre, appels directs navigateur non comptés.
+- Priorité actuelle utilisateur : validation des fonctionnalités principales et de l'expérience utilisateur.
