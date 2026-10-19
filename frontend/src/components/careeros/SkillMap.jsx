@@ -10,7 +10,7 @@ export const SkillMap = ({ profile }) => {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [open, toggle] = usePersistedToggle("cos.skillmap.open", true);
   const ref = useRef(null);
-  if (!groups.length) return null;
+  if (!groups.length) return <p className="mt-3 rounded-xl border border-dashed border-white/10 p-3 text-xs text-slate-400" data-testid="skillmap-empty">La carte s'affiche dès que vos compétences sont listées dans la Career Memory (champ « Compétences ») ou détectées dans un pack.</p>;
   const max = groups[0].weight;
   const size = (w) => Math.round(64 + 76 * Math.sqrt(w / max));
   const move = (e) => {

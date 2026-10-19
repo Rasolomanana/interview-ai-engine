@@ -46,7 +46,7 @@ export const CvVersions = ({ onRestored }) => {
           {v.kind !== "restauration" && <p className="mt-1 text-[11px] text-slate-400" data-testid={`cv-version-gains-${i}`}>
             Estimé : compatibilité {fr(v.estimated?.match_before)} % → {fr(v.estimated?.match_after)} %, indice {fr(v.estimated?.ifp_before)} → {fr(v.estimated?.ifp_after)} ·
             Réel : compatibilité {fr(v.real?.match_after)} %, indice {fr(v.real?.ifp_before)} → {fr(v.real?.ifp_after)}</p>}
-          {view === v.id && <div className="mt-2"><CvDiff cv={v.cv_before} rows={v.diff?.length ? v.diff : rows(v.cv_before, v.cv_after)} /></div>}
+          {view === v.id && <div className="mt-2"><CvDiff cv={v.cv_before} rows={v.diff?.length ? v.diff : rows(v.cv_before, v.cv_after)} afterTitle={v.kind === "restauration" ? "CV restauré" : "CV optimisé"} /></div>}
         </li>))}</ul>
     </section>
   );

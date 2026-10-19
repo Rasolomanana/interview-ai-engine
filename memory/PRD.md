@@ -578,3 +578,10 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Entreprises suivies : bouton Active/En pause, aria-label, titre de dialogue, compteurs rafraîchis après restauration.
 - En attente d'accord utilisateur : extraction automatique des champs du profil depuis le CV (changement plus important).
 - Non fait volontairement : refus serveur keywords=[] (garde côté interface seulement) ; mentions Jooble conservées (source principale en production).
+
+## 2026-06 — Optimisation CV ↔ Offre avec simulation d'impact (iterations 53-55)
+- Backend `careeros/cv_optimize.py` (routes /api/careeros/cv-optimize/*) : propose (règles sélectionnent les lignes faibles → IA chaîne gratuite gouvernée + cache → validateur strict `invented()` : aucun chiffre, intitulé, certification, années, finalité, mot de contenu absent du CV, aucun échange de ligne ; 1 tour de correction IA), simulate (Indice par variantes), apply (CV maître + version : date, offre, gain estimé, gain réel, diff), versions/{id}/real, versions/{id}/restore. Collection `cv_versions`.
+- Frontend : `lib/cvOptimize.js`, `components/careeros/optimize/*` (CvOptimizer, ImpactPanel, ProposalList, CvDiff, ApplyBar, OptimizeButton, useImpact), `CvVersions.jsx` (Career Memory). Points d'entrée : carte Radar, page pack, comparaison CV ↔ offre. Compatibilité = mêmes règles que la comparaison (navigateur), Indice = serveur.
+- Compétences absentes : décochées, preuves = lignes du CV, confiance élevée/moyenne/faible ; gains garanti vs potentiel séparés ; validation explicite obligatoire.
+- Seuils Indice (15 compétences, 5 mentions leadership) validés par l'utilisateur.
+- Reporté (lot séparé) : remplissage automatique de la Career Memory depuis le CV ; quota IA par membre ; plus gros consommateurs ; quotas appliqués au Copilote.

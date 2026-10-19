@@ -23,7 +23,7 @@ export const ProposalList = ({ items, sel, toggle, setAll, rejected, ai }) => {
           <span className={`block ${x.type === "ajout" ? "text-emerald-200" : "text-amber-100"}`} data-testid={`proposal-after-${x.id}`}>{x.after.trim()}</span>
           {x.reason && <span className="mt-0.5 block text-[11px] text-slate-400">{x.reason}</span>}
         </Check>))}
-      {!sure.length && <p className="text-xs text-slate-500" data-testid="proposal-none">{ai === "ok" ? "Votre CV met déjà bien en valeur les éléments de cette offre." : "Les reformulations automatiques sont momentanément indisponibles : réessayez plus tard. Les compétences à confirmer restent disponibles."}</p>}
+      {!sure.length && <p className="text-xs text-slate-500" data-testid="proposal-none">{ai === "ok" ? (rejected?.length ? "Aucune reformulation sûre : toutes les propositions ajoutaient une information absente de votre CV et ont été écartées. Vous pouvez quand même regrouper vos compétences et confirmer celles que vous avez réellement pratiquées." : "Votre CV met déjà bien en valeur les éléments de cette offre.") : "Les reformulations automatiques sont momentanément indisponibles : réessayez plus tard. Les compétences à confirmer restent disponibles."}</p>}
       {rejected?.length > 0 && <p className="text-[11px] text-slate-500" data-testid="proposal-rejected">{rejected.length} proposition(s) écartée(s) automatiquement car elle(s) ajoutai(en)t une information absente de votre CV.</p>}
       {confirm.length > 0 && <div className="space-y-2 border-t border-white/[0.07] pt-3" data-testid="proposal-confirm-group">
         <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-200"><AlertTriangle className="h-3.5 w-3.5" />Gain potentiel : compétences de l'offre absentes de votre CV</p>
@@ -31,7 +31,7 @@ export const ProposalList = ({ items, sel, toggle, setAll, rejected, ai }) => {
         {confirm.map((x) => (
           <Check key={x.id} x={x} on={sel.has(x.id)} toggle={toggle}>
             <span className="block font-semibold text-slate-100">{x.label}{x.required ? "" : " (souhaitée)"}</span>
-            <span className="block text-[11px] text-slate-400">{x.related.length ? `Compétence absente du CV mais ${x.confidence === "élevée" ? "fortement " : ""}liée à : ${x.related.join(", ")}` : `Domaine « ${x.domain} » peu présent dans votre CV`}</span>
+            <span className="block text-[11px] text-slate-400">{x.related.length ? `Compétence absente du CV mais ${x.confidence === "élevée" ? "fortement " : ""}liée à : ${x.related.join(" ; ")}` : "Aucune expérience liée trouvée dans votre CV"}</span>
             <span className={`block text-[11px] ${CONF[x.confidence]}`} data-testid={`proposal-confidence-${x.id}`}>Confiance : {x.confidence}</span>
           </Check>))}
       </div>}

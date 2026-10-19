@@ -109,3 +109,12 @@ def test_candidates_single_paragraph_cv():
                                    "- Supervision d'une équipe de production et gestion des processus opérationnels."])
 def test_validator_generic_loophole(after):
     assert invented(after, "- Supervision d'une équipe de production.", CV, []) != ""
+
+
+def test_iter55_cases():
+    from careeros.cv_optimize import SENT, JobSkill
+    assert "Formation : B.Sc. Statistique, Université de Montréal." in SENT.split("Langues : français. Formation : B.Sc. Statistique, Université de Montréal. Fin du texte.")
+    rep = [JobSkill(label="Reporting et tableaux de bord", aliases=["reporting", "tableaux de bord", "rapports"], status="ok")]
+    b = "- Suivi des indicateurs de rendement quotidiens et des rapports."
+    assert invented("- Suivi des indicateurs de rendement quotidiens, des rapports et tableaux de bord.", b, CV, rep) != ""
+    assert "finalité" in invented("- Participer aux enquêtes d'accident afin d'assurer la sécurité.", "- Participer aux enquêtes d'accident.", CV + " sécurité", [])

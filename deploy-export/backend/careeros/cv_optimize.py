@@ -14,10 +14,12 @@ from .strength import CERTS, compute, quantified
 WEAK = re.compile(r"^(responsable de|participer|participation|aider|aide a|taches|tache|charge de|chargee de|s occuper|gerer les|assurer)\b")
 TITLES = ["directeur", "directrice", "vice president", "gestionnaire", "coordonnateur", "coordonnatrice", "superviseur", "superviseure", "manager",
           "contremaitre", "chef de service", "chef de departement", "ingenieur", "analyste", "conseiller", "conseillere", "technicien", "technicienne"]
+SENT = re.compile(r"(?:(?<=[a-zà-ÿ0-9)]{3}[.;])|(?<=%[.;]))\s+(?=[A-ZÀ-Ý0-9])")  # never after abbreviations like « B.Sc. »
+PURPOSE = [" afin d", " contribuant", " pour assurer", " permettant", " visant", " en vue d", " garantissant"]
 YEARS = re.compile(r"\d+\s*\+?\s*(ans|annees|years)")
 STOP = set("""a au aux avec ce ces cette dans de des du en et la le les leur leurs mon ma mes par pour sur sous un une son sa ses tout tous toute toutes
 d l n s qu que qui dont ou afin ainsi entre chaque selon lors via plus tres bien and the of to for with in on by at from as""".split())
-GENERIC = ["assur", "suivi", "suivr", "respect", "gest", "gere", "geri", "contrib", "particip", "maint", "collabor", "effectu", "realis", "appui", "appuy", "soutien", "soutenir", "mene", "veill"]  # neutral action verbs only
+GENERIC = ["assur", "suivi", "suivr", "respect", "gest", "gere", "geri", "contrib", "particip", "maint", "collabor", "effectu", "realis", "appui", "appuy", "soutien", "soutenir", "veill", "developp", "concu", "concev", "produi", "inclu", "notamm"]  # neutral action verbs only
 SYSTEM = """Tu es le module d'optimisation de CV de CareerOS. Tu reformules des lignes d'expérience d'un CV pour une offre précise.
 RÈGLES ABSOLUES (toute violation rend la proposition inutilisable) :
 - n'invente JAMAIS une expérience, un poste, un employeur, une certification, un diplôme, un outil ni des années d'expérience ;
@@ -70,7 +72,7 @@ def _candidates(cv: str, skills: List[JobSkill]) -> list:
     out = []
     relevant = [a for s in skills if s.status != "manquant" for a in s.aliases] + [k for s in skills for k in s.domain_keys]
     units = [(i, seg) for i, raw in enumerate(cv.splitlines())
-             for seg in ([raw.strip()] if len(raw.strip()) <= 320 else [x.strip() for x in re.split(r"(?<=[.;])\s+", raw) if x.strip()])]
+             for seg in ([raw.strip()] if len(raw.strip()) <= 320 else [x.strip() for x in SENT.split(raw) if x.strip()])]
     first = [i for i, raw in enumerate(cv.splitlines()) if raw.strip()][:2]
     seen_first = set()
     for i, line in units:
@@ -81,7 +83,8 @@ def _candidates(cv: str, skills: List[JobSkill]) -> list:
             continue
         body = line.lstrip("-•*●▪– ").strip()
         n = f" {_n(body)} "
-        if (re.search(r"\b(19|20)\d{2}\b|aujourd|present", n) and len(body) < 90) or re.match(r" (formation|diplome|baccalaureat|langues?|education|competences?) ", n):
+        whole = line == cv.splitlines()[i].strip()
+        if (whole and re.search(r"\b(19|20)\d{2}\b|aujourd|present", n) and len(body) < 90) or re.match(r" (formation|diplome|baccalaureat|langues?|education|competences?) ", n):
             continue
         if not (25 <= len(body) <= 320) or "@" in body or body.endswith(":") or body.isupper() or len(re.findall(r"[a-zA-Zà-ÿ]", body)) < 15:
             continue
@@ -107,21 +110,28 @@ def invented(after: str, before: str, cv: str, skills: List[JobSkill]) -> str:
     for w in CERTS:
         if w not in ("certif", "attestation") and f" {w}" in na and f" {w}" not in ncv:
             return f"certification « {w} » absente du CV"
+    for p in PURPOSE:
+        if p in na and p not in nb:
+            return "finalité ajoutée (« afin de », « contribuant à »…) : information non prouvée par le CV"
     proven = set()
     for s in skills:
-        on_line = any(a and f" {a}" in nb for a in s.aliases) or (s.status == "partiel" and any(k and f" {k}" in nb for k in s.domain_keys))
+        on_line = [a for a in s.aliases if a and f" {a}" in nb]
+        partial = s.status == "partiel" and any(k and f" {k}" in nb for k in s.domain_keys)
+        named = set(re.findall(r"\(([a-z0-9]{2,6})\)", s.label.lower()))  # acronym of the skill, e.g. (kpi)
+        label = _n(re.sub(r"\(.*?\)", "", s.label))
+        as_label = {a for a in s.aliases if on_line and f" {label} " in na and a in label}  # naming the proven skill by its exact label
+        ok_words = set(on_line) | as_label | ({_n(x) for x in named} if on_line else set()) | ({_n(a) for a in s.aliases} if partial else set())
         for a in s.aliases:
-            if a and f" {a}" in na and f" {a}" not in ncv and not (on_line and s.status != "manquant"):
+            if a and f" {a}" in na and f" {a}" not in nb and a not in ok_words:
                 return f"compétence « {s.label} » sans preuve dans cette ligne"
-        if on_line and s.status != "manquant":
-            proven.update(_n(a) for a in s.aliases)
-    core = [w[:5] for w in nb.split() if len(w) >= 4 and w not in STOP and not any(w.startswith(g) for g in GENERIC)]
-    if core and sum(1 for w in core if w in {x[:5] for x in na.split()}) < max(1, 0.5 * len(core)):
+        proven.update(ok_words)
+    core = [w[:6] for w in nb.split() if len(w) >= 4 and w not in STOP and not any(w.startswith(g) for g in GENERIC)]
+    if core and sum(1 for w in core if w in {x[:6] for x in na.split()}) < max(1, 0.5 * len(core)):
         return "la proposition ne correspond plus à la ligne d'origine"
     allowed = proven
-    have = {w[:5] for w in ncv.split() if len(w) >= 3}
+    have = {w[:6] for w in ncv.split() if len(w) >= 3}
     for w in na.split():
-        if len(w) < 4 or w in STOP or w.isdigit() or w[:5] in have or any(w.startswith(g) for g in GENERIC) or any(w in a.split() for a in allowed):
+        if len(w) < 4 or w in STOP or w.isdigit() or w[:6] in have or any(w.startswith(g) for g in GENERIC) or any(w in a.split() for a in allowed):
             continue
         return f"mot « {w} » absent du CV (information possiblement ajoutée)"
     if len(after) > 2.5 * len(before) + 120:
@@ -175,6 +185,11 @@ def create_cv_optimize_router(db, current_user, generate, parse_json):
                     if _n(after) == _n(before):
                         continue
                     why = invented(after, before, cv, body.skills)
+                    raw_line = cv.splitlines()[idx].strip()
+                    if not why and raw_line != before.strip():  # sentence of a long line: never duplicate text from the same line
+                        rest = set(_n(raw_line.replace(before.strip(), " ")).split())
+                        dup = [w for w in _n(after).split() if len(w) >= 3 and w not in set(_n(before).split()) and w in rest]
+                        why = f"texte « {dup[0]} » repris d'une autre partie de la même ligne" if dup else ""
                     (bad if why else ok).append((kmap[k], idx, before, after, it, why))
                 return ok, bad
 

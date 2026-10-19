@@ -1,5 +1,5 @@
 // CV <-> offer optimisation helpers (rules, free): payload for the server, CV assembly, diff, impact breakdown.
-import { DOMAINS, N, buildSkillMap } from "@/lib/skillMap";
+import { DOMAINS, N } from "@/lib/skillMap";
 import { compareSkills } from "@/lib/skillMatch";
 
 const KEY_LINE = "Compétences clés pour ce poste : ";
@@ -9,13 +9,19 @@ export const jobPayload = (r) => r.job.map((s) => ({ label: s.label, aliases: s.
   domain_keys: (DOMAINS.find(([n]) => n === s.domain) || [null, []])[1] }));
 
 // Original CV wording for an alias (same-length normalisation so the slice maps back to the CV text).
+const TITLE_WORDS = /^(superviseur|superviseure|gestionnaire|directeur|directrice|coordonnateur|coordonnatrice|chef|analyste|technicien|technicienne|conseiller|conseillere|manager)s?$/;
 const flat = (s) => s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+#]/g, " ");
 export const cvWord = (cv, alias) => {
   const src = String(cv || "").normalize("NFC"), f = flat(src), a = alias.trim();
-  const i = ` ${f}`.indexOf(` ${a}`);
-  if (i < 0 || !a) return "";
-  let j = i + a.length; while (j < f.length && /[a-z0-9]/.test(f[j])) j += 1;
-  return src.slice(i, j);
+  const ne = [...src.matchAll(/[^\n]*\S[^\n]*/g)];  // skip the name and title lines (« Superviseur » is a title, not a skill)
+  const from = ne[1] ? ne[1].index + ne[1][0].length : 0;
+  if (!a) return "";
+  for (let i = ` ${f}`.indexOf(` ${a}`, from); i >= 0; i = ` ${f}`.indexOf(` ${a}`, i + 1)) {
+    let j = i + a.length; while (j < f.length && /[a-z0-9]/.test(f[j])) j += 1;
+    const w = src.slice(i, j);
+    if (!TITLE_WORDS.test(flat(w))) return w;  // « Supervision » yes, « Superviseur » (a job title) no
+  }
+  return "";
 };
 
 // Guaranteed rule-based highlight: job skills already proven in the CV, in the CV's own words, gathered near the top.
@@ -47,11 +53,9 @@ const evidence = (cv, keys) => {
 
 // Skills of the offer not proven in the CV: never added unless the member confirms them.
 export const toConfirm = (r, profile, covered) => {
-  const mine = buildSkillMap(profile);
   return r.gaps.filter((s) => !covered.has(s.label)).slice(0, 10).map((s) => {
-    const g = mine.find((d) => d.name === s.domain);
     const ev = evidence(profile.cv_text, RELATED[s.label] || []);
-    const related = ev.length ? ev : (g?.skills || []).slice(0, 3).map((x) => x.label);
+    const related = ev;
     const confidence = ev.length >= 2 ? "élevée" : ev.length || s.status === "partiel" ? "moyenne" : "faible";
     return { id: `c:${s.label}`, type: "a_confirmer", label: s.label, required: s.required, confidence, related, domain: s.domain, after: s.label };
   });
