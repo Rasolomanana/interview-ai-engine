@@ -39,7 +39,7 @@ export const CvOptimizer = ({ offer, open, onClose }) => {
   const setAll = (on) => setSel((s) => { const n = new Set([...s].filter((id) => id.startsWith("c:"))); if (on) d.items.filter((x) => x.type !== "a_confirmer").forEach((x) => n.add(x.id)); return n; });
   const apply = async () => {
     const cv = buildCv(d.cv, d.items, sel);
-    const v = await cvOptimize.apply({ cv_text: cv, offer: { title: d.src.title, company: d.src.company, kind: offer.kind || "texte", id: offer.id || "" }, accepted: [...sel],
+    const v = await cvOptimize.apply({ cv_text: cv, offer: { title: d.src.title, company: d.src.company, kind: offer.kind || "texte", id: offer.id || "" }, accepted: [...sel], diff: diffRows(d.cv, d.items, sel),
       estimated: { match_before: sim?.match.before, match_after: sim?.match.after, match_potential: sim?.match.potential, ifp_before: sim?.ifp.before, ifp_after: sim?.ifp.after } });
     const p2 = await careeros.getProfile();
     const realMatch = matchOf(p2, p2.cv_text || "", d.src);

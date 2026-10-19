@@ -5,7 +5,7 @@ import { cvOptimize } from "@/lib/careeros";
 import { CvDiff } from "@/components/careeros/optimize/CvDiff";
 
 const fr = (n) => (n == null ? "—" : String(n).replace(".", ","));
-const rows = (a, b) => { const prev = new Set(a.split("\n")); return b.split("\n").map((t) => ({ tag: prev.has(t) ? "same" : "added", text: t })); };
+const rows = (a, b) => { const prev = a.split("\n"), set = new Set(prev); return b.split("\n").map((t, i) => (set.has(t) ? { tag: "same", text: t } : prev.length === b.split("\n").length ? { tag: "improved", text: t, prev: prev[i] } : { tag: "added", text: t })); };
 
 // Master CV versions: date, offer, estimated vs real gain, differences, restore.
 export const CvVersions = ({ onRestored }) => {
@@ -33,7 +33,7 @@ export const CvVersions = ({ onRestored }) => {
           {v.kind !== "restauration" && <p className="mt-1 text-[11px] text-slate-400" data-testid={`cv-version-gains-${i}`}>
             Estimé : compatibilité {fr(v.estimated?.match_before)} % → {fr(v.estimated?.match_after)} %, indice {fr(v.estimated?.ifp_before)} → {fr(v.estimated?.ifp_after)} ·
             Réel : compatibilité {fr(v.real?.match_after)} %, indice {fr(v.real?.ifp_before)} → {fr(v.real?.ifp_after)}</p>}
-          {view === v.id && <div className="mt-2"><CvDiff cv={v.cv_before} rows={rows(v.cv_before, v.cv_after)} /></div>}
+          {view === v.id && <div className="mt-2"><CvDiff cv={v.cv_before} rows={v.diff?.length ? v.diff : rows(v.cv_before, v.cv_after)} /></div>}
         </li>))}</ul>
     </section>
   );

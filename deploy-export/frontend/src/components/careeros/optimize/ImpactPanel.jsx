@@ -30,6 +30,7 @@ export const ImpactPanel = ({ sim }) => {
           <li key={p.id} className={p.potential ? "text-amber-200" : "text-slate-300"} data-testid={`impact-part-${i}`}>
             <b className="tabular-nums">{sign(p.match)} %</b> compatibilité · <b className="tabular-nums">{sign(p.ifp)}</b> indice : {p.label}{p.potential ? " (à confirmer)" : ""}</li>))}</ul>
           : <p className="text-xs text-slate-500">Sélectionnez des modifications pour voir leur effet.</p>}
+        {sim.match.after === sim.match.before && <p className="mt-1.5 text-[11px] text-slate-400" data-testid="impact-match-zero">Compatibilité inchangée par les reformulations : les compétences concernées sont déjà reconnues dans votre CV. Les reformulations les rendent plus visibles pour le recruteur et augmentent votre indice ; seules les compétences confirmées peuvent augmenter la compatibilité.</p>}
         {sim.criteria.length > 0 && <p className="mt-1.5 text-[11px] text-slate-500" data-testid="impact-criteria">Critères de l'indice qui progressent : {sim.criteria.map((c) => `${c.label} ${sign(c.delta)}`).join(" · ")}</p>}
         <p className="mt-1.5 text-[11px] text-slate-500">Estimation par les règles CareerOS (mêmes calculs que la comparaison CV ↔ offre et l'indice). Les gains ne s'additionnent pas toujours exactement.</p>
       </div>

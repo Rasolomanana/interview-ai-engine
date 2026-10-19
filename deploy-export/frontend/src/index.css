@@ -100,3 +100,7 @@ body {
 .skill-bubble { animation: skill-float 5s ease-in-out infinite; transition: box-shadow .2s, filter .2s; }
 .skill-bubble:hover { filter: brightness(1.12); }
 @media (prefers-reduced-motion: reduce) { .skill-bubble { animation: none; } }
+
+/* While a dialog is open, the privacy banner and page tours stay out of the way (they come back when it closes). */
+body:has([role="dialog"][data-state="open"]) [data-testid="privacy-banner"],
+body:has([data-testid="cv-optimizer-dialog"]) [data-testid$="-tour"]:not([role="dialog"]) { display: none; }

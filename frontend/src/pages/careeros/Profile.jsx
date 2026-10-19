@@ -26,7 +26,7 @@ export default function Profile() {
     careeros.getProfile().then(setP).catch((e) => toast.error(e.message));
     careeros.meta().then((m) => setGoals(m.goals)).catch(() => {});
   }, []);
-  useEffect(() => { const h = () => careeros.getProfile().then(setP).catch(() => {}); window.addEventListener("careeros:cv-updated", h); return () => window.removeEventListener("careeros:cv-updated", h); }, []);
+  useEffect(() => { const h = () => careeros.getProfile().then((x) => setP((cur) => ({ ...cur, cv_text: x.cv_text, updated_at: x.updated_at }))).catch(() => {}); window.addEventListener("careeros:cv-updated", h); return () => window.removeEventListener("careeros:cv-updated", h); }, []);
   if (!p) return <Shell><Loader2 className="h-5 w-5 animate-spin text-indigo-400" /></Shell>;
 
   const set = (k) => (e) => setP({ ...p, [k]: e.target.value });
