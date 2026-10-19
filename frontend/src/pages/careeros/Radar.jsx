@@ -34,6 +34,7 @@ import { AutoNotices } from "@/components/careeros/AutoNotices";
 import { CompanySuggestions } from "@/components/careeros/CompanySuggestions";
 import { OfferMap } from "@/components/careeros/OfferMap";
 import { PackConfirm } from "@/components/careeros/PackConfirm";
+import { ZoneNotice } from "@/components/careeros/ZoneNotice";
 import { sourceLabel } from "@/lib/labels";
 import { OptimizeButton } from "@/components/careeros/optimize/OptimizeButton";
 
@@ -202,6 +203,7 @@ export default function Radar() {
           <PortalHealth status={d.sources_status} run={lr} active={f?.startsWith("co:") ? f.slice(3) : null} onPick={(n) => pick(`co:${n}`)} />
           <CompanySuggestions refreshKey={lr?.id} onFollowed={load} />
           <OfferMap zone={d.zone} points={d.map_points || []} />
+          <ZoneNotice zones={d.zone?.zones || []} onFix={() => setSettings(true)} />
           {lr && (running
             ? <p className="flex items-center gap-1.5 text-xs text-indigo-200" data-testid="radar-last-run"><Loader2 className="h-3.5 w-3.5 animate-spin" />Recherche en cours : les offres apparaissent au fur et à mesure (3 à 4 minutes environ). Vous pouvez quitter la page, la recherche continue.</p>
             : <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernière recherche : {new Date(lr.at).toLocaleString("fr-CA", { dateStyle: "medium", timeStyle: "short" })} ({lr.trigger === "manuel" ? "lancée par vous" : "automatique"}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} seront analysées demain (50 par jour)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>)}

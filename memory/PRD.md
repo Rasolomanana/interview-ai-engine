@@ -585,3 +585,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Compétences absentes : décochées, preuves = lignes du CV, confiance élevée/moyenne/faible ; gains garanti vs potentiel séparés ; validation explicite obligatoire.
 - Seuils Indice (15 compétences, 5 mentions leadership) validés par l'utilisateur.
 - Reporté (lot séparé) : remplissage automatique de la Career Memory depuis le CV ; quota IA par membre ; plus gros consommateurs ; quotas appliqués au Copilote.
+
+## 2026-06 — Correctif zone Radar (offres hors zone visibles)
+- Cause : lieux des portails employeurs au format « Ville, XX, CC, code postal » (ex. « NEUILLY SUR SEINE, FR », « Gurugram, HR, IN, 122002 », « Melville, SK, CA, S0A 2P0 ») non reconnus → règle « lieu non reconnu = gardé ».
+- Correctif `careeros/zone.py` : codes postaux/numéros de département ignorés, codes pays ISO (FR, IN, US, CA…) reconnus en dernier segment (« , CA » = Canada), raison lisible ; VERSION 4 → toutes les offres déjà stockées sont réévaluées au prochain affichage du Radar. Test `tests/test_zone_iso_codes.py`.
+- Zone mal orthographiée (« Longeuil ») : la ville n'était pas reconnue → la zone valait toute la province. Ajout `zone.member_place()` (tolérance aux fautes, villes canadiennes) + bandeau `ZoneNotice.jsx` sur le Radar (ville non reconnue / lue comme…, bouton « Corriger mes zones »).
+- Note tests : test_radar_zone.py et test_radar_zones_multi.py partagent le compte membre.test → à lancer avec -n 0 (sinon conflits de réglages).

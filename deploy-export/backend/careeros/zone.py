@@ -1,11 +1,12 @@
 """Geographic zone of the Radar: keep offers near the member's Radar location (city ≤ RADIUS_KM, else province, else country)."""
+import difflib
 import math
 import re
 
 from careeros.geo import COUNTRIES, PROVINCES, _has, _n
 
 RADIUS_KM = 100
-VERSION = 3
+VERSION = 4
 RADII = ("25", "50", "100", "200", "province", "country")
 # city -> (lat, lon, province or "", country)
 PLACES = {
@@ -67,6 +68,11 @@ MORE_COUNTRIES = {"Roumanie": ["romania", "roumanie"], "Madagascar": ["madagasca
 ALL_COUNTRIES = {**COUNTRIES, **MORE_COUNTRIES}
 US_STATES = {"al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl", "ga", "hi", "id", "il", "in", "ia", "ks", "ky", "la", "me", "md", "ma", "mi", "mn", "ms", "mo",
              "mt", "ne", "nv", "nh", "nj", "nm", "ny", "nc", "nd", "oh", "ok", "or", "pa", "ri", "sc", "sd", "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy"}
+ISO = {"fr": "France", "be": "Belgique", "ch": "Suisse", "us": "États-Unis", "usa": "États-Unis", "ma": "Maroc", "tn": "Tunisie", "dz": "Algérie", "sn": "Sénégal",
+       "ci": "Côte d'Ivoire", "ht": "Haïti", "cm": "Cameroun", "ro": "Roumanie", "mg": "Madagascar", "gb": "Royaume-Uni", "uk": "Royaume-Uni", "mx": "Mexique",
+       "in": "Inde", "ph": "Philippines", "pl": "Pologne", "ie": "Irlande", "de": "Allemagne", "es": "Espagne", "br": "Brésil", "cn": "Chine", "jp": "Japon",
+       "au": "Australie", "nl": "Pays-Bas", "it": "Italie", "pt": "Portugal", "sg": "Singapour", "ae": "Émirats arabes unis", "ca": "Canada"}
+POSTAL = re.compile(r"^([a-z]\d[a-z] ?\d[a-z]\d|\d{2,6}(-\d{3,4})?)$")
 REMOTE = re.compile(r"\b(remote|teletravail|a distance|work from home|virtual)\b")
 
 
@@ -78,7 +84,9 @@ def _km(a, b) -> float:
 
 def place(text: str) -> dict:
     """{city, coords, province, country} recognised in a free-text location (empty values if unknown)."""
-    t = _n(text)
+    segs = [_n(x) for x in (text or "").split(",")]
+    segs = [x for x in segs if x and not POSTAL.match(x)]  # « Melville, SK, CA, S0A 2P0 » / « Belleville, 69, FR, 69220 »
+    t = " ".join(segs)
     out = {"city": "", "coords": None, "province": "", "country": ""}
     if not t:
         return out
@@ -96,11 +104,28 @@ def place(text: str) -> dict:
         if any(_has(t, k) for k in keys if len(k) > 2) or any(re.search(rf"(^|,|\s)\s*{k}(\s*,?\s*(ca|canada))?\s*$", t) for k in keys if len(k) == 2):
             out.update(province=prov, country="Canada")
             return out
+    last = segs[-1] if len(segs) >= 2 else ""
+    if last in ISO and (last == "ca" or last not in US_STATES or (len(segs) >= 3 and segs[-2] not in US_STATES)):  # ISO country code: « Paris, FR », « Gurugram, HR, IN »
+        out["country"] = ISO[last]
+        return out
     if re.search(r"(,|\s)\s*(" + "|".join(US_STATES) + r")(\s*,?\s*(us|usa))?\s*$", t) and not re.search(r"\bcanada\b", t):
         out["country"] = "États-Unis"
         return out
     out["country"] = next((c for c, keys in ALL_COUNTRIES.items() if any(_has(t, k) for k in keys)), "")
     return out
+
+
+def member_place(loc: str) -> dict:
+    """Place of a member zone, tolerant to small typos in the city name (« Longeuil » -> Longueuil)."""
+    m = place(loc)
+    head = _n((loc or "").split(",")[0])
+    if not m["city"] and head:
+        names = {_n(c): c for c in PLACES if PLACES[c][3] == "Canada"}
+        hit = difflib.get_close_matches(head, names, n=1, cutoff=0.85)
+        if hit:
+            la, lo, prov, country = PLACES[names[hit[0]]]
+            m = {"city": names[hit[0]], "coords": (la, lo), "province": prov, "country": country}
+    return m
 
 
 def zones_of(st: dict) -> list:
@@ -128,7 +153,7 @@ def check(offer_location: str, zones) -> tuple:
 
 def _check_one(offer_location: str, member_location: str, radius: str) -> tuple:
     """(in_zone, reason) — any segment of a multi-location offer inside the zone keeps it."""
-    m = place(member_location)
+    m = member_place(member_location)
     if radius in ("province", "country") and m["city"]:
         m = {**m, "city": "", "coords": None}
     if radius == "country":
@@ -150,7 +175,8 @@ def _check_one(offer_location: str, member_location: str, radius: str) -> tuple:
         if m["city"] and o["city"] == m["city"]:
             return True, ""
         if o["country"] != m["country"] and m["country"]:
-            reason = reason or f"{o['city'] or o['province'] or o['country']} ({o['country']}) hors de votre zone ({m['country']})"
+            where = o['city'] or o['province']
+            reason = reason or (f"{where} ({o['country']}) hors de votre zone ({m['country']})" if where else f"{o['country']} : hors de votre zone ({m['country']})")
             continue
         if m["coords"] and o["coords"]:
             d = round(_km(m["coords"], o["coords"]))
@@ -182,11 +208,11 @@ def nearest(offer_location: str, zones: list) -> dict:
         if o["coords"]:
             best = None
             for loc, _r in zones:
-                c = place(loc)["coords"]
+                c = member_place(loc)["coords"]
                 if c:
                     d = round(_km(c, o["coords"]))
                     if best is None or d < best[0]:
-                        best = (d, place(loc)["city"])
+                        best = (d, member_place(loc)["city"])
             return {"lat": o["coords"][0], "lon": o["coords"][1], "city": o["city"],
                     "distance_km": best[0] if best else None, "from": best[1] if best else ""}
     return {}

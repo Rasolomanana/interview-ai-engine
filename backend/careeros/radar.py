@@ -746,7 +746,8 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             "out_zone": out_zone, "out_zone_count": await db.radar_offers.count_documents({"user_id": user["id"], "status": "hors_zone"}),
             "zone": {"location": st["location"], "radius_km": int(st["radius"]) if st["radius"].isdigit() else None,
                      "label": " · ".join(f"{loc} ({Z.label(r)})" for loc, r in zones),
-                     "zones": [{"location": loc, "radius": r, "label": Z.label(r), **({"lat": c[0], "lon": c[1]} if (c := Z.place(loc)["coords"]) else {})} for loc, r in zones]},
+                     "zones": [{"location": loc, "radius": r, "label": Z.label(r), "city": (mp := Z.member_place(loc))["city"],
+                                **({"lat": mp["coords"][0], "lon": mp["coords"][1]} if mp["coords"] else {})} for loc, r in zones]},
             "map_points": [{"id": o["id"], "title": o["title"], "company": o.get("company", ""), "location": o.get("location", ""), "url": o.get("url", ""),
                             "priority": o["ips"]["priority"], "score": o["ips"]["score"], **pt}
                            for o in offers if o.get("ips") and o["status"] != "ignoree" and (pt := Z.nearest(o.get("location"), zones))][:300],
