@@ -30,7 +30,7 @@ export const mergeCompanies = (list, added) => {
   return out;
 };
 
-const DOT = { active: "bg-emerald-400", low: "bg-amber-400", inactive: "bg-rose-400" };
+const DOT = { new: "bg-sky-400", active: "bg-emerald-400", low: "bg-amber-400", inactive: "bg-rose-400" };
 const CompanyRow = ({ c, i, onChange, onRemove, result, setResult, match, picked, onPick, act }) => {
   const [checking, setChecking] = useState(false);
   const [open, setOpen] = useState(false);

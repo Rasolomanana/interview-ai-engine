@@ -547,3 +547,12 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Admin, onglet « IA & quotas » (section finance) : appels du jour et plafond, fournisseur actuel, consommation et état par fournisseur, bouton Réactiver, réponses servies par le cache, plafond, secours payant, forçage des règles.
 - Limites connues : le Copilote en direct (streaming) respecte les pauses des fournisseurs mais pas le plafond ni le forçage ; la recherche d'entreprise et le chat en mode serveur appellent encore le premier modèle directement.
 - Tests : iteration_49 (11/11) ; corrections ensuite (pauses par minute ou par jour, cache servi quand les quotas sont atteints, Radar sans fausse erreur). La suite de tests a des effets de bord entre classes (configuration partagée) ; elle passe quand on lance chaque classe seule.
+
+## 2026-06 — Retrait groupé des entreprises suivies
+- Backend radar.py (MAX_COMPANIES=100) :
+  - GET /companies/activity : dernière offre et dernière offre A/B par entreprise (correspondance de nom AU.same_company) ; statut new (suivie depuis moins de 90 j), active (≤30 j), low (<90 j) ou inactive ; compteurs.
+  - POST /companies/remove {names, mode: retire|bloque, reason} : les offres sont conservées ; un nom non suivi = suggestion masquée.
+  - GET /companies/removed ; POST /companies/restore (vérifie la limite avant de supprimer le retrait).
+  - follow : à la limite, erreur 409 « LIMIT:… ». Les suggestions excluent les entreprises retirées ou bloquées. Company.added_at est fixé au suivi.
+- Frontend : CompanyManager (sélection par ligne, pastille d'activité, compteur N/100, compteurs d'activité, retirer la sélection, nettoyer les inactives, sans offre A/B depuis 30 j, entreprises retirées et restauration) ; CompanyCleanup.jsx (confirmation détaillée, retirer ou bloquer, motif) ; RemovedCompanies.jsx ; panneau de limite dans CompanySuggestions. OfferMap : isolate z-0 (la carte passait au-dessus des fenêtres).
+- Tests : iteration_50 ; corrections ensuite, 7/7.

@@ -1,0 +1,42 @@
+{
+  "summary": "Tested Radar bulk unfollow (backend + UI): GET /companies/activity, POST /companies/remove (retire/bloque + reason), GET /companies/removed, POST /companies/restore, removed companies hidden from suggestions, 100-company limit (409 LIMIT:), CompanyManager bulk bar (row checkboxes, select all, activity dots/counts, Retirer la sélection, Nettoyer inactives, Sans offre pertinente 30 j, Afficher retirées + Restaurer), CompanyCleanup dialog (presets, status chips, deselect, mode, reason, confirm toast), and CompanySuggestions limit panel (Faire de la place / Retirer des entreprises / Voir inactives) -> remove -> follow works again. Backend 6/7 pass. Found 1 backend bug (restore at limit loses entry) and 1 UI overlay bug (Leaflet map above dialog, blocks Confirm) which I fixed in OfferMap.jsx.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/careeros/radar/companies/restore", "issue": "When following is at 100/100, restore first runs db.radar_removed.delete_one and then follow() raises 409 LIMIT. Result: the company is no longer followed AND no longer in the removed/blocked list, so a 'bloque' company comes back in suggestions. UI (RemovedCompanies) shows an error toast but does not reload, so the list looks fine until refresh. Fix: check the limit (or call follow) BEFORE deleting the removed entry, or delete only if follow worked.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/careeros/radar/companies/remove", "issue": "Names that are not followed are still upserted into radar_removed (removed=0 but a ghost entry is created). Should limit to names actually followed (or use the AU.same_company check)."},
+      {"endpoint": "GET /api/careeros/radar/companies/activity", "issue": "A company with no offer ever seen (days=None) gets status 'inactive (>= 90 j)'. So a company followed today is labeled Inactive and picked by 'Nettoyer les entreprises inactives' (seen: TESTUiBravo restored a moment before was pre-selected). Add a 'new/no data yet' status, or use followed_at with a grace period."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OfferMap (Carte des offres) on /careeros/radar", "issue": "Leaflet panes (z-index 400+) appeared above the Radix dialog portal. When CompanyCleanup is opened from the Suggestions limit panel, the map covered the bottom of the dialog, so the Confirm button could not be clicked (Playwright: leaflet-interactive path intercepts pointer events). FIXED by me: added 'relative isolate z-0' to the radar-map-canvas wrapper. Please apply the same change in deploy-export/frontend/src/components/careeros/OfferMap.jsx.", "selector": "[data-testid=cleanup-confirm]", "priority": "HIGH (fixed)"}
+    ],
+    "integration_issues": [
+      {"flow": "RemovedCompanies restore error", "issue": "On a restore error (LIMIT), load() is not called again, so the UI stays out of sync with the backend (see the backend restore bug).", "affected_selectors": ["[data-testid^=removed-restore-]"]}
+    ],
+    "design_issues": [
+      {"screen": "Radar settings / cleanup dialog", "issues": ["The guided tour popover (Visite des réglages / Visite du Radar) stays above the dialogs and their overlay (it existed before this change)", "CompanyManager hardcodes '/ 100' and the >=100 check instead of using act.limit"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_radar_bulk_unfollow.py", "/app/test_reports/pytest/pytest_bulk_unfollow.xml"],
+  "action_items": [
+    "Fix /companies/restore so it does not delete the radar_removed entry when follow fails with 409 LIMIT; on error, reload RemovedCompanies",
+    "Only store names that are actually followed in /companies/remove",
+    "Do not mark never-seen/just-followed companies as 'inactive' (add a grace period or a 'new' status) so cleanup presets do not sweep them",
+    "Copy the OfferMap.jsx 'relative isolate z-0' fix to deploy-export"
+  ],
+  "critical_code_review_comments": [
+    "radar.py companies_remove matches names exactly while follow/suggestions use AU.same_company (subset of tokens). The two are not consistent. Note: same_company is very permissive: names whose tokens are subsets match (e.g. 'X_New_1' and 'X_New_2' match because 1-char tokens are dropped, so follow silently returns ok without adding)",
+    "companies_remove loops update_one per name; use bulk_write for up to 100 names",
+    "_activity is O(companies x offer-groups) because of same_company; fine at 100 but worth watching"
+  ],
+  "updated_files": ["/app/frontend/src/components/careeros/OfferMap.jsx", "/app/backend/tests/test_radar_bulk_unfollow.py"],
+  "success_rate": {"backend": "86% (6/7)", "frontend": "95% (all flows work after the map z-index fix)"},
+  "seed_data_creation": "Temporary TESTUi*/TESTFill*/Cohere follows on membre.test were all removed; the member's 14 original companies were restored and the removed list is empty. The test suite creates fresh accounts test.bulk.<hex>@careeros.dev (100 TESTCo*/TESTNew* companies) and leaves them in place.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: export REACT_APP_BACKEND_URL=... && pytest backend/tests/test_radar_bulk_unfollow.py -n 0. test_limit_and_restore_at_limit fails until the restore bug is fixed. Test company names need distinct alpha tokens (same_company drops tokens shorter than 2 chars). UI: login at /careeros/login (auth-email-input/auth-password-input/auth-submit-btn), then radar-settings-btn -> radar-company-bulk. Suggestions on membre.test: Cohere, GitLab.",
+  "rca of the issue": "Restore bug: companies_restore runs delete_one(radar_removed) unconditionally before follow(), and follow raises 409 at MAX_COMPANIES. Repro: fill to 100, remove 1 as bloque, follow 1 other, restore the blocked one -> 409 and the entry is gone from /companies/removed. Map overlay: Leaflet sets z-index 400-1000 on its panes, and the wrapper had no stacking context, so the panes competed with the body-portaled dialog (z-50) and won."
+}

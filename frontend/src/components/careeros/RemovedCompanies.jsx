@@ -11,7 +11,7 @@ export const RemovedCompanies = ({ refreshKey, onRestored }) => {
   const load = () => radar.removedCompanies().then((r) => setItems(r.items)).catch(() => setItems([]));
   useEffect(() => { load(); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!items) return null;
-  const restore = async (n) => { try { await radar.restoreCompany(n); toast.success(`${n} est de nouveau suivie.`); load(); onRestored?.(n); } catch (e) { toast.error(e.message.replace(/^LIMIT:/, "")); } };
+  const restore = async (n) => { try { await radar.restoreCompany(n); toast.success(`${n} est de nouveau suivie.`); load(); onRestored?.(n); } catch (e) { toast.error(`${e.message.replace(/^LIMIT:/, "")} : retirez d'abord une entreprise.`); load(); } };
   const Group = ({ mode, title }) => {
     const list = items.filter((x) => x.mode === mode);
     return (

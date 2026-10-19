@@ -4,9 +4,9 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { radar } from "@/lib/careeros";
 
-const ST = { active: ["Active (≤ 30 j)", "text-emerald-300"], low: ["Peu active (31-89 j)", "text-amber-300"], inactive: ["Inactive (≥ 90 j)", "text-rose-300"] };
+const ST = { new: ["Nouvelle (suivie depuis < 90 j)", "text-sky-300"], active: ["Active (≤ 30 j)", "text-emerald-300"], low: ["Peu active (31-89 j)", "text-amber-300"], inactive: ["Inactive (≥ 90 j)", "text-rose-300"] };
 const date = (s) => (s ? new Date(s).toLocaleDateString("fr-CA") : "jamais");
-export const PRESETS = { inactive: (a) => a.status === "inactive", norel: (a) => a.relevant_days == null || a.relevant_days > 30, low: (a) => a.status === "low", active: (a) => a.status === "active" };
+export const PRESETS = { inactive: (a) => a.status === "inactive", norel: (a) => a.status !== "new" && (a.relevant_days == null || a.relevant_days > 30), low: (a) => a.status === "low", active: (a) => a.status === "active" };
 
 // Detailed confirmation before unfollowing in bulk (offers already found are always kept).
 export const CompanyCleanup = ({ open, onClose, preset, onRemoved }) => {
@@ -40,7 +40,7 @@ export const CompanyCleanup = ({ open, onClose, preset, onRemoved }) => {
         {!act ? <Loader2 className="h-5 w-5 animate-spin text-indigo-400" /> : <>
           <div className="flex flex-wrap gap-2 text-xs">
             <span className="rounded-full border border-white/10 px-3 py-1 font-semibold" data-testid="cleanup-total">Entreprises suivies : {act.total} / {act.limit}</span>
-            {[["active", act.counts.active], ["low", act.counts.low], ["inactive", act.counts.inactive]].map(([k, n]) => (
+            {[["active", act.counts.active], ["low", act.counts.low], ["inactive", act.counts.inactive], ["new", act.counts.new]].map(([k, n]) => (
               <button key={k} type="button" onClick={() => setSel(new Set(rows.filter(([, a]) => a.status === k).map(([n2]) => n2)))} className={`rounded-full border border-white/10 px-3 py-1 hover:bg-white/5 ${ST[k][1]}`} data-testid={`cleanup-select-${k}`}>{ST[k][0]} : {n}</button>))}
             <button type="button" onClick={() => setSel(new Set(rows.filter(([, a]) => PRESETS.norel(a)).map(([n]) => n)))} className="rounded-full border border-white/10 px-3 py-1 text-slate-300 hover:bg-white/5" data-testid="cleanup-select-norel">Sans offre pertinente (A/B) depuis 30 j : {act.counts.no_relevant_30}</button>
             <button type="button" onClick={() => setSel(new Set())} className="px-2 text-slate-500 hover:text-white" data-testid="cleanup-clear">Tout désélectionner</button>

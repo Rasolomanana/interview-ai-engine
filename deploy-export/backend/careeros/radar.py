@@ -74,6 +74,7 @@ class Company(BaseModel):
     auto: bool = False
     auto_block: List[str] = []
     checked_at: str = ""
+    added_at: str = ""  # follow date (activity grace period for new companies)
 
 
 class RadarSettings(BaseModel):
@@ -509,6 +510,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         for co in data["companies"]:
             co["name"] = co["name"].strip()
             old = prev.get(co["name"]) or {}
+            co["added_at"] = old.get("added_at") or ("" if prev and co["name"] in prev else _now().isoformat())
             if old.get("kind") and not co["kind"] and old["kind"] not in co["auto_block"]:
                 co["auto_block"].append(old["kind"])  # portal removed by the member: never re-associate it automatically
             if co["portal_url"] and not co["kind"]:
@@ -535,7 +537,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             if len(st["companies"]) >= MAX_COMPANIES:
                 raise HTTPException(status_code=409, detail=f"LIMIT:Limite atteinte ({MAX_COMPANIES}/{MAX_COMPANIES})")
             await db.radar_removed.delete_one({"user_id": user["id"], "name": name})
-            st["companies"].append(Company(name=name).model_dump())
+            st["companies"].append(Company(name=name, added_at=_now().isoformat()).model_dump())
             await db.radar_settings.update_one({"user_id": user["id"]}, {"$set": {k: v for k, v in st.items() if k != "user_id"}}, upsert=True)
         asyncio.create_task(AU.auto_detect(db, user["id"], [name], limit=1))
         return {"ok": True, "name": name}
@@ -561,16 +563,18 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             rel = max((r["last_rel"] for r in hit if r.get("last_rel")), default=None)
             days = (now - datetime.fromisoformat(last)).days if last else None
             rdays = (now - datetime.fromisoformat(rel)).days if rel else None
-            out[c["name"]] = {"last": last, "last_relevant": rel, "days": days, "relevant_days": rdays, "offers": sum(r["n"] for r in hit),
-                              "status": "active" if days is not None and days <= 30 else "low" if days is not None and days < 90 else "inactive"}
+            age = (now - datetime.fromisoformat(c["added_at"])).days if c.get("added_at") else None
+            new = age is not None and age < 90 and (days is None or days > 30)  # followed recently: no verdict yet
+            out[c["name"]] = {"last": last, "last_relevant": rel, "days": days, "relevant_days": rdays, "offers": sum(r["n"] for r in hit), "added_at": c.get("added_at"),
+                              "status": "new" if new else "active" if days is not None and days <= 30 else "low" if days is not None and days < 90 else "inactive"}
         return out
 
     @router.get("/companies/activity")
     async def companies_activity(user: dict = Depends(current_user)):
         st = await _settings(user["id"], {})
         act = await _activity(user["id"], st["companies"])
-        counts = {k: sum(a["status"] == k for a in act.values()) for k in ("active", "low", "inactive")}
-        counts["no_relevant_30"] = sum(a["relevant_days"] is None or a["relevant_days"] > 30 for a in act.values())
+        counts = {k: sum(a["status"] == k for a in act.values()) for k in ("active", "low", "inactive", "new")}
+        counts["no_relevant_30"] = sum(a["status"] != "new" and (a["relevant_days"] is None or a["relevant_days"] > 30) for a in act.values())
         return {"items": act, "counts": counts, "total": len(st["companies"]), "limit": MAX_COMPANIES}
 
     class RemoveBody(BaseModel):
@@ -582,7 +586,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
     async def companies_remove(body: RemoveBody, user: dict = Depends(current_user)):
         """Unfollow in bulk: offers already found are kept; removed companies leave the suggestions (restorable)."""
         st = await _settings(user["id"], {})
-        names = {n.strip() for n in body.names if n.strip()}
+        names = {n.strip() for n in body.names if n.strip()}  # non-followed names = suggestions the member never wants to see
         keep = [c for c in st["companies"] if c["name"] not in names]
         await db.radar_settings.update_one({"user_id": user["id"]}, {"$set": {"companies": keep}}, upsert=True)
         at = _now().isoformat()
@@ -600,9 +604,11 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
 
     @router.post("/companies/restore")
     async def companies_restore(body: RestoreBody, user: dict = Depends(current_user)):
-        await db.radar_removed.delete_one({"user_id": user["id"], "name": body.name})
         if body.follow:
-            return await follow(FollowBody(name=body.name), user)
+            res = await follow(FollowBody(name=body.name), user)  # raises LIMIT first: the removed entry is kept
+            await db.radar_removed.delete_one({"user_id": user["id"], "name": body.name})
+            return res
+        await db.radar_removed.delete_one({"user_id": user["id"], "name": body.name})
         return {"ok": True}
 
     @router.get("/notices")

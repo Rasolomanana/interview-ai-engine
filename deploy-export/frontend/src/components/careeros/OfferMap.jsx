@@ -21,7 +21,7 @@ export const OfferMap = ({ zone, points }) => {
   const spread = points.map((p) => { const k = `${p.lat},${p.lon}`; const i = (seen[k] = (seen[k] || 0) + 1) - 1; const a = i * 2.4; return { ...p, y: p.lat + Math.sin(a) * 0.004 * Math.sqrt(i), x: p.lon + Math.cos(a) * 0.006 * Math.sqrt(i) }; });
   return (
     <Foldable storageKey="cos.radar.map.open" title={<span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-200"><MapIcon className="h-4 w-4 text-indigo-300" />Carte des offres</span>} hint={`${points.length} offre(s)`} testid="radar-map">
-      <div className="h-[380px] overflow-hidden rounded-2xl border border-white/[0.07]" data-testid="radar-map-canvas">
+      <div className="relative isolate z-0 h-[380px] overflow-hidden rounded-2xl border border-white/[0.07]" data-testid="radar-map-canvas">
         <MapContainer center={center} zoom={zones[0]?.radius === "province" ? 6 : zones[0]?.radius === "country" ? 4 : 9} scrollWheelZoom={false} className="h-full w-full">
           <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {zones.map((z) => /^\d+$/.test(z.radius) && <Circle key={z.location} center={[z.lat, z.lon]} radius={Number(z.radius) * 1000} pathOptions={{ color: "#818cf8", weight: 1.5, fillOpacity: 0.06 }} />)}
