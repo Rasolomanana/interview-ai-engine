@@ -401,6 +401,9 @@ async def _generate_text_raw(system_message: str, user_text: str, tier: str = "e
                 if AB.is_quota_error(e):
                     await AB.mark_exhausted(db, label, str(e), e)
     logger.error("all server LLM providers failed: %s", " | ".join(errors) or "aucun fournisseur configuré")
+    free = {c[0] for c in chain if c[0] in AB.FREE}
+    if free and not (await AB.config(db))["allow_paid"] and free <= await AB.exhausted(db):
+        raise AB.QuotaReached("quotas gratuits du jour atteints")
     raise HTTPException(status_code=502, detail="Analyse indisponible (fournisseurs LLM)")
 
 

@@ -36,7 +36,7 @@ def restore_config():
     requests.put(URL, headers=A, json={k: orig.get(k, v) for k, v in DEFAULT_CFG.items()}, timeout=30)
 
 
-# ---------- Admin endpoint ----------
+# ---------- Admin endpoint + gate (all tests that mutate the global config) ----------
 class TestAdminEndpoint:
     def test_status_shape(self):
         r = requests.get(URL, headers=A, timeout=30)
@@ -79,9 +79,7 @@ class TestAdminEndpoint:
         assert d["rules_only"] is True and d["current"] is None
         requests.put(URL, headers=A, json=DEFAULT_CFG, timeout=30)
 
-
-# ---------- Gate blocks real AI features (no LLM call made) ----------
-class TestGateOnFeatures:
+    # ---------- Gate blocks real AI features (same class: xdist loadscope keeps config-mutating tests on one worker) ----------
     def _app_id(self, h):
         r = requests.get(f"{BASE_URL}/api/careeros/applications", headers=h, timeout=30)
         assert r.status_code == 200

@@ -556,3 +556,10 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
   - follow : à la limite, erreur 409 « LIMIT:… ». Les suggestions excluent les entreprises retirées ou bloquées. Company.added_at est fixé au suivi.
 - Frontend : CompanyManager (sélection par ligne, pastille d'activité, compteur N/100, compteurs d'activité, retirer la sélection, nettoyer les inactives, sans offre A/B depuis 30 j, entreprises retirées et restauration) ; CompanyCleanup.jsx (confirmation détaillée, retirer ou bloquer, motif) ; RemovedCompanies.jsx ; panneau de limite dans CompanySuggestions. OfferMap : isolate z-0 (la carte passait au-dessus des fenêtres).
 - Tests : iteration_50 ; corrections ensuite, 7/7.
+
+## 2026-06 — Vérification Gouvernance IA (chaîne gratuite, Admin, cache)
+- Tests stabilisés : tests modifiant la config globale regroupés dans une classe (xdist loadscope) → 16/16 passés 8 fois de suite.
+- Nouveau test `backend/tests/test_ai_chain_fallback.py` (build production deploy-export, LLM simulés) : ordre Gemini→Groq→OpenRouter free→Mistral→Anthropic, bascule sur 429, Anthropic seulement si payant autorisé.
+- Correctif deploy-export/server.py : si les quotas gratuits s'épuisent pendant un appel et payant interdit → QuotaReached (mode règles) au lieu de 502.
+- Cache vérifié en réel sur la preview : 2e brouillon identique (>10 min) = 0 appel IA, +1 réponse servie par le cache.
+- Preview utilise la clé Emergent (chaîne Anthropic/OpenAI, non gouvernée par allow_paid) ; la chaîne gratuite n'existe qu'en production (Render).
