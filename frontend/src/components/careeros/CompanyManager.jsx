@@ -5,6 +5,8 @@ import { Building2, CheckCircle2, Eye, EyeOff, Loader2, Plus, RefreshCw, Search,
 import { InfoTip } from "@/components/careeros/guide/InfoTip";
 import { toast } from "sonner";
 import { radar } from "@/lib/careeros";
+import { CompanyCleanup } from "@/components/careeros/CompanyCleanup";
+import { RemovedCompanies } from "@/components/careeros/RemovedCompanies";
 import { PortalSuggest, discoverFor } from "@/components/careeros/PortalSuggest";
 import { EmployerDirectory } from "@/components/careeros/EmployerDirectory";
 import { CompanySummary, detectedLabel } from "@/components/careeros/CompanySummary";
@@ -28,7 +30,8 @@ export const mergeCompanies = (list, added) => {
   return out;
 };
 
-const CompanyRow = ({ c, i, onChange, onRemove, result, setResult, match }) => {
+const DOT = { active: "bg-emerald-400", low: "bg-amber-400", inactive: "bg-rose-400" };
+const CompanyRow = ({ c, i, onChange, onRemove, result, setResult, match, picked, onPick, act }) => {
   const [checking, setChecking] = useState(false);
   const [open, setOpen] = useState(false);
   const check = async () => {
@@ -42,9 +45,11 @@ const CompanyRow = ({ c, i, onChange, onRemove, result, setResult, match }) => {
   const show = open || !!result;
   return (
     <div className="space-y-1.5">
-    <div className="grid grid-cols-[auto_1fr_1.4fr_auto_auto_auto_auto] items-center gap-2" data-testid={`radar-company-${i}`}>
+    <div className="grid grid-cols-[auto_auto_1fr_1.4fr_auto_auto_auto_auto] items-center gap-2" data-testid={`radar-company-${i}`}>
+      <input type="checkbox" className="h-3.5 w-3.5 accent-rose-500" checked={picked} onChange={onPick} title="Sélectionner pour retirer en groupe" data-testid={`radar-company-select-${i}`} />
       <input type="checkbox" className="accent-indigo-500" checked={c.enabled} onChange={(e) => onChange({ enabled: e.target.checked })} title="Surveillance active" data-testid={`radar-company-enabled-${i}`} />
-      <input value={c.name} onChange={(e) => onChange({ name: e.target.value })} className={inputCls} data-testid={`radar-company-name-${i}`} />
+      <div className="relative"><input value={c.name} onChange={(e) => onChange({ name: e.target.value })} className={`${inputCls} pl-6`} data-testid={`radar-company-name-${i}`} />
+        {act && <span className={`absolute left-2.5 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ${DOT[act.status]}`} title={`Dernière offre : ${act.last ? new Date(act.last).toLocaleDateString("fr-CA") : "jamais"}`} data-testid={`radar-company-activity-${i}`} />}</div>
       <input value={c.portal_url} onChange={(e) => onChange({ portal_url: e.target.value, kind: "", slug: "" })} placeholder="URL portail carrières (optionnel)" className={inputCls} data-testid={`radar-company-url-${i}`} />
       {c.kind ? <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-emerald-300" data-testid={`radar-company-kind-${i}`}><CheckCircle2 className="h-3.5 w-3.5" />{KIND[c.kind]}{c.auto && <span className="rounded border border-emerald-400/40 px-1 text-[9px] uppercase" title="Associé automatiquement : modifiable ou supprimable à tout moment" data-testid={`radar-company-auto-${i}`}>auto</span>}</span>
         : c.portal_url ? <button type="button" onClick={check} disabled={checking} className="whitespace-nowrap text-[11px] text-indigo-300" data-testid={`radar-company-check-${i}`}>{checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-amber-300" title="Portail pas encore reconnu : cliquez pour vérifier">À vérifier</span>}</button>
@@ -69,6 +74,14 @@ export const CompanyManager = ({ companies, setCompanies }) => {
   const [scan, setScan] = useState(null);
   const [showAssoc, setShowAssoc] = useState(false);
   const [kb, setKb] = useState({});
+  const [sel, setSel] = useState(new Set());
+  const [clean, setClean] = useState(null);
+  const [act, setAct] = useState(null);
+  const [showRemoved, setShowRemoved] = useState(false);
+  const [rk, setRk] = useState(0);
+  useEffect(() => { radar.companiesActivity().then(setAct).catch(() => {}); }, [rk]);
+  const onRemoved = (names) => { const n = new Set(names); setCompanies(companies.filter((c) => !n.has(c.name))); setSel(new Set()); setResults({}); setRk((k) => k + 1); };
+  const pick = (n) => setSel((s) => { const x = new Set(s); x.has(n) ? x.delete(n) : x.add(n); return x; });
   const pending = companies.filter((c) => !c.kind).map((c) => c.name).join("|");
   useEffect(() => {
     const names = pending ? pending.split("|") : [];
@@ -143,9 +156,24 @@ export const CompanyManager = ({ companies, setCompanies }) => {
           {showAssoc ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}{showAssoc ? "Masquer les associées" : `Afficher les associées (${assocN})`}
         </button>
       </div>
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-[11px]" data-testid="radar-company-bulk">
+        <span className={`font-semibold ${companies.length >= 100 ? "text-rose-300" : "text-slate-200"}`} data-testid="radar-company-limit">Entreprises suivies : {companies.length} / 100</span>
+        {act && <span className="text-slate-400" data-testid="radar-company-activity-counts"><span className="text-emerald-300">Actives (30 j) : {act.counts.active}</span> · <span className="text-amber-300">Peu actives : {act.counts.low}</span> · <span className="text-rose-300">Inactives (90 j) : {act.counts.inactive}</span></span>}
+        <span className="ml-auto flex flex-wrap gap-2">
+          <button type="button" onClick={() => setSel(new Set(rows.map(([c]) => c.name)))} className="text-indigo-300 hover:text-white" data-testid="radar-company-select-all">Tout sélectionner ({rows.length} affichées)</button>
+          {sel.size > 0 && <button type="button" onClick={() => setSel(new Set())} className="text-slate-400 hover:text-white" data-testid="radar-company-select-none">Désélectionner</button>}
+          <button type="button" onClick={() => setClean([...sel])} disabled={!sel.size} className="rounded-full bg-rose-600 px-3 py-0.5 font-semibold text-white disabled:opacity-40" data-testid="radar-company-remove-selected">Retirer la sélection ({sel.size})</button>
+          <button type="button" onClick={() => setClean("inactive")} className="rounded-full border border-rose-400/40 px-3 py-0.5 text-rose-200" data-testid="radar-company-clean-inactive">Nettoyer les entreprises inactives</button>
+          <button type="button" onClick={() => setClean("norel")} className="rounded-full border border-white/15 px-3 py-0.5 text-slate-300" data-testid="radar-company-clean-norel">Sans offre pertinente depuis 30 jours</button>
+          <button type="button" onClick={() => setShowRemoved((v) => !v)} className="text-indigo-300 hover:text-white" data-testid="radar-company-show-removed">{showRemoved ? "Masquer" : "Afficher"} les entreprises retirées</button>
+        </span>
+      </div>
+      <p className="text-[11px] text-slate-500">Retirer une entreprise arrête son suivi, mais ses offres déjà trouvées restent dans votre Radar et votre historique. Enregistrez vos autres modifications avant un retrait groupé.</p>
+      {showRemoved && <RemovedCompanies refreshKey={rk} onRestored={(n) => { setCompanies(mergeCompanies(companies, [{ name: n, enabled: true, portal_url: "", kind: "", slug: "" }])); setRk((k) => k + 1); }} />}
+      <CompanyCleanup open={!!clean} preset={clean} onClose={() => setClean(null)} onRemoved={onRemoved} />
       <div className="space-y-2">
         {rows.length === 0 && companies.length > 0 && <p className="text-[11px] text-emerald-300" data-testid="radar-company-all-assoc">Toutes vos entreprises sont associées à leur portail.</p>}
-        {rows.map(([c, i]) => <CompanyRow key={i} c={c} i={i} match={kb[c.name]} result={results[i]} setResult={(r) => { setResults((x) => ({ ...x, [i]: r })); if (r) update(i, { detected: detectedLabel(r) }); }} onChange={(p) => update(i, p)} onRemove={() => { setResults({}); setCompanies(companies.filter((_, j) => j !== i)); }} />)}
+        {rows.map(([c, i]) => <CompanyRow key={i} c={c} i={i} match={kb[c.name]} picked={sel.has(c.name)} onPick={() => pick(c.name)} act={act?.items?.[c.name]} result={results[i]} setResult={(r) => { setResults((x) => ({ ...x, [i]: r })); if (r) update(i, { detected: detectedLabel(r) }); }} onChange={(p) => update(i, p)} onRemove={() => { setResults({}); setCompanies(companies.filter((_, j) => j !== i)); }} />)}
         {companies.length === 0 && <p className="text-[11px] text-slate-500" data-testid="radar-company-empty">Aucune entreprise suivie. Ajoutez-en une ou importez une liste.</p>}
       </div>
       <div className="grid grid-cols-[1fr_1.4fr_auto] gap-2">

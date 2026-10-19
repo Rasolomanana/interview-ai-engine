@@ -28,6 +28,7 @@ from .ips import compute_ips
 from .prompts import SYSTEM
 
 logger = logging.getLogger("careeros.radar")
+MAX_COMPANIES = 100
 DAILY_LIMIT = int(os.environ.get("RADAR_DAILY_LIMIT", "50"))
 DEFAULT_SOURCES = ["jooble", "workday", "boards"]
 AI_TOP = int(os.environ.get("RADAR_AI_TOP") or 5)  # AI confirmation of the best rule-scored offers, per member per day
@@ -79,7 +80,7 @@ class RadarSettings(BaseModel):
     enabled: bool = True
     keywords: List[str] = []
     location: str = "Québec"
-    companies: List[Company] = Field(default=[], max_length=100)
+    companies: List[Company] = Field(default=[], max_length=MAX_COMPANIES)
     sources: List[str] = DEFAULT_SOURCES
     expand: bool = True  # recherche élargie : famille de titres FR/EN générée à partir des mots-clés
     radius: str = "100"  # 25/50/100/200 km, province or country around the main location
@@ -531,8 +532,9 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         st = await _settings(user["id"], profile)
         name = body.name.strip()
         if not any(AU.same_company(name, c["name"]) for c in st["companies"]):
-            if len(st["companies"]) >= 100:
-                raise HTTPException(status_code=400, detail="Maximum 100 entreprises suivies.")
+            if len(st["companies"]) >= MAX_COMPANIES:
+                raise HTTPException(status_code=409, detail=f"LIMIT:Limite atteinte ({MAX_COMPANIES}/{MAX_COMPANIES})")
+            await db.radar_removed.delete_one({"user_id": user["id"], "name": name})
             st["companies"].append(Company(name=name).model_dump())
             await db.radar_settings.update_one({"user_id": user["id"]}, {"$set": {k: v for k, v in st.items() if k != "user_id"}}, upsert=True)
         asyncio.create_task(AU.auto_detect(db, user["id"], [name], limit=1))
@@ -543,7 +545,65 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
         st = await _settings(user["id"], profile)
         roles = (st.get("keywords") or []) + [r for r in re.split(r"[,;/\n]", profile.get("target_roles") or "") if r.strip()]
-        return {"items": await AU.suggestions(db, user["id"], roles, [c["name"] for c in st["companies"]])}
+        removed = [r["name"] async for r in db.radar_removed.find({"user_id": user["id"]}, {"_id": 0, "name": 1})]
+        return {"items": await AU.suggestions(db, user["id"], roles, [c["name"] for c in st["companies"]] + removed)}
+
+    async def _activity(user_id: str, companies: list) -> dict:
+        """Per followed company: last offer seen and last relevant (A/B) offer, from the member's own Radar history."""
+        rows = [r async for r in db.radar_offers.aggregate([{"$match": {"user_id": user_id}}, {"$group": {
+            "_id": "$company", "last": {"$max": "$last_seen"},
+            "last_rel": {"$max": {"$cond": [{"$in": ["$ips.priority", ["A", "B"]]}, "$last_seen", None]}}, "n": {"$sum": 1}}}])]
+        now = _now()
+        out = {}
+        for c in companies:
+            hit = [r for r in rows if r["_id"] and AU.same_company(r["_id"], c["name"])]
+            last = max((r["last"] for r in hit if r.get("last")), default=None)
+            rel = max((r["last_rel"] for r in hit if r.get("last_rel")), default=None)
+            days = (now - datetime.fromisoformat(last)).days if last else None
+            rdays = (now - datetime.fromisoformat(rel)).days if rel else None
+            out[c["name"]] = {"last": last, "last_relevant": rel, "days": days, "relevant_days": rdays, "offers": sum(r["n"] for r in hit),
+                              "status": "active" if days is not None and days <= 30 else "low" if days is not None and days < 90 else "inactive"}
+        return out
+
+    @router.get("/companies/activity")
+    async def companies_activity(user: dict = Depends(current_user)):
+        st = await _settings(user["id"], {})
+        act = await _activity(user["id"], st["companies"])
+        counts = {k: sum(a["status"] == k for a in act.values()) for k in ("active", "low", "inactive")}
+        counts["no_relevant_30"] = sum(a["relevant_days"] is None or a["relevant_days"] > 30 for a in act.values())
+        return {"items": act, "counts": counts, "total": len(st["companies"]), "limit": MAX_COMPANIES}
+
+    class RemoveBody(BaseModel):
+        names: List[str] = Field(min_length=1, max_length=MAX_COMPANIES)
+        mode: str = Field(default="retire", pattern="^(retire|bloque)$")
+        reason: str = Field(default="", max_length=200)
+
+    @router.post("/companies/remove")
+    async def companies_remove(body: RemoveBody, user: dict = Depends(current_user)):
+        """Unfollow in bulk: offers already found are kept; removed companies leave the suggestions (restorable)."""
+        st = await _settings(user["id"], {})
+        names = {n.strip() for n in body.names if n.strip()}
+        keep = [c for c in st["companies"] if c["name"] not in names]
+        await db.radar_settings.update_one({"user_id": user["id"]}, {"$set": {"companies": keep}}, upsert=True)
+        at = _now().isoformat()
+        for n in names:
+            await db.radar_removed.update_one({"user_id": user["id"], "name": n}, {"$set": {"mode": body.mode, "reason": body.reason.strip(), "at": at}}, upsert=True)
+        return {"removed": len(st["companies"]) - len(keep), "total": len(keep), "companies": keep}
+
+    @router.get("/companies/removed")
+    async def companies_removed(user: dict = Depends(current_user)):
+        return {"items": [r async for r in db.radar_removed.find({"user_id": user["id"]}, {"_id": 0, "user_id": 0}).sort("at", -1).limit(500)]}
+
+    class RestoreBody(BaseModel):
+        name: str = Field(min_length=1, max_length=80)
+        follow: bool = True
+
+    @router.post("/companies/restore")
+    async def companies_restore(body: RestoreBody, user: dict = Depends(current_user)):
+        await db.radar_removed.delete_one({"user_id": user["id"], "name": body.name})
+        if body.follow:
+            return await follow(FollowBody(name=body.name), user)
+        return {"ok": True}
 
     @router.get("/notices")
     async def notices(user: dict = Depends(current_user)):
