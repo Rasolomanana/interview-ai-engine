@@ -1,0 +1,119 @@
+{
+  "summary": "Campagne de validation « nouveau membre » (5 priorités), compte frais newmember.1792379944@careeros.dev / Nouveau2026!x + membre.test pour P5. 2 packs IA générés (1 via /careeros/nouveau, 1 lancé involontairement par « Générer le pack » sur une carte Radar : il démarre sans confirmation). Résultats : P1 ⚠️ partiel (on peut avancer, mais il y a de vraies sources de confusion), P2 ✅ côté fonctionnel avec des points UX (aucune erreur technique visible, mais beaucoup de jargon technique ; bug d'estimation de l'expérience par les règles), P3 ✅ (le pack est complet, le Copilote est prérempli, l'import depuis le pack ou le Radar fonctionne, plus de bouton en double) MAIS la fenêtre « Réglages IA » (clé Gemini) s'ouvre toute seule pour chaque nouveau membre, P4 ⚠️ (le score est expliqué, ses critères, leviers, gains, efforts et preuves sont visibles, mais il y a des incohérences et du jargon), P5 ✅ (cases à cocher, tout sélectionner, retrait en rouge avec confirmation, compteur N/100, indicateurs 30/90 j, nettoyage des inactives et « sans offre pertinente » avec confirmation, onglet des retirées avec date et Restaurer, isolation par membre vérifiée).",
+  "per_priority_results": {
+    "P1_parcours_membre": [
+      "✅ Inscription à /connexion → arrivée sur /careeros, la visite guidée démarre (5 étapes + « CareerOS est prêt »), le bandeau « Que faire ensuite ? » et son CTA sont clairs, la barre du parcours en 5 étapes est visible",
+      "✅ Les modes Débutant et Expert sont présents dans le menu Aide, ainsi que « Revoir la visite guidée »",
+      "✅ Career Memory est enregistrée et persiste (toast « Career Memory mise à jour »)",
+      "❌ Après l'enregistrement de la Career Memory, la barre du parcours et le bandeau restent à « 0/6 terminées · Complétez votre Career Memory » tant qu'on ne change pas de page (l'API /journey renvoie bien 1/6 et la prochaine étape « radar »). Même chose sur la page du pack : après la génération, le bandeau dit « Consultez vos nouvelles opportunités » au lieu de « Préparez l'entrevue »",
+      "❌ Le parcours affiche 5 étapes mais le compteur indique « 0/6 terminées » (6 jalons) : incohérent pour un nouveau membre",
+      "❌ Sur la page Career Memory, le bloc du CV maître (l'action principale demandée : « Collez votre CV ») est replié derrière « Afficher » dans la colonne de droite, alors que le bandeau dit « utilisez le bouton principal de la page » (ce bouton est « Enregistrer »)",
+      "❌ Le CV n'est pas extrait automatiquement : le membre doit retaper ses compétences, sa ville, etc., champ par champ",
+      "❌ Copilote : la fenêtre « Réglages IA » s'ouvre automatiquement par-dessus le panneau de contexte et demande une « Clé API Google Gemini (AIza…) », avec des noms de modèles (Gemini 3.8 Flash) et les boutons Debug/Reset ainsi que le coût « ≈ $0 » visibles. C'est très technique et des noms de fournisseurs sont exposés (InterviewConsole.jsx:95 : le fournisseur par défaut n'est pas « server »)"
+    ],
+    "P2_radar": [
+      "✅ Zones : 3 villes au maximum (le bouton « Ajouter une ville » disparaît à la 3e), rayon par zone (25/50/100/200 km, Toute la province, Tout le pays), sauvegarde et persistance OK",
+      "✅ La recherche aboutit (~3,5 min) : 51 offres, sections A (0), B (14-16), C (31), 5 hors zone avec la raison (« Rimouski est à 504 km de Montréal (rayon 25 km) »), filtre hors zone fonctionnel, carte avec 41 offres localisées, analyse d'offre externe (fenêtre claire), « Pourquoi ce score ? » détaillé avec l'écart pour atteindre A",
+      "✅ Aucune erreur technique visible (pas de 429, Gemini, Groq, JSON ni stack trace)",
+      "❌ Pour un nouveau membre, les réglages du Radar ne sont PAS préremplis depuis la Career Memory : mots-clés vides et lieu « Québec » au lieu de Montréal. RCA : radar.py:197 (_apply_zone) fait un upsert de radar_settings avec seulement zone_for → _settings() trouve ce document incomplet et n'applique jamais les valeurs par défaut du profil (target_roles → mots-clés, city → lieu). On peut aussi enregistrer des réglages sans mots-clés, sans aucun avertissement",
+      "❌ Pendant la recherche (~3,5 min) les statistiques restent à « Nouvelles 0 · Total : 0 offres analysées sur 0 trouvées » et la ligne « Dernier passage … 0 offres trouvées » s'affiche alors que des offres B apparaissent déjà",
+      "❌ BUG métier : l'expérience estimée par les règles vaut 3 ans au lieu d'environ 8 (radar_rules.cv_years ignore les postes en cours « 03/2021 – aujourd'hui » et ne fait que max(année) - min(année)). Cela coûte -10 points d'IPS, et l'offre serait A au lieu de B (« +1 point requis pour A »). L'Indice de Force affiche 8,2 ans et le pack IA « plus de 6 ans » : 3 valeurs différentes pour le même CV"
+    ],
+    "P3_offre_pack_copilote": [
+      "✅ « Vérifier d'abord (gratuit) » → verdict rapide IPS 69 / Priorité B, instantané, sans IA",
+      "✅ Un seul bouton « Générer le pack » (plus de doublon ni de chevauchement)",
+      "✅ Pack généré en ~60 s, 9 onglets tous remplis (Décision, ATS 82, CV ATS, CV humain, Lettre, Questions, STAR, Simulation, Suivi), IPS 77, aucune erreur technique",
+      "✅ « Préparer l'entrevue » et /careeros/copilote?pack={id} : CV (852 car.), poste, entreprise, CV ATS et lettre préremplis ; « Importer depuis un pack / le Radar » liste les packs (1) et les offres A/B du Radar (14)",
+      "❌ La page du pack affiche « …s'activera avec la clé SerpApi » (OfferAvailability.jsx:79) : texte technique de configuration montré au membre",
+      "❌ « Interview AI Engine » (nom interne) apparaît dans NewPack.jsx:54, PackView.jsx:129 (« Interview AI Engine génère votre pack… ») et AuthPage.jsx:45 ; « DECISION REPORT » est en anglais",
+      "❌ Sur une carte Radar, « Générer le pack » lance immédiatement une génération IA, sans confirmation ni étape « Vérifier d'abord »",
+      "❌ Le verdict rapide crée une offre Radar « Analyste BI senior — Banque Laurentienne, Montréal (hybride) · Entreprise non précisée · · externe » : le titre contient toute la 1re ligne, l'entreprise n'est pas extraite et il y a un double séparateur",
+      "❌ Copilote, panneau de contexte : le CV ATS s'affiche en Markdown brut (« # Nouveau Membre », « --- », « ## Résumé ») ; en thème clair, les champs de texte sont gris foncé avec un texte sombre (faible contraste) ; des textes IA parlent du « membre » à la 3e personne (« le profil du membre », « Si le membre vise… »)"
+    ],
+    "P4_indice_force": [
+      "✅ Score 62/100, niveau « Intermédiaire », 6 critères avec barres ; un clic sur le score ou sur un critère explique la règle et les preuves ; leviers « Comment gagner des points ? » avec gain simulé (+6 pts), difficulté, effort (20 min), retour sur effort, preuve, « Suivre ce levier » (toast + « Je m'y mets ») ; paliers 65/85/90/95 ; « Autres leviers (4) »",
+      "❌ Paliers 90 et 95 : « (atteignable jusqu'à 82,4 avec ces leviers) Déjà couvert par les leviers précédents » se contredit (le palier n'est PAS atteignable) ; le membre ne sait pas quoi faire au-delà de 82,4",
+      "❌ Les preuves montrent des racines brutes : « encadr », « « certif » (dans le CV) » : c'est du jargon interne",
+      "❌ Certifications : « 3 certification(s) » pour une seule (PL-300 compté via le champ + « certif » + le texte du CV) ; reproduit par le test test_strength_cert_not_triple_counted",
+      "❌ Profil vide : le score est 8/100 avec « Stabilité 7,5/15 » et des leviers comme « Compléter vos outils : Excel, Power Bi » ou « Pour atteindre 10 : +32,5 pts », ce qui est déroutant avant toute saisie",
+      "❌ « Compétences 5/20 » avec 7 compétences saisies (la règle demande 25 compétences pour le maximum) et « Leadership 1,2/15 » alors que le CV indique « encadrement de 2 analystes » : ce sera perçu comme injuste. Les décimales sont mélangées (20.5 et +32,5)"
+    ],
+    "P5_entreprises_suivies": [
+      "✅ Ajout de 2 entreprises : compteur 5/100 ; sélection de 2 lignes : « Retirer la sélection (2) » en rouge ; fenêtre de confirmation (tableau, choix Retirer ou Bloquer, motif) ; toast « 2 entreprise(s) retirée(s) · 3/100 suivies »",
+      "✅ « Entreprises retirées (2) » avec date et Restaurer → « Zorblax Analytics est de nouveau suivie », compteur 4",
+      "✅ membre.test : « Tout sélectionner (4 affichées) » → (4), Tout désélectionner → (0) ; « Nettoyer les entreprises inactives » → « Confirmer : retirer 4 », « Sans offre pertinente » → « retirer 6 » (annulé à chaque fois) ; la liste des retirées de membre.test est vide alors que l'autre membre en a retiré : l'isolation par membre est confirmée",
+      "❌ UX : 2 cases à cocher identiques et sans libellé côte à côte sur chaque ligne (sélection et « Surveillance active ») ; « Tout sélectionner (4 affichées) » alors que 14 entreprises sont suivies (10 associées masquées par défaut) ; deux compteurs différents (« (14/14 actives) » et « Entreprises suivies : 14 / 100 ») ; la fenêtre s'appelle « Faire de la place » même pour un retrait manuel ; « suivie via Jooble » est affiché alors que Jooble est « Non configuré » (attendu en preview)"
+    ],
+    "global_mobile": [
+      "✅ 390 px : le tableau de bord, le Radar et le pack ne débordent pas horizontalement (les onglets du pack défilent)",
+      "❌ 390 px, connexion : le bandeau de confidentialité couvre la moitié de l'écran, dont le mot de passe et le bouton « Se connecter » (il faut d'abord cliquer « J'ai compris »)",
+      "❌ Sur ordinateur, le bandeau de confidentialité n'est pas cliquable tant que la visite guidée est ouverte (l'overlay de la fenêtre intercepte les clics)",
+      "❌ Sur mobile, les libellés de la barre du parcours sont coupés (seules les coches sont visibles)"
+    ]
+  },
+  "points_confus": [
+    {"point": "La fenêtre Réglages IA (clé Gemini, modèles, Debug/Reset, coût en $) s'ouvre automatiquement dans le Copilote pour un nouveau membre", "severity": "petite correction (fournisseur par défaut « server », masquer Debug/Reset/coût) — HAUTE priorité"},
+    {"point": "Le parcours et le bandeau « Que faire ensuite ? » ne se rafraîchissent pas après l'enregistrement de la Career Memory ou la fin du pack", "severity": "petite correction (recharger /journey après sauvegarde ou fin de génération)"},
+    {"point": "5 étapes affichées contre « x/6 terminées »", "severity": "petite correction (libellé « jalons » ou compter les 5 étapes)"},
+    {"point": "CV maître replié derrière « Afficher » sur la page Career Memory alors que c'est l'action n°1", "severity": "petite correction (ouvert par défaut quand le CV est vide)"},
+    {"point": "Pas d'extraction automatique du CV vers les champs (compétences, ville, postes)", "severity": "changement plus important"},
+    {"point": "Réglages du Radar non préremplis depuis la Career Memory (mots-clés vides, lieu « Québec ») et aucun avertissement si les mots-clés sont vides", "severity": "petite correction (radar.py:197 upsert + fusion des valeurs par défaut du profil)"},
+    {"point": "Textes techniques visibles : « planificateur interne, 11 membre(s) », « clé SerpApi », « Jooble/Adzuna · Non configuré », « jusqu'à 8 recherches Jooble, 2 pages », la liste des ATS (Workday, SuccessFactors, Taleo…), la source de chaque offre en minuscules (« successfactors », « workday »), « Analysées aujourd'hui (règles · IA) 46 · 5/25 », « Dernier passage 03 h 23 min 55 s »", "severity": "petite correction (reformuler ou masquer en mode Débutant)"},
+    {"point": "« Interview AI Engine » et « DECISION REPORT » visibles", "severity": "petite correction"},
+    {"point": "Statistiques du Radar à 0 pendant toute la recherche (~3,5 min) alors que les offres s'affichent déjà", "severity": "petite correction"},
+    {"point": "Trois estimations d'expérience différentes (3 ans par les règles, 8,2 ans dans l'Indice de Force, 6+ ans dans le pack)", "severity": "petite correction (réutiliser strength._merged_years dans radar_rules.cv_years)"},
+    {"point": "Indice de Force : « Déjà couvert par les leviers précédents » pour des paliers non atteignables ; preuves « encadr » ou « certif » ; certification comptée 3 fois ; score non nul sur un profil vide", "severity": "petite correction"},
+    {"point": "« Générer le pack » sur une carte Radar lance une génération IA sans confirmation", "severity": "petite correction (confirmation ou verdict d'abord)"},
+    {"point": "Entreprises suivies : 2 cases à cocher sans libellé par ligne ; associées masquées par défaut, donc « Tout sélectionner » ne prend qu'une partie de la liste", "severity": "petite correction"},
+    {"point": "Tableau de bord : la carte « Opportunités » a un X permanent (on dirait un filtre actif) ; « Offres 0 » alors que le Radar a 51 offres ; l'état vide « Commencez par une offre » n'a pas de bouton", "severity": "petite correction"},
+    {"point": "Visites guidées du Radar et des réglages qui s'ouvrent à chaque fois et se superposent aux fenêtres", "severity": "petite correction (mémoriser le refus)"}
+  ],
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "radar_rules.cv_years (IPS Radar / verdict rapide)", "issue": "Ignore les postes en cours (« aujourd'hui ») : 3 ans au lieu de ~8, -10 pts d'IPS, B au lieu de A"},
+      {"endpoint": "GET /api/careeros/radar/settings", "issue": "Nouveau membre : mots-clés et lieu non dérivés du profil, car _apply_zone (radar.py:197) crée un document radar_settings incomplet via upsert"},
+      {"endpoint": "GET /api/careeros/strength", "issue": "Une certification comptée 3 fois (champ + mot-clé « certif » + texte du CV)"},
+      {"endpoint": "Verdict rapide → offre Radar externe", "issue": "Titre = 1re ligne complète, entreprise « non précisée »"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "InterviewConsole settings", "issue": "S'ouvre automatiquement et demande une clé Gemini à chaque nouveau membre", "selector": "[data-testid=settings-close-btn]", "priority": "HIGH"},
+      {"component": "Journey / NextStep", "issue": "Données périmées après une sauvegarde ou la fin d'un pack", "selector": "[data-testid=journey-progress]", "priority": "MEDIUM"},
+      {"component": "PrivacyBanner", "issue": "Non cliquable sous l'overlay de la visite ; couvre le formulaire de connexion à 390 px", "selector": "[data-testid=privacy-accept-btn]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Recherche Radar", "issue": "Statistiques et ligne du dernier passage à 0 pendant la recherche", "affected_selectors": ["[data-testid=radar-stats]", "[data-testid=radar-last-run]"]}
+    ],
+    "design_issues": [
+      {"screen": "Copilote, panneau de contexte (thème clair)", "issues": ["Champs de texte gris foncé avec texte sombre : faible contraste", "CV ATS en Markdown brut"]},
+      {"screen": "Pack / NewPack / Auth", "issues": ["Libellé interne « Interview AI Engine »", "« DECISION REPORT » en anglais", "Texte « clé SerpApi »"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_new_member_campaign.py", "/app/test_reports/pytest/iteration_51.xml"],
+  "action_items": [
+    "HAUTE : InterviewConsole.jsx:95, fournisseur par défaut « server » pour les membres ; ne jamais ouvrir automatiquement les Réglages IA ; masquer Debug/Reset/coût en $",
+    "Corriger radar_rules.cv_years (postes en cours « aujourd'hui/présent/actuel ») ou réutiliser strength._merged_years",
+    "Corriger radar.py:197 (upsert zone_for) ou fusionner les valeurs par défaut du profil dans _settings() quand les mots-clés sont vides ; avertir si on enregistre sans mots-clés",
+    "Recharger /api/careeros/journey après la sauvegarde du profil et à la fin de la génération du pack ; harmoniser 5 étapes et 6 jalons",
+    "Supprimer les textes techniques visibles par les membres : SerpApi, planificateur interne/nombre de membres, Jooble/Adzuna « Non configuré », Interview AI Engine, DECISION REPORT, source ATS en minuscules",
+    "Indice de Force : dédoublonner les certifications, remplacer les racines brutes (« encadr », « certif ») par des libellés, corriger le texte des paliers non atteignables, score neutre sur un profil vide",
+    "Career Memory : déplier le CV maître quand il est vide ; envisager l'extraction du CV vers les champs",
+    "Radar : confirmation avant « Générer le pack » ; statistiques mises à jour pendant la recherche ; libellés pour les 2 cases à cocher de chaque entreprise",
+    "Bandeau de confidentialité : cliquable au-dessus de l'overlay de la visite ; plus compact sur mobile"
+  ],
+  "critical_code_review_comments": [
+    "radar.py:197 : un upsert crée un document radar_settings partiel qui empêche d'appliquer les valeurs par défaut du profil (_settings ne fusionne que si aucun document n'existe)",
+    "radar_rules.cv_years et strength._merged_years calculent l'expérience de deux façons divergentes : centraliser",
+    "strength.py:146 : la liste des certifications fusionne le champ du profil et les correspondances de mots-clés du CV sans dédoublonnage sémantique",
+    "OfferAvailability.jsx:79 : texte de configuration (SerpApi) rendu côté membre"
+  ],
+  "updated_files": ["/app/backend/tests/test_new_member_campaign.py"],
+  "success_rate": {"backend": "50% (2/4 ; les 2 échecs sont des bugs réels documentés)", "frontend": "≈75% des contrôles fonctionnels OK ; nombreux points UX"},
+  "seed_data_creation": "Compte newmember.1792379944@careeros.dev / Nouveau2026!x (Career Memory BI, 3 zones, 4 entreprises suivies + Quintavo Systems retirée, packs CO-2026-000015 et CO-2026-000016) ; compte test_campaign.<ts>@careeros.dev créé par pytest. membre.test non modifié (fenêtres de nettoyage annulées). Budget IA admin non modifié.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Lancer : export REACT_APP_BACKEND_URL=... && pytest backend/tests/test_new_member_campaign.py -n 0 (test_cv_years_counts_ongoing_job et test_strength_cert_not_triple_counted échouent tant que les bugs ne sont pas corrigés). Pour l'UI : cliquer d'abord privacy-accept-btn (sinon il intercepte les clics à 390 px), puis tour-skip ou tour-finish. Les indices data-testid des entreprises (radar-company-select-{i}) suivent la liste complète, associées masquées comprises : utiliser page.check(force=True). Une recherche Radar prend ~3,5 min. Le Copilote ouvre les Réglages IA par-dessus le panneau de contexte : fermer avec settings-close-btn.",
+  "rca of the issue": "1) Expérience : cv_years fait max(année) - min(année) sur les années à 4 chiffres et n'interprète pas « aujourd'hui », donc 2021 - 2018 = 3. 2) Réglages Radar : _apply_zone fait un upsert {zone_for} avant toute sauvegarde de réglages, si bien que _settings voit un document existant et saute la branche des valeurs par défaut du profil. 3) Parcours périmé : Journey et NextStep ne récupèrent /journey qu'au montage ou à la navigation ; l'API est correcte (vérifié : 1/6 puis 4/6). 4) Réglages Copilote : InterviewConsole.jsx:95 ouvre les réglages si provider !== 'server' et qu'il n'y a pas de clé, et le fournisseur par défaut est gemini."
+}

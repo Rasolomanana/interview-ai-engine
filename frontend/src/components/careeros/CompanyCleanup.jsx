@@ -35,7 +35,7 @@ export const CompanyCleanup = ({ open, onClose, preset, onRemoved }) => {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[88vh] overflow-y-auto border-white/10 bg-[#121520] text-slate-100 sm:max-w-3xl" data-testid="company-cleanup-dialog">
-        <DialogHeader><DialogTitle>Faire de la place dans vos entreprises suivies</DialogTitle>
+        <DialogHeader><DialogTitle>Retirer des entreprises suivies</DialogTitle>
           <DialogDescription className="text-slate-400">Vérifiez la liste avant de confirmer. Les offres déjà trouvées restent dans votre Radar et votre historique.</DialogDescription></DialogHeader>
         {!act ? <Loader2 className="h-5 w-5 animate-spin text-indigo-400" /> : <>
           <div className="flex flex-wrap gap-2 text-xs">

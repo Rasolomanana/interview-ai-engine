@@ -5,6 +5,7 @@ import { careeros } from "@/lib/careeros";
 import { usePersistedToggle } from "@/lib/usePersistedToggle";
 import { Levers } from "@/components/careeros/Levers";
 
+const fr = (n) => String(n).replace(".", ",");
 const tone = (r) => (r >= 0.8 ? "bg-emerald-400" : r >= 0.55 ? "bg-indigo-400" : r >= 0.35 ? "bg-amber-400" : "bg-rose-400");
 
 const Spark = ({ hist }) => {
@@ -51,7 +52,7 @@ export const ProStrength = ({ refreshKey }) => {
       </div>
       {open && <div className="mt-3 space-y-4">
         <div className="flex flex-wrap items-end gap-4">
-          <button type="button" onClick={() => setD({ title: `Indice global : ${s.score}/100`, sub: s.note, items: s.criteria.map((c) => `${c.label} : ${c.score}/${c.max} — ${c.summary}`) })} className="text-left" data-testid="pro-strength-score">
+          <button type="button" onClick={() => setD({ title: `Indice global : ${s.score}/100`, sub: s.note, items: s.criteria.map((c) => `${c.label} : ${fr(c.score)}/${c.max} — ${c.summary}`) })} className="text-left" data-testid="pro-strength-score">
             <span className="font-display text-5xl font-bold tabular-nums text-white">{s.score}</span><span className="text-sm text-slate-500">/100</span>
             <span className="ml-2 rounded-full bg-indigo-500/15 px-2 py-0.5 text-[11px] text-indigo-200" data-testid="pro-strength-level">{s.level}</span>
           </button>
@@ -59,8 +60,8 @@ export const ProStrength = ({ refreshKey }) => {
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {s.criteria.map((c) => (
-            <button key={c.key} type="button" onClick={() => setD({ title: `${c.label} : ${c.score}/${c.max}`, sub: c.summary, rule: c.rule, items: c.evidence })} className="rounded-xl border border-white/[0.07] p-2.5 text-left transition-colors hover:border-indigo-400/40" data-testid={`strength-crit-${c.key}`}>
-              <div className="flex justify-between text-xs"><span className="text-slate-300">{c.label}</span><span className="font-mono text-white">{c.score}/{c.max}</span></div>
+            <button key={c.key} type="button" onClick={() => setD({ title: `${c.label} : ${fr(c.score)}/${c.max}`, sub: c.summary, rule: c.rule, items: c.evidence })} className="rounded-xl border border-white/[0.07] p-2.5 text-left transition-colors hover:border-indigo-400/40" data-testid={`strength-crit-${c.key}`}>
+              <div className="flex justify-between text-xs"><span className="text-slate-300">{c.label}</span><span className="font-mono text-white">{fr(c.score)}/{c.max}</span></div>
               <div className="mt-1.5 h-1.5 rounded-full bg-white/5"><div className={`h-1.5 rounded-full ${tone(c.score / c.max)} transition-[width] duration-700`} style={{ width: `${(c.score / c.max) * 100}%` }} /></div>
             </button>))}
         </div>

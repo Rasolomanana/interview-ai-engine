@@ -80,11 +80,11 @@ export default function Dashboard() {
       </div>
       <p className="mb-2 text-[11px] text-slate-500" data-testid="dashboard-breakdown">{nApps} candidature(s) · {radarItems.filter((x) => x.priority === "A").length} priorité(s) A du Radar sans pack · {count(FILTERS.saved[1])} offre(s) sauvegardée(s)</p>
       <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-5">
-        <StatFilter label="Opportunités" value={list.length} testid="stat-total" active={!f} onClick={() => setF(null)} />
+        <StatFilter label="Opportunités" value={list.length} testid="stat-total" active={false} onClick={() => setF(null)} />
         <StatFilter label="Sauvegardées" value={count(FILTERS.saved[1])} testid="stat-saved" active={f === "saved"} onClick={() => pick("saved")} />
         <StatFilter label="Priorité A" value={count(FILTERS.a[1])} testid="stat-priority-a" active={f === "a"} onClick={() => pick("a")} />
         <StatFilter label="Entrevues" value={count(FILTERS.entrevue[1])} testid="stat-interviews" active={f === "entrevue"} onClick={() => pick("entrevue")} />
-        <StatFilter label="Offres" value={count(FILTERS.offre[1])} testid="stat-offers" active={f === "offre"} onClick={() => pick("offre")} />
+        <StatFilter label="Offres d'emploi reçues" value={count(FILTERS.offre[1])} testid="stat-offers" active={f === "offre"} onClick={() => pick("offre")} />
       </div>
       <section className="rounded-2xl border border-white/[0.07] bg-[#121520]/60 p-3 sm:p-5">
         <h2 className="mb-2 px-2 text-sm font-semibold text-slate-200">Candidatures et opportunités</h2>
@@ -92,7 +92,11 @@ export default function Dashboard() {
         {apps === null ? <p className="px-2 py-6 text-sm text-slate-500">Chargement…</p> : list.length === 0 ? (
           <div className="flex flex-col items-start gap-3 px-2 py-10" data-testid="empty-history">
             <Brain className="h-6 w-6 text-indigo-300" />
-            <p className="text-sm text-slate-400">Aucune candidature pour l'instant. Commencez par une offre qui vous intéresse.</p>
+            <p className="text-sm text-slate-400">Aucune candidature pour l'instant. Laissez le Radar trouver des offres pour vous, ou collez une offre qui vous intéresse.</p>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/careeros/radar" className="rounded-full bg-indigo-500 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-400" data-testid="empty-open-radar">Ouvrir le Radar</Link>
+              <Link to="/careeros/nouveau" className="rounded-full border border-white/10 px-4 py-2 text-xs text-slate-200 hover:text-white" data-testid="empty-new-pack">Analyser une offre</Link>
+            </div>
           </div>
         ) : shown.length === 0 ? <p className="px-2 py-6 text-sm text-slate-500" data-testid="filter-empty">Aucune candidature pour ce filtre.</p> : <div data-testid="applications-list">{[...shown].sort((x, y) => (x.priority || "Z").localeCompare(y.priority || "Z") || (y.ips || 0) - (x.ips || 0)).map((a) => (a.radar ? <RadarRow key={a.id} a={a} /> : <Row key={a.id} a={a} />))}</div>}
       </section>

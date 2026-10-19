@@ -42,7 +42,7 @@ export default function AuthPage() {
           <h1 className="font-display text-5xl font-bold leading-[1.05] tracking-tight">Votre directeur de carrière personnel.</h1>
           <p className="mt-5 text-base text-slate-400">Analyser, prioriser, recommander. Chaque opportunité devient une décision éclairée — et une candidature de niveau professionnel.</p>
         </div>
-        <p className="relative font-mono text-[11px] uppercase tracking-[0.2em] text-slate-600">Interview AI Engine · IPS · Career Memory</p>
+        <p className="relative font-mono text-[11px] uppercase tracking-[0.2em] text-slate-600">CareerOS · Radar · Packs · Entrevues</p>
       </section>
       <section className="flex items-center justify-center p-6">
         <form onSubmit={submit} className="w-full max-w-sm space-y-4" data-testid="auth-form">

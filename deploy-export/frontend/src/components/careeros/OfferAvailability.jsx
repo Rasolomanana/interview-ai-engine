@@ -75,8 +75,7 @@ export const OfferAvailability = ({ a, onChange }) => {
           </div>))}
       </div>}
       <p className="text-[11px] text-slate-500" data-testid="auto-sources">Recherche automatique à l'ouverture (résultats gardés 12 h) : {(a.auto_sources || ["Portail officiel"]).join(" · ")}.
-        {a.google_jobs?.enabled ? <span data-testid="google-jobs-budget"> Google Jobs (Indeed, LinkedIn, Glassdoor…) : {a.google_jobs.used}/{a.google_jobs.cap} recherches ce mois, réservé aux offres A en priorité.</span>
-          : <span data-testid="google-jobs-off"> Google Jobs (liens Indeed, LinkedIn, Glassdoor…) s'activera avec la clé SerpApi.</span>}</p>
+        {a.google_jobs?.enabled ? <span data-testid="google-jobs-budget"> Google Emplois (Indeed, LinkedIn, Glassdoor…) inclus.</span> : null}</p>
       <details className="text-[11px]" data-testid="manual-sites">
         <summary className="cursor-pointer text-slate-400 hover:text-white" data-testid="manual-sites-toggle">Autres sites (recherche manuelle) · {manual.length}</summary>
         <div className="mt-2 flex flex-wrap items-center gap-2" data-testid="search-links">

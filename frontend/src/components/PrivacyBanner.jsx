@@ -12,14 +12,15 @@ export default function PrivacyBanner() {
     setShow(false);
   };
   return (
-    <div data-testid="privacy-banner" className="fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-slate-950/95 px-4 py-3 backdrop-blur">
+    <div data-testid="privacy-banner" className="pointer-events-auto fixed inset-x-0 bottom-0 z-[200] border-t border-white/10 bg-slate-950/95 px-4 py-2.5 backdrop-blur sm:py-3">
       <div className="mx-auto flex max-w-5xl items-start gap-3 sm:items-center">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400 sm:mt-0" />
-        <p className="flex-1 text-[12px] leading-relaxed text-slate-300">
-          Confidentialité : certaines données d'analyse (rapport ATS, score, date, IP anonymisée) peuvent être
+        <p className="flex-1 text-[11px] leading-snug text-slate-300 sm:text-[12px] sm:leading-relaxed">
+          <span className="sm:hidden">Confidentialité : votre CV n'est conservé qu'avec votre accord ; données d'analyse anonymisées, supprimées après 90 jours. Vous restez responsable de vos décisions et documents.</span>
+          <span className="hidden sm:inline">Confidentialité : certaines données d'analyse (rapport ATS, score, date, IP anonymisée) peuvent être
           enregistrées à des fins administratives et d'amélioration du service. Votre CV n'est conservé que si
-          vous cochez explicitement le consentement avant « Analyser ». Données supprimées automatiquement après 90 jours.
-          <span className="mt-1 block text-slate-400" data-testid="privacy-disclaimer">
+          vous cochez explicitement le consentement avant « Analyser ». Données supprimées automatiquement après 90 jours.</span>
+          <span className="mt-1 hidden text-slate-400 sm:block" data-testid="privacy-disclaimer">
             CareerOS est un outil d'aide à la recherche d'emploi, à la préparation des candidatures et à la préparation des entrevues.
             Les décisions, réponses et documents finaux demeurent sous la responsabilité du membre.
           </span>

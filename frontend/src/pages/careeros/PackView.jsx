@@ -56,6 +56,7 @@ export default function PackView() {
         if (!alive) return;
         setA(d);
         if (d.status === "generating") timer = setTimeout(load, 2500);
+        else window.dispatchEvent(new Event("careeros:journey"));
       } catch (e) { toast.error(e.message); }
     };
     load();
@@ -126,7 +127,7 @@ export default function PackView() {
       {dialog === "compare" && <CompareDialog open onOpenChange={() => setDialog("")} app={a} />}
       {a.status === "generating" && (
         <div className="mb-6" data-testid="pack-progress">
-          <div className="mb-1.5 flex justify-between text-xs text-slate-400"><span>Interview AI Engine génère votre pack…</span><span>{done}/6 documents</span></div>
+          <div className="mb-1.5 flex justify-between text-xs text-slate-400"><span>CareerOS prépare votre pack…</span><span>{done}/6 documents</span></div>
           <div className="h-1 rounded-full bg-white/5"><div className="h-full rounded-full bg-indigo-400 transition-[width] duration-700" style={{ width: `${(done / 6) * 100}%` }} /></div>
         </div>
       )}

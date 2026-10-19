@@ -29,6 +29,7 @@ const BADGE = {
 
 const MARKER_RE = /\[(RESET|RECRUTEUR|MODE_SIMULATION|REPONSE_ORALE|R[ÉE]PONSE_ORALE|DEBUG)\]/gi;
 const cleanDisplay = (t) => (t || "").replace(MARKER_RE, "").trim();
+const DEV = (() => { try { return localStorage.getItem("careeros:dev") === "1"; } catch { return false; } })();  // debug tools only for the team
 const ZERO_COST = { cost: 0, inputTokens: 0, outputTokens: 0, turns: 0, lastProvider: null };
 
 export default function InterviewConsole() {
@@ -92,7 +93,6 @@ export default function InterviewConsole() {
     (async () => {
       const st = await api.getSettings();
       setSettings(st);
-      if (st.provider !== "server" && !st.geminiKey) setSettingsOpen(true);
       const q = new URLSearchParams(window.location.search);
       const kind = q.get("pack") ? "pack" : q.get("radar") ? "radar" : "";
       if (kind) {  // « Préparer l'entrevue » from a pack / Radar offer: new session already filled
@@ -474,10 +474,10 @@ export default function InterviewConsole() {
               >
                 {state}
               </motion.span>
-              <span className="rounded-lg border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-slate-400" data-testid="turn-counter">
+              {DEV && <span className="rounded-lg border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-slate-400" data-testid="turn-counter">
                 Tours ss marq. : {active?.tours_sans_marqueur ?? 0}
-              </span>
-              <button
+              </span>}
+              {DEV && <button
                 onClick={resetCost}
                 data-testid="cost-counter"
                 title={`Estimation des crédits de cette session\nEntrée ~${cost.inputTokens.toLocaleString()} tok · Sortie ~${cost.outputTokens.toLocaleString()} tok · ${cost.turns} tours${cost.lastProvider === "gemini" ? " · Gemini (gratuit)" : cost.lastProvider === "server" ? " · Serveur (payant)" : ""}\nCliquez pour remettre à zéro`}
@@ -489,7 +489,7 @@ export default function InterviewConsole() {
                   : cost.cost > 0
                     ? `≈ $${cost.cost.toFixed(4)}`
                     : cost.lastProvider === "gemini" ? "Gratuit" : "≈ $0"}
-              </button>
+              </button>}
             </div>
             <div className="flex flex-wrap items-center gap-1.5" data-testid="copilot-toolbar">
               <HeaderBtn n={1} onClick={() => setCtxOpen(true)} testid="open-context-btn" icon={<SlidersHorizontal className="h-4 w-4" />} label="Contexte" />
@@ -507,8 +507,8 @@ export default function InterviewConsole() {
               <HeaderBtn onClick={tour.open} testid="copilot-tour-btn" icon={<Compass className="h-4 w-4" />} label="Visite" />
               <ThemeToggle className="!rounded-lg !p-1.5" />
               <HeaderBtn onClick={() => { window.location.href = "/careeros"; }} testid="careeros-btn" icon={<Brain className="h-4 w-4" />} label="CareerOS" />
-              <HeaderBtn onClick={toggleDebug} testid="debug-toggle-btn" icon={<Bug className="h-4 w-4" />} label="Debug" active={active?.debug} />
-              <HeaderBtn onClick={doReset} testid="reset-btn" icon={<RotateCcw className="h-4 w-4" />} label="Reset" />
+              {DEV && <HeaderBtn onClick={toggleDebug} testid="debug-toggle-btn" icon={<Bug className="h-4 w-4" />} label="Debug" active={active?.debug} />}
+              <HeaderBtn onClick={doReset} testid="reset-btn" icon={<RotateCcw className="h-4 w-4" />} label="Recommencer" />
             </div>
           </div>
 

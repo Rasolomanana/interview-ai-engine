@@ -3,7 +3,7 @@ years, languages, location) with an offer and grades the 8 radar IPS criteria 0-
 The best offers of the day are then confirmed by AI; the rest stays rule-scored (free)."""
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timezone
 
 SKILLS = [
     "sql", "python", "r", "excel", "power bi", "tableau", "looker", "sas", "spss", "vba", "dax", "power query", "etl", "dbt",
@@ -70,10 +70,12 @@ def skills_in(t: str) -> set:
 
 
 def cv_years(cv: str) -> int:
+    from .strength import _merged_years, periods  # same experience measure as the Pro strength index
     n = norm(cv)
     m = [int(x) for x in re.findall(r"(\d{1,2})\s*\+?\s*(?:ans|annees|years?)\s+(?:d'|de |of )?(?:experience|exp)", n)]
-    if m:
-        return max(m)
+    merged = _merged_years(periods(cv or "", datetime.now(timezone.utc)))
+    if m or merged:
+        return min(40, round(max(m + [merged])))
     yrs = [int(y) for y in re.findall(r"\b(19[89]\d|20[0-3]\d)\b", n)]
     now = datetime.now().year
     return max(0, min(40, (min(now, max(yrs)) - min(yrs)))) if len(yrs) >= 2 else 0

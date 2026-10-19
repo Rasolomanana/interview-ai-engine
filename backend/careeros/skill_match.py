@@ -1,4 +1,5 @@
 """Skill map comparison (CV vs job): job text sources + saved comparison history. The rule-based matching runs in the browser (free, instant)."""
+import re
 import json
 import uuid
 from datetime import datetime, timezone
@@ -52,6 +53,18 @@ def create_skill_match_router(db, current_user):
         d = (a.get("parts") or {}).get("decision") or {}
         return {"title": d.get("poste") or a.get("code", ""), "company": d.get("entreprise", ""), "text": f"{d.get('poste') or ''}\n{(a.get('inputs') or {}).get('offer_text') or ''}"}
 
+    def _plain(md) -> str:
+        """Markdown -> readable plain text for the copilot fields (no #, ---, ** marks)."""
+        if not isinstance(md, str):
+            return ""
+        out = []
+        for line in md.splitlines():
+            if re.fullmatch(r"\s*([-*_]\s*){3,}", line):
+                continue
+            line = re.sub(r"^\s*#{1,6}\s*", "", line)
+            out.append(re.sub(r"\*\*(.+?)\*\*|__(.+?)__", lambda m: m.group(1) or m.group(2), line))
+        return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
     @router.get("/copilot")
     async def copilot(kind: str = Query(pattern="^(radar|pack|memoire)$"), id: str = Query(default="", max_length=80), user: dict = Depends(current_user)):
         """Interview copilot context prefilled from Career Memory + a pack or a Radar offer (nothing to retype)."""
@@ -68,7 +81,7 @@ def create_skill_match_router(db, current_user):
             miss = next((v for k, v in ats.items() if ("manq" in k or "missing" in k) and isinstance(v, list)), [])
             return {**out, "title": f"Entrevue · {d.get('poste') or a.get('code', '')}"[:120], "cv": (a.get("inputs") or {}).get("cv_text") or out["cv"],
                     "poste": f"{d.get('poste') or ''}\n{(a.get('inputs') or {}).get('offer_text') or ''}".strip(), "entreprise": d.get("entreprise", ""),
-                    "atsCv": parts.get("cv_ats") if isinstance(parts.get("cv_ats"), str) else "", "coverLetter": parts.get("letter") if isinstance(parts.get("letter"), str) else "",
+                    "atsCv": _plain(parts.get("cv_ats")), "coverLetter": _plain(parts.get("letter")),
                     "score": (a.get("ips") or {}).get("score"), "missingKeywords": [str(x) for x in miss][:15],
                     "gaps": [str(x) for x in (d.get("reasons_avoid") or [])][:8] if isinstance(d.get("reasons_avoid"), list) else []}
         o = await db.radar_offers.find_one({"id": id, "user_id": user["id"]}, {"_id": 0, "title": 1, "company": 1, "description": 1, "ips": 1})

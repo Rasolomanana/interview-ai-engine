@@ -17,7 +17,7 @@ export const SourceStatus = ({ status, run, active, onPick }) => (
       <table className="w-full text-left text-xs" data-testid="radar-source-table">
         <thead className="text-slate-500"><tr><th className="py-1.5 pr-3 font-medium">Source</th><th className="pr-3 font-medium">Statut</th><th className="pr-3 text-right font-medium">Trouvées</th><th className="text-right font-medium">Analysées</th></tr></thead>
         <tbody>
-          {SOURCES.map(([k, l]) => {
+          {SOURCES.filter(([k]) => status?.configured?.[k]).map(([k, l]) => {
             const s = state(k, status);
             const n = run?.by_source?.[k];
             return (

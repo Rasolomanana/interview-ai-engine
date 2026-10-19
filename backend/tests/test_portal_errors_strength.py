@@ -225,4 +225,5 @@ class TestStrength:
         assert crit["experience"]["score"] == 25
         assert crit["tools"]["score"] > 0 and crit["certifications"]["score"] > 0
         assert d["domains"] and d["domains"][0]["name"]
-        assert ST.compute({})["criteria"][-1]["score"] == 7.5
+        assert ST.compute({})["criteria"][-1]["score"] == 0  # empty profile: no neutral points
+        assert ST.compute({"cv_text": "Analyste sans dates"})["criteria"][-1]["score"] == 7.5

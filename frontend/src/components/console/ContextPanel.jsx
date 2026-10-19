@@ -274,7 +274,7 @@ export default function ContextPanel({ open, session, onClose, onSave }) {
           </motion.div>
         </motion.div>
       )}
-      <style>{`.input{width:100%;border-radius:0.75rem;border:1px solid var(--border);background:rgba(9,10,15,0.6);padding:0.6rem 0.8rem;font-size:0.9rem;color:var(--fg);outline:none;transition:border-color .15s}.input:focus{border-color:rgba(99,102,241,0.6)}`}</style>
+      <style>{`.input{width:100%;border-radius:0.75rem;border:1px solid var(--border);background:rgba(9,10,15,0.6);padding:0.6rem 0.8rem;font-size:0.9rem;color:var(--fg);outline:none;transition:border-color .15s}.input:focus{border-color:rgba(99,102,241,0.6)}html.light .input{background:#ffffff;color:#0f172a;border-color:rgba(15,23,42,.18)}`}</style>
     </AnimatePresence>
   );
 }

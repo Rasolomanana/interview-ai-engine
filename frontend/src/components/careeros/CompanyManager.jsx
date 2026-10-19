@@ -46,8 +46,9 @@ const CompanyRow = ({ c, i, onChange, onRemove, result, setResult, match, picked
   return (
     <div className="space-y-1.5">
     <div className="grid grid-cols-[auto_auto_1fr_1.4fr_auto_auto_auto_auto] items-center gap-2" data-testid={`radar-company-${i}`}>
-      <input type="checkbox" className="h-3.5 w-3.5 accent-rose-500" checked={picked} onChange={onPick} title="Sélectionner pour retirer en groupe" data-testid={`radar-company-select-${i}`} />
-      <input type="checkbox" className="accent-indigo-500" checked={c.enabled} onChange={(e) => onChange({ enabled: e.target.checked })} title="Surveillance active" data-testid={`radar-company-enabled-${i}`} />
+      <input type="checkbox" className="h-3.5 w-3.5 accent-rose-500" checked={picked} onChange={onPick} title="Cocher pour retirer en groupe" aria-label={`Sélectionner ${c.name} pour la retirer`} data-testid={`radar-company-select-${i}`} />
+      <button type="button" onClick={() => onChange({ enabled: !c.enabled })} title={c.enabled ? "Recherche active : cliquez pour mettre en pause" : "En pause : cliquez pour réactiver"} aria-pressed={c.enabled}
+        className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${c.enabled ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200" : "border-white/15 text-slate-400"}`} data-testid={`radar-company-enabled-${i}`}>{c.enabled ? "Active" : "En pause"}</button>
       <div className="relative"><input value={c.name} onChange={(e) => onChange({ name: e.target.value })} className={`${inputCls} pl-6`} data-testid={`radar-company-name-${i}`} />
         {act && <span className={`absolute left-2.5 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ${DOT[act.status]}`} title={`Dernière offre : ${act.last ? new Date(act.last).toLocaleDateString("fr-CA") : "jamais"}`} data-testid={`radar-company-activity-${i}`} />}</div>
       <input value={c.portal_url} onChange={(e) => onChange({ portal_url: e.target.value, kind: "", slug: "" })} placeholder="URL portail carrières (optionnel)" className={inputCls} data-testid={`radar-company-url-${i}`} />

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="4" time="1.463" timestamp="2026-10-19T03:37:05.213595+00:00" hostname="agent-env-f81d7871-9f90-471b-9cbf-0fdf03414731"><testcase classname="tests.test_new_member_campaign" name="test_journey_new_member_next_is_memory" time="1.156" /><testcase classname="tests.test_new_member_campaign" name="test_profile_save_advances_journey" time="0.151" /><testcase classname="tests.test_new_member_campaign" name="test_cv_years_counts_ongoing_job" time="0.002"><failure message="AssertionError: cv_years=3 (ongoing job 03/2021 – aujourd'hui ignored)&#10;assert 3 &gt;= 7&#10; +  where 3 = &lt;function cv_years at 0xf8297cc44cc0&gt;('Nouveau Membre — Analyste de données / BI\nMontréal, QC\nEXPÉRIENCE\nAnalyste BI — Desjardins, Montréal (03/2021 – au...accalauréat en statistiques — Université de Montréal (2018)\nCERTIFICATIONS : Microsoft PL-300 (Power BI Data Analyst)')">def test_cv_years_counts_ongoing_job():
+        from careeros.radar_rules import cv_years
+&gt;       assert cv_years(CV) &gt;= 7, f"cv_years={cv_years(CV)} (ongoing job 03/2021 – aujourd'hui ignored)"
+E       AssertionError: cv_years=3 (ongoing job 03/2021 – aujourd'hui ignored)
+E       assert 3 &gt;= 7
+E        +  where 3 = &lt;function cv_years at 0xf8297cc44cc0&gt;('Nouveau Membre — Analyste de données / BI\nMontréal, QC\nEXPÉRIENCE\nAnalyste BI — Desjardins, Montréal (03/2021 – au...accalauréat en statistiques — Université de Montréal (2018)\nCERTIFICATIONS : Microsoft PL-300 (Power BI Data Analyst)')
+
+tests/test_new_member_campaign.py:59: AssertionError</failure></testcase><testcase classname="tests.test_new_member_campaign" name="test_strength_cert_not_triple_counted" time="0.089"><failure message="AssertionError: 3 certification(s) ou attestation(s)&#10;assert '1 certification' in '3 certification(s) ou attestation(s)'">client = &lt;requests.sessions.Session object at 0xf8297d91bd50&gt;
+
+    def test_strength_cert_not_triple_counted(client):
+        d = client.get(f"{BASE_URL}/api/careeros/strength")
+        if d.status_code != 200:
+            pytest.skip("strength endpoint path differs")
+        crit = {c["key"]: c for c in d.json().get("criteria", [])}
+&gt;       assert "1 certification" in crit["certifications"]["summary"], crit["certifications"]["summary"]
+E       AssertionError: 3 certification(s) ou attestation(s)
+E       assert '1 certification' in '3 certification(s) ou attestation(s)'
+
+tests/test_new_member_campaign.py:68: AssertionError</failure></testcase></testsuite></testsuites>

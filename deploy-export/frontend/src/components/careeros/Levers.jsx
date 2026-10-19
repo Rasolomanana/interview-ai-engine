@@ -27,6 +27,7 @@ const Lever = ({ it, rank, onOpen, onFollow }) => (
 export const Levers = ({ s, setD, onChange }) => {
   const [busy, setBusy] = useState("");
   const lv = s.levers;
+  if (lv?.empty) return <p className="text-xs text-slate-400" data-testid="levers-empty">Collez votre CV maître dans la Career Memory : CareerOS calculera votre indice et vous proposera les actions qui rapportent le plus de points.</p>;
   if (!lv || !lv.items.length) return <p className="text-xs text-slate-500" data-testid="levers-empty">Aucun levier simple détecté : votre profil est déjà très complet.</p>;
   const by = Object.fromEntries(lv.items.map((x) => [x.id, x]));
   const open = (it) => setD({ title: `${it.title} · ${fmt(it.gain)}`, sub: it.why, rule: `Gain estimé en recalculant l'indice avec cette action. Effet : ${it.impact.join(" ; ").replace(/(\d)\.(\d)/g, "$1,$2") || "—"}. Difficulté ${it.difficulty}, effort ${it.effort}, retour sur effort ${it.roi}.`,
@@ -43,9 +44,10 @@ export const Levers = ({ s, setD, onChange }) => {
       <ol className="space-y-2">{lv.top3.map((id, i) => <Lever key={id} it={by[id]} rank={i + 1} onOpen={open} onFollow={follow} />)}</ol>
       {lv.milestones.map((m) => (
         <div key={m.target} className="rounded-xl bg-white/[0.02] p-2.5" data-testid={`milestone-${m.target}`}>
-          <p className="text-xs font-semibold text-slate-200">Pour atteindre {m.target} {m.reachable ? "" : <span className="font-normal text-slate-500">(atteignable jusqu'à {String(m.reach).replace(".", ",")} avec ces leviers)</span>}</p>
+          <p className="text-xs font-semibold text-slate-200">Pour atteindre {m.target}{m.reachable ? " :" : ""}</p>
+          {!m.reachable && <p className="mt-0.5 text-[11px] text-slate-500" data-testid={`milestone-${m.target}-note`}>{m.levers.length ? `Ces leviers vous mènent jusqu'à environ ${String(m.reach).replace(".", ",")}. ` : `Les leviers simples s'arrêtent vers ${String(m.reach).replace(".", ",")}. `}Au-delà, les points viendront avec plus d'années d'expérience, des responsabilités plus larges ou une certification avancée.</p>}
           <ul className="mt-1 space-y-0.5 text-xs">{m.levers.map((id) => <li key={id}><button type="button" onClick={() => open(by[id])} className="text-left text-slate-300 hover:text-white" data-testid={`milestone-${m.target}-${id}`}><span className="font-mono text-emerald-300">{fmt(by[id].gain)}</span> : {by[id].title}</button></li>)}
-            {!m.levers.length && <li className="text-slate-500">Déjà couvert par les leviers précédents.</li>}</ul>
+            {!m.levers.length && m.reachable && <li className="text-slate-500">Déjà atteint avec les leviers ci-dessus.</li>}</ul>
         </div>))}
       {lv.items.length > 3 && <details className="text-xs text-slate-400"><summary className="cursor-pointer" data-testid="levers-more">Autres leviers ({lv.items.length - 3})</summary>
         <ul className="mt-2 space-y-2">{lv.items.slice(3).map((it) => <Lever key={it.id} it={it} onOpen={open} onFollow={follow} />)}</ul></details>}

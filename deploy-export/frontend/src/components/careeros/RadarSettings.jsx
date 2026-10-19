@@ -31,16 +31,16 @@ export const RadarSettingsDialog = ({ onClose }) => {
     onClose();
   };
   const save = async () => {
+    if (!(s.keywords || []).length) { toast.warning("Ajoutez au moins un poste visé : sans mots-clés, le Radar ne peut pas chercher d'offres."); return; }
     setBusy(true);
     try {
       const { enabled, keywords, location, companies, sources, expand, radius, extra_zones } = s;
       const r = await radar.saveSettings({ enabled, keywords, location, companies: companies.filter((c) => c.name.trim()), sources, expand: expand !== false,
         radius: radius || "100", extra_zones: (extra_zones || []).filter((z) => z.location.trim()) });
-      const n = (f) => r.companies.filter((c) => c.enabled && f(c)).length;
       const bad = r.companies.filter((c) => c.portal_url && !c.kind).map((c) => c.name);
-      toast.success(`Réglages enregistrés : ${n((c) => c.kind === "workday")} portail(s) Workday, ${n((c) => c.kind && c.kind !== "workday")} autre(s) portail(s) employeur, ${n((c) => !c.kind)} entreprise(s) via Jooble.`);
-      if (r.auto_detecting?.length) toast.message(`Détection automatique lancée pour ${r.auto_detecting.length} entreprise(s) : les portails vérifiés avec certitude seront associés et signalés sur la page Radar.`, { duration: 8000 });
-      if (bad.length) toast.warning(`URL non reconnue pour : ${bad.join(", ")}. Ces entreprises sont suivies via Jooble.`, { duration: 9000 });
+      toast.success(`Réglages enregistrés · ${r.companies.filter((c) => c.enabled).length} entreprise(s) suivie(s).`);
+      if (r.auto_detecting?.length) toast.message(`CareerOS cherche le site carrière officiel de ${r.auto_detecting.length} entreprise(s) : le résultat s'affichera sur la page Radar.`, { duration: 8000 });
+      if (bad.length) toast.warning(`Lien carrière non reconnu pour : ${bad.join(", ")}. Ces entreprises restent suivies par la recherche générale.`, { duration: 9000 });
       onClose();
     } catch (e) { toast.error(e.message); } finally { setBusy(false); }
   };
@@ -56,19 +56,16 @@ export const RadarSettingsDialog = ({ onClose }) => {
             <label className="block text-slate-400">Mots-clés / postes visés (virgules)<input defaultValue={csv(s.keywords)} onBlur={(e) => setS({ ...s, keywords: list(e.target.value) })} className={`${inputCls} mt-1`} data-testid="radar-keywords-input" /></label>
             <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3" data-testid="radar-expand-box">
               <label className="flex items-center gap-2 text-slate-300"><input type="checkbox" className="accent-indigo-500" checked={s.expand !== false} onChange={(e) => setS({ ...s, expand: e.target.checked })} data-testid="radar-expand-checkbox" />
-                Recherche élargie : titres équivalents en français et en anglais (jusqu'à 8 recherches Jooble, 2 pages chacune)</label>
+                Recherche élargie : titres équivalents en français et en anglais</label>
               {s.expand !== false && s.expanded?.length > 0 && <p className="mt-2 flex flex-wrap gap-1" data-testid="radar-expanded-terms">{s.expanded.map((t) => <span key={t} className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-slate-300">{t}</span>)}</p>}
               <p className="mt-1 text-[11px] text-slate-500">Calculé à partir de vos mots-clés enregistrés. Seules les 50 offres aux titres les plus proches de vos postes visés sont analysées chaque jour.</p>
             </div>
             <ZoneEditor s={s} setS={setS} />
             <div className="flex flex-wrap gap-2" data-testid="radar-sources">
-              {SOURCES.map(([k, l]) => {
-                const off = !s.configured?.[k];
-                return (
-                  <button key={k} type="button" onClick={() => toggleSrc(k)} disabled={off} data-testid={`radar-source-${k}`} title={off ? "Clé API non configurée sur le serveur" : ""}
-                    className={`rounded-full border px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-60 ${s.sources.includes(k) && !off ? "border-indigo-400/60 bg-indigo-500/15 text-white" : "border-white/10 text-slate-400"}`}>
-                    {l}{off ? " · Non configuré" : ""}</button>);
-              })}
+              {SOURCES.filter(([k]) => s.configured?.[k]).map(([k, l]) => (
+                  <button key={k} type="button" onClick={() => toggleSrc(k)} data-testid={`radar-source-${k}`}
+                    className={`rounded-full border px-3 py-1.5 ${s.sources.includes(k) ? "border-indigo-400/60 bg-indigo-500/15 text-white" : "border-white/10 text-slate-400"}`}>
+                    {l}</button>))}
             </div>
             <CompanyManager companies={s.companies} setCompanies={(companies) => setS({ ...s, companies })} />
           </div>

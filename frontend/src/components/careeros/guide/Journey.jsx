@@ -16,11 +16,11 @@ const Progress = ({ j }) => (
     <PopoverTrigger asChild>
       <button className="flex shrink-0 items-center gap-2 rounded-full border border-indigo-400/25 bg-indigo-500/10 px-2.5 py-1 text-[11px] font-medium text-indigo-200" data-testid="journey-progress">
         <span className="h-1.5 w-12 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-emerald-400" style={{ width: `${(j.completed / j.total) * 100}%` }} /></span>
-        {j.completed}/{j.total} terminées
+        {j.completed}/{j.total} objectifs
       </button>
     </PopoverTrigger>
     <PopoverContent align="end" className="w-64 border-white/10 bg-[#121520] p-3 text-xs" data-testid="journey-milestones">
-      <p className="mb-2 font-semibold text-white">Votre progression</p>
+      <p className="mb-2 font-semibold text-white">Vos objectifs</p>
       {j.milestones.map((m) => (
         <p key={m.key} className={`flex items-center gap-2 py-0.5 ${m.done ? "text-emerald-300" : "text-slate-400"}`} data-testid={`milestone-${m.key}`}>
           <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${m.done ? "border-emerald-400 bg-emerald-500/20" : "border-white/20"}`}>{m.done && <Check className="h-3 w-3" />}</span>{m.label}
@@ -46,6 +46,7 @@ export const JourneyBar = () => {
                 className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-xs transition-colors ${on ? "bg-indigo-500/15 font-semibold text-indigo-200 ring-1 ring-indigo-400/40" : s.done ? "text-emerald-300 hover:bg-white/5" : "text-slate-500 hover:bg-white/5 hover:text-slate-300"}`}>
                 <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${s.done ? "bg-emerald-500/20 text-emerald-300" : on ? "bg-indigo-500 text-white" : "border border-white/15"}`}>{s.done ? <Check className="h-3 w-3" /> : i + 1}</span>
                 <span className={on ? "" : "hidden md:inline"}>{s.label}</span>
+                {on && <span className="sr-only">étape {i + 1} sur {j.steps.length}</span>}
               </Link>
             </li>);
         })}
@@ -68,7 +69,7 @@ export const NextStep = () => {
         <p className="mt-1 font-medium text-white" data-testid="next-step-title">{n.title}</p>
         <p className="text-sm text-slate-400">{n.text} <span className="ml-1 inline-flex items-center gap-1 text-xs text-slate-500"><Clock className="h-3 w-3" />{n.time}</span></p>
       </div>
-      {here ? <span className="shrink-0 text-xs text-indigo-200" data-testid="next-step-here">Vous êtes au bon endroit : utilisez le bouton principal de la page.</span> : <Link to={n.to} data-testid="next-step-cta" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-400">
+      {here ? <span className="shrink-0 text-xs text-indigo-200" data-testid="next-step-here">Vous êtes au bon endroit : suivez les indications de cette page.</span> : <Link to={n.to} data-testid="next-step-cta" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-400">
         {n.cta}<ArrowRight className="h-4 w-4" /></Link>}
     </div>
   );

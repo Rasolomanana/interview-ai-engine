@@ -174,10 +174,11 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
 
     async def _settings(user_id: str, profile: dict) -> dict:
         s = await db.radar_settings.find_one({"user_id": user_id}, {"_id": 0})
-        if s:
-            return _normalize(s)
         roles = [r.strip() for r in re.split(r"[,;/]", profile.get("target_roles") or "") if r.strip()]
-        return {"user_id": user_id, **RadarSettings(keywords=roles[:5], location=profile.get("location") or profile.get("city") or profile.get("province") or "Québec").model_dump()}
+        loc = profile.get("location") or profile.get("city") or profile.get("province") or "Québec"
+        if s:  # profile values fill what the member never saved (e.g. a doc holding only the zone marker or companies)
+            return _normalize({**({"keywords": roles[:5]} if "keywords" not in s else {}), **({"location": loc} if "location" not in s else {}), **s})
+        return {"user_id": user_id, **RadarSettings(keywords=roles[:5], location=loc).model_dump()}
 
     async def _apply_zone(user_id: str, st: dict) -> None:
         """Re-evaluate the member's stored offers when the zone rules or the Radar zones change (reversible)."""
@@ -834,7 +835,18 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         if len(o["description"]) < 80:
             raise HTTPException(status_code=422, detail="Collez le texte complet de l'offre (au moins quelques lignes).")
         if not o["title"]:
-            o["title"] = next((x.strip() for x in o["description"].splitlines() if x.strip()), "Offre externe")[:120]
+            head = next((x.strip() for x in o["description"].splitlines() if x.strip()), "Offre externe")[:200]
+            m = re.match(r"(.+?)\s+(?:—|–|-|\||chez|at|@)\s+(.+)", head)
+            if m and len(m.group(1)) <= 90:
+                co, _, loc = m.group(2).partition(",")
+                o["title"] = m.group(1).strip()
+                o["company"] = o["company"] or co.strip()[:120]
+                o["location"] = o["location"] or loc.strip()[:120]
+            else:
+                o["title"] = head[:120]
+        if not o["company"]:
+            m = re.search(r"(?im)^\s*(?:entreprise|employeur|company|organisation)\s*:\s*(.+)$", o["description"])
+            o["company"] = m.group(1).strip()[:120] if m else ""
         profile = await db.career_profiles.find_one({"user_id": user["id"]}, {"_id": 0}) or {}
         cv = profile.get("cv_text") or ""
         if len(cv) < 80:

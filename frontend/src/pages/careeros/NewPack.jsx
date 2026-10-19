@@ -51,7 +51,7 @@ export default function NewPack() {
       <form onSubmit={submit} className="grid gap-8 lg:grid-cols-[1fr_320px]" data-testid="new-pack-form">
         <div className="space-y-6">
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300">Interview AI Engine</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-indigo-300">CareerOS · Nouveau pack</p>
             <h1 className="mt-2 font-display text-4xl font-bold tracking-tight sm:text-5xl">Pack candidature en un clic</h1>
             <p className="mt-3 max-w-xl text-sm text-slate-400">Collez l'offre (ou son lien) : CareerOS décide s'il faut postuler, et prépare tout le reste.</p>
             <ConceptRow keys={["pack", "ips", "priorite"]} />

@@ -16,7 +16,7 @@ export const DecisionReport = ({ report }) => {
   if (!report) return null;
   return (
     <section className="rounded-2xl border border-indigo-400/20 bg-gradient-to-br from-indigo-500/[0.07] to-transparent p-5" data-testid="decision-report">
-      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-indigo-300">Decision Report</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-indigo-300">Rapport de décision</p>
       <p className="mt-2 text-base leading-relaxed text-white" data-testid="decision-report-summary">{report.summary}</p>
       <ul className="mt-3 space-y-1" data-testid="decision-report-why">
         {(report.why_priority || []).map((w, i) => <li key={i} className="text-xs text-slate-300">— {w}</li>)}
@@ -42,7 +42,7 @@ export const DecisionReport = ({ report }) => {
 export function decisionReportMd(r) {
   if (!r) return "";
   const l = (a, f) => (a || []).map(f).join("\n");
-  return `## Decision Report
+  return `## Rapport de décision
 ${r.summary}
 ${l(r.why_priority, (w) => `- ${w}`)}
 

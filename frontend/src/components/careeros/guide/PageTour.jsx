@@ -7,7 +7,7 @@ const RING = ["ring-2", "ring-indigo-400", "ring-offset-2", "ring-offset-[#090a0
 export const usePageTour = (key) => {
   const { beginner } = useGuide();
   const [step, setStep] = useState(null);
-  useEffect(() => { try { if (beginner && localStorage.getItem(key) !== "1") setStep(0); } catch { /* ignore */ } }, [key, beginner]);
+  useEffect(() => { try { if (beginner && localStorage.getItem(key) !== "1") { setStep(0); localStorage.setItem(key, "1"); } } catch { /* ignore */ } }, [key, beginner]);
   const close = () => { try { localStorage.setItem(key, "1"); } catch { /* ignore */ } setStep(null); };
   return { step, setStep, open: () => setStep(0), close };
 };

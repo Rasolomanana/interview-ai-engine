@@ -387,7 +387,7 @@ const ALLOWED_MODELS = [
 
 export async function getSettings() {
   const s = await store.get("settings", { geminiKey: "", model: "gemini-flash-latest", provider: "gemini", answerStyle: "complet", tone: "confiant", starMode: true });
-  if (!s.provider) s.provider = "gemini";
+  if (!s.provider || (s.provider !== "server" && !s.geminiKey)) s.provider = "server";  // no personal Gemini key: CareerOS server AI
   if (!s.answerStyle) s.answerStyle = "complet";
   if (!s.tone) s.tone = "confiant";
   if (s.starMode === undefined) s.starMode = true;

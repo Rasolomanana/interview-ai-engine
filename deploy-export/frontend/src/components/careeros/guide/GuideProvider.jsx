@@ -17,6 +17,7 @@ export const GuideProvider = ({ children }) => {
   const refresh = useCallback(() => (user ? call("/careeros/journey").then((j) => { setJourney(j); setPrefs(j.preferences); }).catch(() => {}) : null), [user]);
   useEffect(() => { setPrefs(user?.preferences || {}); }, [user]);
   useEffect(() => { refresh(); }, [refresh, pathname]);
+  useEffect(() => { const h = () => refresh(); window.addEventListener("careeros:journey", h); return () => window.removeEventListener("careeros:journey", h); }, [refresh]);
   useEffect(() => {
     if (user && pathname.startsWith("/careeros") && journey && !journey.preferences.tour_done && (journey.preferences.guide_mode || "debutant") === "debutant" && !tour) setTour({ step: 0 });
   }, [journey, pathname]); // eslint-disable-line react-hooks/exhaustive-deps

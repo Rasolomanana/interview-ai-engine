@@ -36,6 +36,7 @@ export default function Profile() {
       const { user_id, updated_at, skills_detected, ...body } = p;
       setP(await careeros.saveProfile(body));
       toast.success("Career Memory mise à jour");
+      window.dispatchEvent(new Event("careeros:journey"));
     } catch (e) { toast.error(e.message); } finally { setBusy(false); }
   };
 
@@ -72,7 +73,7 @@ export default function Profile() {
           )}
         </section>
         <section>
-          <Foldable storageKey="cos.profile.cv.open" initial={false} title="CV maître (utilisé par défaut dans chaque pack)" hint={`${(p.cv_text || "").length.toLocaleString("fr-CA")} caractères`} testid="profile-cv-block">
+          <Foldable storageKey="cos.profile.cv.open" initial={!(p.cv_text || "").trim()} title="CV maître (collez ici votre CV complet : il sert de base à chaque pack)" hint={`${(p.cv_text || "").length.toLocaleString("fr-CA")} caractères`} testid="profile-cv-block">
             <textarea rows={26} value={p.cv_text || ""} onChange={set("cv_text")} className={`${inputCls} font-mono text-xs`} data-testid="profile-cv-input" aria-label="CV maître" />
           </Foldable>
           <SkillMap profile={p} />

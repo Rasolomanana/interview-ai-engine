@@ -33,6 +33,10 @@ import { CompareDialog } from "@/components/careeros/explain/CompareDialog";
 import { AutoNotices } from "@/components/careeros/AutoNotices";
 import { CompanySuggestions } from "@/components/careeros/CompanySuggestions";
 import { OfferMap } from "@/components/careeros/OfferMap";
+import { PackConfirm } from "@/components/careeros/PackConfirm";
+
+const SOURCE_LABEL = { jooble: "Jooble", adzuna: "Adzuna", google_jobs: "Google Emplois", externe: "Offre ajoutée par vous" };
+const sourceLabel = (s) => SOURCE_LABEL[s] || "Site officiel de l'employeur";
 
 const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, onSave, deepId, busy }) => (
   <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4 min-w-0 break-words" data-testid={`radar-offer-${o.id}`}>
@@ -40,7 +44,7 @@ const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, onSave, deepId, bus
       <PriorityBadge priority={o.ips?.priority} testid={`radar-priority-${o.id}`} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-white">{o.title}</p>
-        <p className="truncate text-xs text-slate-500">{o.company} · {o.location} · {o.source}{o.posted_at ? ` · ${postedAge(o.posted_at)}` : ""}</p>
+        <p className="truncate text-xs text-slate-500">{[o.company, o.location, sourceLabel(o.source), o.posted_at && postedAge(o.posted_at)].filter(Boolean).join(" · ")}</p>
         {o.status === "hors_zone" && <p className="mt-1 text-[11px] text-amber-300" data-testid={`radar-zone-reason-${o.id}`}>Hors zone : {o.zone_reason || "lieu hors de votre zone"}</p>}
       </div>
       {o.ips ? <button type="button" onClick={() => onExplain(o)} className="whitespace-nowrap rounded-md px-1 font-mono text-xs text-indigo-300 underline decoration-indigo-400/40 underline-offset-2 hover:bg-indigo-500/10" title="IPS Radar provisoire : cliquez pour le détail du score" data-testid={`radar-ips-${o.id}`}>IPS Radar {o.ips.score}</button>
@@ -129,7 +133,9 @@ export default function Radar() {
   useEffect(() => { if (!running) return undefined; const t = setTimeout(load, 4000); return () => clearTimeout(t); }, [running, d, load]);
 
   const runNow = async () => { try { await radar.run(); toast.success("Recherche lancée"); setTimeout(load, 1200); } catch (e) { toast.error(e.message); } };
-  const onPack = async (o) => { setBusy(true); try { const r = await radar.pack(o.id); nav(`/careeros/candidature/${r.id}`); } catch (e) { toast.error(e.message); setBusy(false); } };
+  const [confirmPack, setConfirmPack] = useState(null);
+  const doPack = async (o) => { setConfirmPack(null); setBusy(true); try { const r = await radar.pack(o.id); nav(`/careeros/candidature/${r.id}`); } catch (e) { toast.error(e.message); setBusy(false); } };
+  const onPack = (o) => setConfirmPack(o);
   const onIgnore = async (o) => { await radar.ignore(o.id); load(); };
   const onSave = async (o) => { try { const r = await radar.save(o.id); toast.success(r.saved ? "Offre sauvegardée : le Radar apprend vos préférences." : "Offre retirée des sauvegardes."); load(); } catch (e) { toast.error(e.message); } };
   const [deepId, setDeepId] = useState(null);
@@ -185,17 +191,19 @@ export default function Radar() {
         <div className="space-y-8">
           <div className="relative grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="radar-stats">
             <span className="absolute -top-5 right-0"><InfoTip k="compteurs" /></span>
-            <StatFilter label="Analysées aujourd'hui (règles · IA)" value={`${d.analyzed_today} · ${d.ai_today ?? 0}/${d.deep_limit ?? 0}`} testid="radar-stat-analyzed" active={f === "analyzed"} onClick={() => pick("analyzed")} />
-            <StatFilter label="Nouvelles (dernier passage)" value={lr?.new ?? 0} testid="radar-stat-new" active={f === "new"} onClick={() => pick("new")} />
-            <StatFilter label="Déjà connues" value={lr?.known ?? 0} testid="radar-stat-known" active={f === "known"} onClick={() => pick("known")} />
+            <StatFilter label="Analysées aujourd'hui" value={d.analyzed_today} testid="radar-stat-analyzed" active={f === "analyzed"} onClick={() => pick("analyzed")} />
+            <StatFilter label="Nouvelles (dernier passage)" value={running ? "…" : lr?.new ?? 0} testid="radar-stat-new" active={f === "new"} onClick={() => pick("new")} />
+            <StatFilter label="Déjà connues" value={running ? "…" : lr?.known ?? 0} testid="radar-stat-known" active={f === "known"} onClick={() => pick("known")} />
             <StatFilter label="Priorité A" value={d.top_a.length} testid="radar-stat-a" active={f === "a"} onClick={() => pick("a")} />
           </div>
-          <SourceStatus status={d.sources_status} run={lr} active={f?.startsWith("src:") ? f.slice(4).replace(/^a_/, "") : null} onPick={(k) => pick(`src:${k}`)} />
+          <SourceStatus status={d.sources_status} run={running ? null : lr} active={f?.startsWith("src:") ? f.slice(4).replace(/^a_/, "") : null} onPick={(k) => pick(`src:${k}`)} />
           <AutoNotices refreshKey={lr?.id} onChange={load} onEdit={() => setSettings(true)} />
           <PortalHealth status={d.sources_status} run={lr} active={f?.startsWith("co:") ? f.slice(3) : null} onPick={(n) => pick(`co:${n}`)} />
           <CompanySuggestions refreshKey={lr?.id} onFollowed={load} />
           <OfferMap zone={d.zone} points={d.map_points || []} />
-          {lr && <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernier passage : {new Date(lr.at).toLocaleString("fr-CA")} ({lr.trigger}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} reportées (limite quotidienne)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>}
+          {lr && (running
+            ? <p className="flex items-center gap-1.5 text-xs text-indigo-200" data-testid="radar-last-run"><Loader2 className="h-3.5 w-3.5 animate-spin" />Recherche en cours : les offres apparaissent au fur et à mesure (3 à 4 minutes environ). Vous pouvez quitter la page, la recherche continue.</p>
+            : <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernière recherche : {new Date(lr.at).toLocaleString("fr-CA", { dateStyle: "medium", timeStyle: "short" })} ({lr.trigger === "manuel" ? "lancée par vous" : "automatique"}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} seront analysées demain (50 par jour)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>)}
           {Object.values(lr?.notices || {}).map((v, k) => <p key={k} className="text-[11px] text-slate-400" data-testid={`radar-notice-${k}`}>{v}</p>)}
           {d.out_zone_count > 0 && <button type="button" onClick={() => pick("out_zone")} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${f === "out_zone" ? "border-amber-400/50 bg-amber-500/15 text-amber-100" : "border-amber-400/25 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10"}`} title="Offres situées hors de votre zone de recherche : masquées automatiquement, consultables ici" data-testid="radar-out-zone-btn"><MapPinOff className="h-3.5 w-3.5" /><span className="font-semibold tabular-nums" data-testid="radar-out-zone-count">{d.out_zone_count}</span> hors zone masquée(s) · zones : {d.zone?.label}</button>}
           {(d.saved || []).length > 0 && <button type="button" onClick={() => pick("saved")} className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-amber-400/25 px-3 py-1 text-xs text-amber-200 hover:bg-amber-500/10" data-testid="radar-saved-btn"><Bookmark className="h-3.5 w-3.5" />{d.saved.length} sauvegardée(s)</button>}
@@ -213,6 +221,7 @@ export default function Radar() {
         </div>
       )}
       {d && !settings && <PageTour tour={tour} steps={RADAR_STEPS} label="Visite du Radar" testid="radar-tour" />}
+      <PackConfirm offer={confirmPack} onCancel={() => setConfirmPack(null)} onConfirm={doPack} onExplain={(o) => { setConfirmPack(null); setExplainId(o.id); }} />
       <ScoreExplain id={explainId} onClose={() => { setExplainId(null); load(); }} onDeep={load} />
       <CompareDialog open={cmp} onClose={() => setCmp(false)} onExplain={(id) => { setCmp(false); setExplainId(id); }} />
       <ExternalOffer open={ext} onClose={() => setExt(false)} onRefresh={load} onDone={(o) => { setExt(false); load(); setExplainId(o.id); }} />

@@ -104,6 +104,12 @@ def _hits(text: str, words: list) -> list:
     return [w for w in words if f" {w}" in f" {text}"]
 
 
+def _word(text: str, root: str) -> str:
+    """Full word found in the profile for a keyword root (« encadr » -> « encadrement »)."""
+    m = re.search(rf"(?<![a-z0-9]){re.escape(root)}[a-z0-9]*", text)
+    return m.group(0) if m else root
+
+
 FIGURE = re.compile(r"\d[\d\s.,]*\s?(?:%|\$|k\$|m\$)|\$\s?\d[\d\s.,]*|\b\d{2,}\s+(?:employes|employés|personnes|agents|membres|chauffeurs|colis|commandes|camions|"
                     r"livraisons|clients|magasins|sites|quarts|palettes|associés|associes|collaborateurs|people|employees|staff)\b", re.I)
 
@@ -134,24 +140,31 @@ def compute(p: dict, now: datetime = None) -> dict:
             doms[name] = {"skills": hit, "mentions": mentions, "weight": len(hit) * 3 + mentions}
     breadth = len([d for d in doms.values() if d["skills"]])
     figures = quantified(cv + " " + (p.get("achievements") or ""))
-    crit["skills"] = (min(1, len(skills) / 25 * 0.6 + min(breadth, 5) / 5 * 0.25 + min(len(figures), 5) / 5 * 0.15),
+    crit["skills"] = (min(1, len(skills) / 15 * 0.6 + min(breadth, 5) / 5 * 0.25 + min(len(figures), 5) / 5 * 0.15),
                       f"{len(skills)} compétence(s), {breadth} domaine(s), {len(figures)} résultat(s) chiffré(s)",
                       skills[:30] + [f"Résultat chiffré : « {f} »" for f in figures[:8]],
-                      "25 compétences distinctes (60 %) + 5 domaines couverts (25 %) + 5 résultats chiffrés (15 %) = note maximale.")
+                      "15 compétences distinctes (60 %) + 5 domaines couverts (25 %) + 5 résultats chiffrés (15 %) = note maximale.")
     lead = _hits(corpus, LEAD)
     lead_n = sum(corpus.count(w) for w in lead)
     promos = int(p.get("promotions") or 0)
-    crit["leadership"] = (min(1, lead_n / 10 * 0.8 + min(promos, 2) / 2 * 0.2), f"{lead_n} mention(s) de leadership, {promos} promotion(s)",
-                          [f"« {w} »" for w in lead], "10 mentions d'encadrement (80 %) + 2 promotions (20 %) = note maximale.")
-    certs = list(dict.fromkeys([c for c in p.get("certifications") or [] if str(c).strip()] + [f"« {w} » (dans le CV)" for w in _hits(corpus, CERTS)]))
+    crit["leadership"] = (min(1, lead_n / 5 * 0.8 + min(promos, 2) / 2 * 0.2), f"{lead_n} mention(s) de leadership, {promos} promotion(s)",
+                          [f"« {_word(corpus, w)} »" for w in lead], "5 mentions d'encadrement (80 %) + 2 promotions (20 %) = note maximale.")
+    declared_certs = [str(c).strip() for c in p.get("certifications") or [] if str(c).strip()]
+    covered = " ".join(_n(c) for c in declared_certs)
+    found = [w for w in _hits(corpus, CERTS) if w not in ("certif", "attestation") and f" {w}" not in f" {covered}"]
+    certs = list(dict.fromkeys(declared_certs + [f"« {_word(corpus, w)} » (dans le CV)" for w in found]))
+    if not certs and _hits(corpus, ["certif", "attestation"]):
+        certs = ["Certification mentionnée dans le CV (précisez son nom dans la Career Memory)"]
     crit["certifications"] = (min(1, len(certs) / 4), f"{len(certs)} certification(s) ou attestation(s)", certs, "4 certifications ou attestations = note maximale.")
     tools = _hits(corpus, TOOLS)
     crit["tools"] = (min(1, len(tools) / 6), f"{len(tools)} outil(s) détecté(s)", tools, "6 outils ou logiciels distincts = note maximale.")
     if ps:
         tenure = round(sum(b - a for a, b, _ in ps) / len(ps), 1)
         crit["stability"] = (min(1, tenure / 3), f"{tenure:g} an(s) en moyenne par poste", [x[2] for x in ps[:8]], "3 ans en moyenne par poste = note maximale.")
-    else:
+    elif cv.strip():
         crit["stability"] = (0.5, "Dates de postes non détectées : note neutre", [], "Ajoutez les dates de vos postes (ex. « 2019-03 à 2022-06 ») dans le CV.")
+    else:
+        crit["stability"] = (0, "Aucun CV pour l'instant", [], "Collez votre CV maître dans la Career Memory pour calculer ce critère.")
     criteria = [{"key": k, "label": LABELS[k], "max": WEIGHTS[k], "score": round(v[0] * WEIGHTS[k], 1), "summary": v[1], "evidence": v[2][:30], "rule": v[3]}
                 for k, v in crit.items()]
     raw = round(sum(v[0] * WEIGHTS[k] for k, v in crit.items()), 2)
@@ -288,6 +301,8 @@ def levers(p: dict, res: dict) -> dict:
     corpus = _n(" ".join([p.get("cv_text") or "", p.get("achievements") or "", " ".join(p.get("skills_detected") or []), " ".join(p.get("skills") or []),
                           " ".join(p.get("certifications") or [])]))
     raw, items = res["raw"], []
+    if not (p.get("cv_text") or "").strip():
+        return {"items": [], "top3": [], "milestones": [], "empty": True}
     for lid, title, why, diff, effort, hours, sim, ev in _catalog(p, res, corpus):
         new = compute(sim)
         gain = round(new["raw"] - raw, 1)
