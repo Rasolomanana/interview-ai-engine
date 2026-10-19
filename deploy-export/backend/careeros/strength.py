@@ -100,6 +100,13 @@ def _merged_years(ps: list) -> float:
     return round(total + ((cur[1] - cur[0]) if cur else 0), 1)
 
 
+def _fr(x):
+    """French decimal comma in member-facing texts (8.8 -> 8,8)."""
+    if isinstance(x, str):
+        return re.sub(r"(?<=\d)\.(?=\d)", ",", x)
+    return [_fr(v) for v in x] if isinstance(x, list) else x
+
+
 def _hits(text: str, words: list) -> list:
     return [w for w in words if f" {w}" in f" {text}"]
 
@@ -213,7 +220,9 @@ def create_strength_router(db, current_user):
         followed = {f["lever_id"] async for f in db.strength_follow.find({"user_id": user["id"], "done": False}, {"_id": 0, "lever_id": 1})}
         for it in lv["items"]:
             it["followed"] = it["id"] in followed
-        return {**res, "history": hist, "levers": lv}
+            it["why"], it["impact"] = _fr(it["why"]), _fr(it["impact"])
+        criteria = [{**c, "summary": _fr(c["summary"])} for c in res["criteria"]]
+        return {**res, "criteria": criteria, "history": hist, "levers": lv}
 
     @router.post("/strength/levers/{lever_id}/follow")
     async def follow(lever_id: str, user: dict = Depends(current_user)):

@@ -17,7 +17,7 @@ export const QuickAssociate = ({ c, i, match, onPick }) => {
     return <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-rose-300" title="Portail protégé volontairement par l'employeur : CareerOS ne le contourne pas et suit l'entreprise via Jooble" data-testid={`radar-company-blocked-${i}`}><ShieldAlert className="h-3.5 w-3.5" />{blocked} · bloqué · suivi via Jooble</span>;
   }
   const go = async () => {
-    if (match) { onPick(fromKnowledge(match)); toast.success(`${c.name} associée via la base commune CareerOS (${match.kind_label}).`); return; }
+    if (match) { onPick(fromKnowledge(match)); toast.success(`${c.name} associée à son portail déjà vérifié par CareerOS (${match.kind_label}).`); return; }
     setBusy(true);
     try {
       const r = await discoverFor(c);

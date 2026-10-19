@@ -3,7 +3,7 @@ import { BadgeCheck, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { radar } from "@/lib/careeros";
 
-const ORIGIN = { annuaire: "annuaire CareerOS", "annuaire partagé": "annuaire partagé", site: "lien officiel du site employeur" };
+const ORIGIN = { annuaire: "vérifié dans l'annuaire CareerOS", "annuaire partagé": "vérifié dans l'annuaire CareerOS", "base commune": "déjà vérifié par CareerOS", site: "trouvé sur le site officiel de l'employeur" };
 
 export const AutoNotices = ({ onChange, onEdit, refreshKey }) => {
   const [items, setItems] = useState([]);
@@ -23,7 +23,7 @@ export const AutoNotices = ({ onChange, onEdit, refreshKey }) => {
       <p className="flex items-center gap-2 text-sm font-semibold text-emerald-200"><BadgeCheck className="h-4 w-4" />Portails associés automatiquement ({items.length})</p>
       {items.map((n) => (
         <div key={n.id} className="flex flex-wrap items-center gap-2 text-xs text-slate-200" data-testid={`auto-notice-${n.id}`}>
-          <span className="min-w-0 flex-1"><b>{n.company}</b> → {n.kind_label} · {n.count} offre(s) visibles · vérifié via {ORIGIN[n.origin] || n.origin}</span>
+          <span className="min-w-0 flex-1"><b>{n.company}</b> → {n.kind_label} · {n.count} offre(s) visibles · {ORIGIN[n.origin] || "vérifié par CareerOS"}</span>
           <button type="button" onClick={() => act(n, false)} className="rounded-full bg-emerald-500 px-3 py-1 font-semibold text-emerald-950 hover:bg-emerald-400" data-testid={`auto-notice-ok-${n.id}`}>OK</button>
           <button type="button" onClick={onEdit} className="rounded-full border border-white/15 px-3 py-1 hover:text-white" data-testid={`auto-notice-edit-${n.id}`}>Modifier</button>
           <button type="button" onClick={() => act(n, true)} className="flex items-center gap-1 rounded-full border border-rose-400/40 px-3 py-1 text-rose-200 hover:bg-rose-500/10" data-testid={`auto-notice-undo-${n.id}`}><Undo2 className="h-3 w-3" />Annuler</button>

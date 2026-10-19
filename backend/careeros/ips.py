@@ -71,7 +71,7 @@ def compute_ips(ai_criteria: dict, knockout: dict, goal_fit: dict, posted_date: 
             score, just = NETWORK_SCORES.get(network or "aucun", NETWORK_SCORES["aucun"])
             source = "membre"
         elif key == "qualite_lettre":
-            score, just = (8, "Lettre sur mesure générée par Interview AI Engine") if letter_ready else (5, "Lettre non disponible (valeur neutre)")
+            score, just = (8, "Lettre sur mesure générée par CareerOS") if letter_ready else (5, "Lettre non disponible (valeur neutre)")
             source = "formule"
         else:
             c = ai_criteria.get(key) or {}

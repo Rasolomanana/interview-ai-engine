@@ -19,7 +19,7 @@ export default function SessionSidebar({ sessions, activeId, onSelect, onNew, on
           </div>
           <div>
             <p className="font-display text-sm font-bold leading-none text-white">Copilote</p>
-            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500">Entretien IA v4</p>
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500">Copilote d'entrevue</p>
           </div>
         </div>
       </div>

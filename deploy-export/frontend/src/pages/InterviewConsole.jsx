@@ -20,6 +20,7 @@ import RecapPanel from "@/components/console/RecapPanel";
 import FloatingAnswer from "@/components/console/FloatingAnswer";
 import { CopilotTour, StepNum, useCopilotTour } from "@/components/console/CopilotTour";
 import { ThemeToggle, usePageTitle } from "@/components/careeros/ThemeToggle";
+import { DEV } from "@/lib/labels";
 
 const BADGE = {
   NEUTRE: "border-slate-600 bg-slate-800/80 text-slate-300",
@@ -29,7 +30,6 @@ const BADGE = {
 
 const MARKER_RE = /\[(RESET|RECRUTEUR|MODE_SIMULATION|REPONSE_ORALE|R[ÉE]PONSE_ORALE|DEBUG)\]/gi;
 const cleanDisplay = (t) => (t || "").replace(MARKER_RE, "").trim();
-const DEV = (() => { try { return localStorage.getItem("careeros:dev") === "1"; } catch { return false; } })();  // debug tools only for the team
 const ZERO_COST = { cost: 0, inputTokens: 0, outputTokens: 0, turns: 0, lastProvider: null };
 
 export default function InterviewConsole() {

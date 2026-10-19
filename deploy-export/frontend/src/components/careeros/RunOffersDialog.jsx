@@ -3,6 +3,7 @@ import { ExternalLink, Info, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { radar } from "@/lib/careeros";
+import { metaLine } from "@/lib/labels";
 
 const LABEL = { new: "Nouvelles offres", found: "Offres trouvées", analyzed: "Offres analysées pendant ce passage", skipped: "Offres reportées (pas encore analysées)", out_zone: "Offres hors zone (masquées automatiquement)",
   src_jooble: "Offres Jooble", src_workday: "Offres Workday", src_boards: "Offres des sites carrières", src_adzuna: "Offres Adzuna" };
@@ -13,7 +14,7 @@ const OfferLine = ({ o }) => (
     <PriorityBadge priority={o.ips?.priority} testid={`run-offer-priority-${o.id}`} />
     <div className="min-w-0 flex-1">
       <p className="truncate text-sm font-medium text-white">{o.title}</p>
-      <p className="truncate text-xs text-slate-500">{o.company} · {o.location} · {o.source}{o.status && o.status !== "nouvelle" ? ` · ${STATUS[o.status] || o.status}` : ""}</p>
+      <p className="truncate text-xs text-slate-500">{metaLine(o)}{o.status && o.status !== "nouvelle" ? ` · ${STATUS[o.status] || o.status}` : ""}</p>
       {o.status === "hors_zone" && o.zone_reason && <p className="text-[11px] text-amber-300" data-testid={`run-offer-zone-${o.id}`}>{o.zone_reason}</p>}
     </div>
     <span className="whitespace-nowrap font-mono text-xs text-slate-300">{o.ips ? `IPS ${o.ips.score}` : "à analyser"}</span>

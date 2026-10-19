@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PriorityBadge } from "@/components/careeros/Ips";
 import { radar } from "@/lib/careeros";
+import { sourceLabel } from "@/lib/labels";
 
 const STATUS = {
   priorite_a: ["Trouvée · priorité A", "text-emerald-300"], priorite_b: ["Trouvée · priorité B", "text-sky-300"], priorite_c: ["Trouvée · priorité C", "text-amber-300"],
@@ -23,7 +24,7 @@ const Item = ({ it, i, onExplain }) => {
       </div>
       <dl className="mt-2 grid gap-1 sm:grid-cols-[150px_1fr]">
         <dt className="text-slate-500">1. Couverture</dt><dd className={COVER[it.coverage.state]} data-testid={`compare-coverage-${i}`}>{it.coverage.label}</dd>
-        <dt className="text-slate-500">2–3. Résultat Radar</dt><dd className={color} data-testid={`compare-status-${i}`}>{label}{it.offer ? ` (« ${it.offer.title} », ${it.offer.source})` : ""}</dd>
+        <dt className="text-slate-500">2–3. Résultat Radar</dt><dd className={color} data-testid={`compare-status-${i}`}>{label}{it.offer ? ` (« ${it.offer.title} », ${sourceLabel(it.offer.source)})` : ""}</dd>
         {!it.found && <><dt className="text-slate-500">Pourquoi</dt><dd className="text-slate-300" data-testid={`compare-why-${i}`}>{it.why}</dd></>}
         {it.found && <><dt className="text-slate-500">4. Critères pénalisants</dt><dd className="text-slate-300" data-testid={`compare-losses-${i}`}>
           {it.knockout && <span className="block text-rose-300">Éliminatoire : {it.knockout}</span>}

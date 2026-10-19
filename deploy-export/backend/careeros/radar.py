@@ -873,7 +873,9 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         if o.get("application_id"):
             return {"id": o["application_id"], "already": True}
         from .router import PackBody
-        text = f"{o['title']} — {o['company']} — {o['location']}\nSource : {o['source']} · {o['url']}\n\n{o['description']}"
+        src = {"jooble": "Jooble", "adzuna": "Adzuna", "google_jobs": "Google Emplois", "externe": "offre ajoutée par le membre"}.get(o["source"], "site officiel de l'employeur")
+        head = " — ".join(x for x in (o["title"], o["company"], o["location"]) if x)
+        text = f"{head}\nSource : {' · '.join(x for x in (src, o['url']) if x)}\n\n{o['description']}"
         if o.get("method") == "ia" and o.get("ips"):  # reuse the Radar AI analysis for consistency
             notes = "; ".join(f"{c['label']} {c['score']}/10" for c in o["ips"]["criteria"])
             text += (f"\n\nANALYSE RADAR CAREEROS DÉJÀ RÉALISÉE (à réutiliser sauf contradiction avec l'offre) : {notes}. "

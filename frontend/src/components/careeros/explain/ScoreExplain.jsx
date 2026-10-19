@@ -7,6 +7,7 @@ import { PriorityBadge } from "@/components/careeros/Ips";
 import { radar } from "@/lib/careeros";
 import { Criteria } from "./Criteria";
 import { Requirements } from "./Requirements";
+import { metaLine } from "@/lib/labels";
 
 const GapToA = ({ ips }) => {
   if (ips.priority === "A") return <p className="text-xs text-emerald-300" data-testid="explain-gap">Priorité A atteinte (IPS ≥ 70 et objectifs ≥ 6/10).</p>;
@@ -49,7 +50,7 @@ export const ScoreExplain = ({ id, onClose, onDeep }) => {
           <div className="mt-4 space-y-5">
             <div className="flex items-start gap-3">
               <PriorityBadge priority={o.ips?.priority} testid="explain-priority" />
-              <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-white">{o.title}</p><p className="text-xs text-slate-500">{o.company} · {o.location} · {o.source}</p></div>
+              <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-white">{o.title}</p><p className="text-xs text-slate-500">{metaLine(o)}</p></div>
               <span className="font-mono text-sm text-white" data-testid="explain-ips">IPS {o.ips?.score}</span>
             </div>
             <p className={`rounded-xl border px-3 py-2 text-xs ${ia ? "border-indigo-400/30 bg-indigo-500/10 text-indigo-100" : "border-white/10 bg-white/5 text-slate-300"}`} data-testid="explain-method">

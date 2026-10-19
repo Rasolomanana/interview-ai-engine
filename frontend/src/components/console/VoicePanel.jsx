@@ -1,4 +1,5 @@
 import { Activity, Gauge, Mic, Radio, Bug, Cpu } from "lucide-react";
+import { DEV } from "@/lib/labels";
 
 const STATE_CANDIDAT_COLOR = {
   NORMAL: "text-emerald-400",
@@ -56,10 +57,10 @@ export default function VoicePanel({ metrics, listening, meta, debug, latency })
           )}
         </div>
 
-        <div className="mb-3 flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/30 px-3 py-2">
+        {DEV && <div className="mb-3 flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/30 px-3 py-2">
           <span className="font-mono text-[10px] uppercase tracking-widest text-slate-500">State_Candidat</span>
           <span className={`font-mono text-xs font-bold ${STATE_CANDIDAT_COLOR[sc] || "text-slate-300"}`} data-testid="state-candidat-value">{sc}</span>
-        </div>
+        </div>}
 
         <div className="space-y-3">
           <Bar label="Confiance voix" value={conf} max={1} unit="" color={conf >= 0.7 ? "bg-emerald-400" : "bg-slate-500"} />
@@ -67,13 +68,13 @@ export default function VoicePanel({ metrics, listening, meta, debug, latency })
           <Bar label="Monotone" value={metrics.monotone} max={1} color="bg-amber-400" />
           <Bar label="Débit" value={metrics.rate} max={220} unit=" mpm" color="bg-sky-400" />
         </div>
-        <p className={`mt-3 text-center font-mono text-[10px] ${tm6Active ? "text-emerald-400" : "text-slate-600"}`}>
+        {DEV && <p className={`mt-3 text-center font-mono text-[10px] ${tm6Active ? "text-emerald-400" : "text-slate-600"}`}>
           TM6 {tm6Active ? "ACTIF (conf ≥ 0.7)" : "ignoré (conf < 0.7)"}
-        </p>
+        </p>}
       </section>
 
-      {/* State inspector */}
-      <section className="glass rounded-2xl p-4">
+      {/* State inspector (team only) */}
+      {DEV && <section className="glass rounded-2xl p-4">
         <h3 className="mb-3 flex items-center gap-2 font-display text-sm font-bold text-white">
           <Gauge className="h-4 w-4 text-indigo-400" /> Inspecteur d'état
         </h3>
@@ -84,7 +85,7 @@ export default function VoicePanel({ metrics, listening, meta, debug, latency })
           <Row k="MODULES" v={(meta?.modules || ["—"]).join(", ")} />
           <Row k="VOICE_MODULE" v={meta?.voice_module || "—"} />
         </dl>
-      </section>
+      </section>}
 
       {/* Debug telemetry */}
       {debug && (

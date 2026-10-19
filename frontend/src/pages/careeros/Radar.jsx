@@ -34,9 +34,8 @@ import { AutoNotices } from "@/components/careeros/AutoNotices";
 import { CompanySuggestions } from "@/components/careeros/CompanySuggestions";
 import { OfferMap } from "@/components/careeros/OfferMap";
 import { PackConfirm } from "@/components/careeros/PackConfirm";
+import { sourceLabel } from "@/lib/labels";
 
-const SOURCE_LABEL = { jooble: "Jooble", adzuna: "Adzuna", google_jobs: "Google Emplois", externe: "Offre ajoutée par vous" };
-const sourceLabel = (s) => SOURCE_LABEL[s] || "Site officiel de l'employeur";
 
 const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, onSave, deepId, busy }) => (
   <article className="rounded-2xl border border-white/[0.07] bg-[#121520]/80 p-4 min-w-0 break-words" data-testid={`radar-offer-${o.id}`}>

@@ -6,7 +6,7 @@ export const SOURCES = [["jooble", "Jooble"], ["workday", "Workday"], ["boards",
 const state = (k, status) => {
   if (!status?.configured?.[k]) return { dot: "bg-amber-400", label: "Non configuré" };
   if (!status.selected?.includes(k)) return { dot: "bg-slate-500", label: "Désactivé" };
-  if (status?.portals && k in status.portals && !status.portals[k]) return { dot: "bg-slate-500", label: "Aucun portail configuré" };
+  if (status?.portals && k in status.portals && !status.portals[k]) return { dot: "bg-slate-500", label: "Ajoutez une entreprise pour l'activer" };
   return { dot: "bg-emerald-400", label: "Actif" };
 };
 

@@ -1,0 +1,60 @@
+{
+  "summary": "Re-test de la campagne « nouveau membre » (corrections de l'iteration 51). Comptes : nouveau compte newmember52.1792386408@careeros.dev / Nouveau2026!x (parcours complet), emptymember52.1792386683@careeros.dev / Nouveau2026!x (profil vide), mobilemember52.* (390 px), membre.test pour les cartes Radar et la confirmation du pack. 1 seul pack IA généré (depuis l'offre externe, avec confirmation) et 1 message au Copilote. Backend : 15/15 tests pytest réussis (test_new_member_campaign.py + nouveau test_new_member_retest_52.py). Frontend : tous les points P1 à P5 sont validés ✅, sauf 1 reste de texte technique ❌ : « Lettre sur mesure générée par Interview AI Engine » apparaît dans le tableau IPS du pack (justification codée en dur dans backend/careeros/ips.py:74). Points secondaires : la source brute (« workday », « externe ») apparaît encore dans 3 vues secondaires, et le panneau de droite du Copilote affiche des libellés de débogage (STATE_CANDIDAT, TM6, Inspecteur d'état, TOURS_SS_MARQ).",
+  "results_by_item": {
+    "P1 Copilote nouveau membre": "✅ Réglages IA ne s'ouvrent pas tout seuls, message envoyé via le serveur (réponse reçue, aucun toast « clé Gemini »), pas de Debug, pas de compteur de coût, pas de « Tours ss marq. », bouton « Recommencer ». ⚠️ Le panneau de droite (VoicePanel) affiche encore des libellés techniques : STATE_CANDIDAT, « TM6 ignoré (conf < 0.7) », Inspecteur d'état avec TOURS_SS_MARQ, VOICE_MODULE ; la barre latérale affiche « ENTRETIEN IA V4 ».",
+    "P1 Parcours/Guide": "✅ Après l'enregistrement de la Career Memory, on passe de 0/6 à 1/6 objectifs et le bandeau devient « Lancez votre premier Radar », sans recharger la page. ✅ À la fin du pack, le bandeau affiche « Préparez l'entrevue » (et non « Consultez vos nouvelles opportunités ») et le parcours passe à 4/6. ✅ Le libellé « X/6 objectifs » est bien affiché.",
+    "P1 Profil CV maître": "✅ La section est ouverte par défaut quand le CV est vide (nouveau membre et membre vide). Elle reste fermée quand un CV existe déjà.",
+    "P1 Bandeau confidentialité": "✅ « J'ai compris » est cliquable (sans force) pendant la visite guidée, sur ordinateur et à 390 px. La visite reste ouverte. À 390 px, le texte est compact (hauteur de 112 px).",
+    "P1 Visites de page": "✅ La visite du Radar s'ouvre seule la 1re fois. On quitte la page sans la fermer, on revient : elle ne se rouvre pas. Note : le choix est mémorisé dans le navigateur (localStorage) ; sur un autre appareil ou navigateur, la visite se rouvre une fois.",
+    "P1 Tableau de bord": "✅ « Offres d'emploi reçues », pas d'icône X (l'icône filtre n'apparaît qu'au survol), empty-open-radar « Ouvrir le Radar » et empty-new-pack « Analyser une offre ».",
+    "P1 Textes techniques": "✅ Page de connexion, Radar, réglages du Radar et historique : aucune occurrence de Interview AI Engine, SerpApi, Non configuré, planificateur interne, membre(s), jusqu'à 8 recherches ou successfactors. Le titre « RAPPORT DE DÉCISION » est correct. Toast : « Réglages enregistrés · 3 entreprise(s) suivie(s). » ❌ « Interview AI Engine » est visible sur la page du pack terminé, dans la justification du critère IPS « Qualité de la lettre » : « Lettre sur mesure générée par Interview AI Engine » (backend/careeros/ips.py:74).",
+    "P2 Réglages Radar": "✅ GET settings renvoie les mots-clés du profil même après un follow (le document ne contient alors que les entreprises). ✅ Enregistrer avec des mots-clés vides affiche l'avertissement (toast) et n'enregistre rien (la fenêtre reste ouverte). Remarque : ce contrôle existe seulement côté frontend ; PUT /radar/settings accepte toujours keywords=[].",
+    "P2 Page Radar": "✅ Le libellé est « Analysées aujourd'hui ». ✅ Pendant la recherche : roue de chargement et « Recherche en cours : … », et les compteurs nouvelles/connues affichent « … ». ✅ À la fin : « Dernière recherche : 19 oct. 2026, 05 h 09 (lancée par vous) · 72 offres trouvées · 12 seront analysées demain… ». ✅ Les métadonnées des cartes n'ont pas de « · · ». Les sources s'affichent comme « Site officiel de l'employeur » ou « Offre ajoutée par vous ». ✅ La fenêtre pack-confirm-dialog s'ouvre. « Annuler » ne crée aucun pack (toujours 13 packs pour membre.test). « Voir le score d'abord (gratuit) » ouvre « Pourquoi ce score ? ». « Confirmer » génère le pack.",
+    "P2 Offre externe": "✅ « Analyste BI — Banque Laurentienne, Montréal » donne titre = Analyste BI, entreprise = Banque Laurentienne, lieu = Montréal. ✅ La ligne « Entreprise : Groupe Cyclone » est détectée (pytest).",
+    "P3 Import Copilote": "✅ ats-cv et cover-letter sont en texte simple (pas de #, --- ni **). ✅ En thème clair, les zones de texte du contexte ont un fond blanc (rgb 255,255,255) et un texte foncé (rgb 15,23,42). Les Réglages IA ne s'ouvrent pas.",
+    "P4 Indice de Force": "✅ Expérience estimée : 9 ans dans le Radar et 8,8 ans dans l'indice pour « 2018 - aujourd'hui ». ✅ PL-300 déclaré + « certifié PL-300 » dans le CV = 1 certification. ✅ La preuve affiche « encadrement ». ✅ Virgule décimale sur les scores (0,6/20, 2,4/15). ✅ Paliers 85/90/95 : note milestone-<target>-note, pas de « Déjà couvert ». ✅ Membre vide : levers-empty invite à coller le CV, et la stabilité est à 0/15.",
+    "P5 Entreprises suivies": "✅ Bouton « Active » / « En pause » qui bascule, plus de case à cocher pour l'activation. aria-label = « Sélectionner Desjardins pour la retirer ». Titre de la fenêtre : « Retirer des entreprises suivies ». Retrait groupé : 3/100 → 2/100, toast correct. Restaurer : retour à 3/100, le portail Workday est conservé côté backend."
+  },
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "Pack IPS (backend/careeros/ips.py:74)", "issue": "La justification « Lettre sur mesure générée par Interview AI Engine » est visible des membres dans le tableau IPS du pack."},
+      {"endpoint": "PUT /api/careeros/radar/settings", "issue": "keywords=[] est accepté côté serveur. L'avertissement n'existe que côté frontend."},
+      {"endpoint": "GET /api/careeros/strength", "issue": "Les résumés et impacts gardent le point décimal (« 8.8 an(s) d'expérience », « Leadership : 2.4 → 14.4/15 ») et sont affichés tels quels dans les détails et les leviers. Le frontend ne formate que les scores."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ScoreExplain.jsx:52, RunOffersDialog.jsx:16, CompareDialog.jsx:26", "issue": "La source brute est encore affichée (« Desjardins · Montréal · workday ») dans « Pourquoi ce score ? », la liste des offres d'un passage et la comparaison LinkedIn. Utiliser sourceLabel() de Radar.jsx.", "selector": "[role=dialog]", "priority": "MEDIUM"},
+      {"component": "VoicePanel.jsx / SessionSidebar (Copilote)", "issue": "Libellés techniques visibles des membres : STATE_CANDIDAT, « TM6 ignoré (conf < 0.7) », Inspecteur d'état (ÉTAT RÉSOLU, TOURS_SS_MARQ, MODULES, VOICE_MODULE), « ENTRETIEN IA V4 ». À réserver au mode DEV.", "selector": "aside panel", "priority": "MEDIUM"},
+      {"component": "Copilote, import depuis le pack (ctx-poste)", "issue": "Le texte du poste importé contient « Source : externe · » : source brute suivie d'un séparateur vide quand l'URL est vide (le texte est construit dans radar.py pack(), puis dans le contexte du copilote).", "selector": "[data-testid=ctx-poste]", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Réglages Radar, après Restaurer", "issue": "Les compteurs de couverture ont affiché un instant « Via portail employeur 2 / Suivies via Jooble 1 » juste après la restauration de Desjardins. Le backend a bien conservé le portail Workday : le compteur n'est pas rafraîchi.", "affected_selectors": ["radar-company-filter"]}
+    ],
+    "design_issues": [
+      {"screen": "Réglages Radar", "issues": ["Jooble est encore cité (« Suivies via Jooble », « Jooble cherche dans chaque ville », « l'entreprise reste suivie via Jooble ») alors que Jooble n'est pas configuré en preview. Masquer ces mentions quand configured.jooble=false.", "« vérifié via base commune » dans le panneau Portails associés reste du jargon."]},
+      {"screen": "Radar pour un nouveau membre", "issues": ["Le tableau des sources affiche « Aucun portail configuré » avant tout suivi d'entreprise. Un libellé du type « Ajoutez une entreprise » serait plus clair."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_new_member_campaign.py", "/app/backend/tests/test_new_member_retest_52.py", "/app/test_reports/pytest/pytest_results_52.xml"],
+  "action_items": [
+    "backend/careeros/ips.py:74 : remplacer « générée par Interview AI Engine » par « générée par CareerOS ». Vérifier aussi que les prompts (prompts.py) n'amènent pas l'IA à écrire « Interview AI Engine » dans le contenu des packs.",
+    "Afficher sourceLabel() au lieu de o.source dans ScoreExplain.jsx:52, RunOffersDialog.jsx:16 et CompareDialog.jsx:26.",
+    "Copilote : masquer derrière DEV les libellés STATE_CANDIDAT, TM6, Inspecteur d'état et ENTRETIEN IA V4 (VoicePanel.jsx, SessionSidebar).",
+    "Formater en français (virgule) les décimales des textes summary et impact de l'indice de force (backend ou frontend).",
+    "Optionnel : rejeter keywords=[] dans PUT /radar/settings (422) ; masquer les mentions de Jooble quand Jooble n'est pas configuré ; ne pas afficher « Source : externe · » dans le contexte importé."
+  ],
+  "critical_code_review_comments": [
+    "ips.py:74 : texte de marque interne en dur dans une justification visible des membres.",
+    "Le choix « visite de page déjà vue » est stocké seulement en localStorage, donc il ne suit pas le compte d'un appareil à l'autre (acceptable, mais à savoir).",
+    "PUT /radar/settings ne valide pas l'absence de mots-clés côté serveur.",
+    "Le contenu IA du CV ATS indique « plus de 6 ans d'expérience » alors que les règles comptent 8,8 ans (2018 - aujourd'hui) : petite incohérence entre l'IA et les règles."
+  ],
+  "updated_files": ["/app/backend/tests/test_new_member_retest_52.py"],
+  "success_rate": {"backend": "100% (15/15 pytest)", "frontend": "~93% (13/14 points validés ; 1 reste de texte technique dans le pack)"},
+  "seed_data_creation": "Comptes de test créés : newmember52.1792386408@careeros.dev, emptymember52.1792386683@careeros.dev, mobilemember52.<ts>@careeros.dev (mot de passe Nouveau2026!x), plus les comptes test_retest52.* et test_campaign.* créés par pytest. newmember52 a 1 pack (CO-2026-000018, Analyste BI — Banque Laurentienne) et 3 entreprises suivies (Desjardins, Hydro-Québec, Ubisoft).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Lancer : export REACT_APP_BACKEND_URL=... && pytest backend/tests/test_new_member_campaign.py backend/tests/test_new_member_retest_52.py -n 0. Pour l'UI : cliquer privacy-accept-btn puis tour-skip ; sur le Radar, radar-tour-skip et radar-settings-tour-skip. Les entreprises associées sont masquées dans les réglages : cliquer radar-company-toggle-assoc. Le bouton « Préparer l'entrevue » de la page pack est un lien (get_by_text). Une recherche Radar prend environ 4 à 5 min (72 offres pour 3 entreprises)."
+}

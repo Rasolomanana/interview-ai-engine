@@ -121,7 +121,7 @@ export const CompanyManager = ({ companies, setCompanies }) => {
     let extra = {};
     if (!url.trim()) {
       const m = (await radar.knowledgeMatch([n]).catch(() => ({ items: {} }))).items?.[n];
-      if (m?.usable) { extra = fromKnowledge(m); toast.success(`${n} associée automatiquement via la base commune CareerOS (${m.kind_label}). Modifiable à tout moment.`); }
+      if (m?.usable) { extra = fromKnowledge(m); toast.success(`${n} associée automatiquement à son portail déjà vérifié par CareerOS (${m.kind_label}). Modifiable à tout moment.`); }
       else if (m) extra = { detected: `Bloqué (anti-robot) : ${m.kind_label}` };
     }
     setCompanies(mergeCompanies(companies, [{ name: n, enabled: true, portal_url: url.trim(), kind: "", slug: "", ...extra }])); setName(""); setUrl("");
@@ -170,7 +170,7 @@ export const CompanyManager = ({ companies, setCompanies }) => {
         </span>
       </div>
       <p className="text-[11px] text-slate-500">Retirer une entreprise arrête son suivi, mais ses offres déjà trouvées restent dans votre Radar et votre historique. Enregistrez vos autres modifications avant un retrait groupé.</p>
-      {showRemoved && <RemovedCompanies refreshKey={rk} onRestored={(n) => { setCompanies(mergeCompanies(companies, [{ name: n, enabled: true, portal_url: "", kind: "", slug: "" }])); setRk((k) => k + 1); }} />}
+      {showRemoved && <RemovedCompanies refreshKey={rk} onRestored={async (n) => { const st = await radar.settings().catch(() => null); const c = st?.companies?.find((x) => x.name === n); setCompanies(mergeCompanies(companies, [c || { name: n, enabled: true, portal_url: "", kind: "", slug: "" }])); setRk((k) => k + 1); }} />}
       <CompanyCleanup open={!!clean} preset={clean} onClose={() => setClean(null)} onRemoved={onRemoved} />
       <div className="space-y-2">
         {rows.length === 0 && companies.length > 0 && <p className="text-[11px] text-emerald-300" data-testid="radar-company-all-assoc">Toutes vos entreprises sont associées à leur portail.</p>}
