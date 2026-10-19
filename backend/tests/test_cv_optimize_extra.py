@@ -85,3 +85,27 @@ def test_validator_rejects_reported_inventions():
 
 def test_validator_rejects_line_swap():
     assert "origine" in invented("- Supervision des quarts de production.", "- Aider à la formation des nouveaux employés.", CV, [])
+
+
+# Iteration 54: simulate must return every variant key the UI sends (ids like "c:<skill label>" can exceed 40 chars)
+def test_simulate_keeps_long_variant_keys(two):
+    k = "c:Diplôme d'études collégiales / universitaires"
+    r = requests.post(f"{API}/careeros/cv-optimize/simulate", headers=two[0], json={"variants": {"base": CV, k: CV}}, timeout=20).json()
+    assert k in r, list(r)
+
+
+# Iteration 54: a CV pasted as one paragraph (> 320 chars, single line) must still yield candidate sentences
+def test_candidates_single_paragraph_cv():
+    from careeros.cv_optimize import _candidates
+    cv = ("Jean Tremblay — Analyste de données, Montréal. Responsable de la production des rapports mensuels pour la direction. "
+          "Participer aux réunions de suivi des projets avec les équipes. Aider les utilisateurs avec les tableaux de bord Excel. "
+          "Compétences : SQL, Python, Excel. Formation : B.Sc. Statistique. Langues : français, anglais. Gestion des demandes des clients internes.")
+    assert _candidates(cv, []), "single-line CV gives no candidate"
+
+
+# Iteration 54: generic-prefix whitelist lets new activities/purposes through (observed in real AI output)
+@pytest.mark.parametrize("after", ["- Superviser une équipe de production en assurant la coordination quotidienne des opérations.",
+                                   "- Supervision d'une équipe de production dans le respect des objectifs de conformité.",
+                                   "- Supervision d'une équipe de production et gestion des processus opérationnels."])
+def test_validator_generic_loophole(after):
+    assert invented(after, "- Supervision d'une équipe de production.", CV, []) != ""

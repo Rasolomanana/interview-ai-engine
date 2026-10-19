@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -28,8 +28,11 @@ export const CvOptimizer = ({ offer, open, onClose }) => {
   const [tab, setTab] = useState("props");
   const [done, setDone] = useState(null);
   const [full, fsButton] = useFullscreen("cv-optimizer-fullscreen");
+  const started = useRef(false);  // one AI analysis per opening (StrictMode runs effects twice in dev)
   useEffect(() => {
-    if (!open) return;
+    if (!open) { started.current = false; return; }
+    if (started.current) return;
+    started.current = true;
     setD(null); setDone(null); setTab("props");
     load(offer).then((x) => { setD(x); setSel(new Set(x.items.filter((i) => i.type !== "a_confirmer").map((i) => i.id))); })
       .catch((e) => { toast.error(e.message); onClose(); });

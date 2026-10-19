@@ -1,4 +1,4 @@
-const TONE = { same: "text-slate-500", improved: "bg-amber-400/15 text-amber-100", added: "bg-emerald-400/15 text-emerald-100" };
+const TONE = { same: "text-slate-500", improved: "bg-amber-400/15 text-amber-100", added: "bg-emerald-400/15 text-emerald-100", removed: "text-rose-300/70 line-through" };
 
 // Side-by-side: current CV | optimised CV (green = added, yellow = improved, grey = unchanged).
 export const CvDiff = ({ cv, rows }) => (

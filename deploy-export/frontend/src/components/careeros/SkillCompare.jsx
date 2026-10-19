@@ -78,7 +78,8 @@ export const SkillCompare = ({ profile }) => {
     setBusy(true);
     try { const s = await skillMatch.source(kind, x.id); await run({ title: s.title, company: s.company, source_kind: kind, source_id: x.id }, s.text); } catch (e) { toast.error(e.message); } finally { setBusy(false); }
   };
-  const onText = () => run({ title: (texts.offre || texts.description || "").split("\n")[0].slice(0, 120) || "Texte collé", company: "", source_kind: "texte", texts }, Object.values(texts).join("\n"));
+  const head = (t) => { const l = (t || "").split("\n").find((x) => x.trim())?.trim() || ""; const c = l.split(/(?<=[.!?])\s/)[0]; return c.length <= 80 ? c : `${c.slice(0, 80).replace(/\s+\S*$/, "")}…`; };
+  const onText = () => run({ title: head(texts.offre || texts.description) || "Texte collé", company: "", source_kind: "texte", texts }, Object.values(texts).join("\n"));
   const onHist = async (x) => { try { const h = await skillMatch.get(x.id); setRes({ title: h.title, company: h.company, at: h.at, r: h.result }); } catch (e) { toast.error(e.message); } };
   return (
     <>

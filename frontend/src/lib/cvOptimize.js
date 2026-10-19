@@ -8,9 +8,21 @@ const EXTRA_LINE = "Compétences complémentaires : ";
 export const jobPayload = (r) => r.job.map((s) => ({ label: s.label, aliases: s.aliases, status: s.status, weight: s.weight,
   domain_keys: (DOMAINS.find(([n]) => n === s.domain) || [null, []])[1] }));
 
-// Guaranteed rule-based highlight: job skills already proven in the CV, gathered in one line near the top.
+// Original CV wording for an alias (same-length normalisation so the slice maps back to the CV text).
+const flat = (s) => s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9+#]/g, " ");
+export const cvWord = (cv, alias) => {
+  const src = String(cv || "").normalize("NFC"), f = flat(src), a = alias.trim();
+  const i = ` ${f}`.indexOf(` ${a}`);
+  if (i < 0 || !a) return "";
+  let j = i + a.length; while (j < f.length && /[a-z0-9]/.test(f[j])) j += 1;
+  return src.slice(i, j);
+};
+
+// Guaranteed rule-based highlight: job skills already proven in the CV, in the CV's own words, gathered near the top.
 export const keySkillsItem = (r, cv) => {
-  const ok = r.job.filter((s) => s.status === "ok" && s.cat !== "cert").sort((a, b) => b.weight - a.weight).slice(0, 8).map((s) => s.label);
+  const words = r.job.filter((s) => s.status === "ok" && ["skill", "tool"].includes(s.cat)).sort((a, b) => b.weight - a.weight)
+    .map((s) => s.aliases.map((a) => cvWord(cv, a)).find(Boolean)).filter(Boolean);
+  const ok = [...new Map(words.map((w) => [N(w), w.charAt(0).toUpperCase() + w.slice(1)])).values()].slice(0, 8);
   if (ok.length < 2 || cv.includes(KEY_LINE)) return null;
   return { id: "key", type: "ajout", after: KEY_LINE + ok.join(" · "), skills: ok, reason: "Ces compétences demandées par l'offre sont déjà prouvées dans votre CV : les regrouper en haut les rend visibles du recruteur et des logiciels de tri (ATS)." };
 };
@@ -28,7 +40,7 @@ const RELATED = {
 };
 // Evidence = the original CV line (never the name/title line), shortened, one per line.
 const evidence = (cv, keys) => {
-  const lines = String(cv || "").split("\n").map((l) => l.trim()).filter(Boolean).slice(1);
+  const lines = String(cv || "").split("\n").map((l) => l.trim()).filter(Boolean).slice(2).filter((l) => !(/\b(19|20)\d{2}\b|aujourd/i.test(l) && l.length < 90));
   return [...new Set(lines.filter((l) => keys.some((k) => ` ${N(l)} `.includes(` ${k}`))).map((l) => l.replace(/^[-•*●▪–]\s*/, "").replace(/\.$/, "")))]
     .slice(0, 3).map((l) => (l.length > 70 ? `${l.slice(0, 67)}…` : l));
 };
@@ -40,7 +52,7 @@ export const toConfirm = (r, profile, covered) => {
     const g = mine.find((d) => d.name === s.domain);
     const ev = evidence(profile.cv_text, RELATED[s.label] || []);
     const related = ev.length ? ev : (g?.skills || []).slice(0, 3).map((x) => x.label);
-    const confidence = s.status === "partiel" || ev.length >= 2 ? "élevée" : related.length ? "moyenne" : "faible";
+    const confidence = ev.length >= 2 ? "élevée" : ev.length || s.status === "partiel" ? "moyenne" : "faible";
     return { id: `c:${s.label}`, type: "a_confirmer", label: s.label, required: s.required, confidence, related, domain: s.domain, after: s.label };
   });
 };

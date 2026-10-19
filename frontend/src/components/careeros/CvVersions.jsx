@@ -5,7 +5,20 @@ import { cvOptimize } from "@/lib/careeros";
 import { CvDiff } from "@/components/careeros/optimize/CvDiff";
 
 const fr = (n) => (n == null ? "—" : String(n).replace(".", ","));
-const rows = (a, b) => { const prev = a.split("\n"), set = new Set(prev); return b.split("\n").map((t, i) => (set.has(t) ? { tag: "same", text: t } : prev.length === b.split("\n").length ? { tag: "improved", text: t, prev: prev[i] } : { tag: "added", text: t })); };
+// Line diff (LCS): replaced line = improved (with previous text), new = added, deleted = removed.
+const rows = (a, b) => {
+  const x = a.split("\n"), y = b.split("\n"), L = x.map(() => Array(y.length + 1).fill(0));
+  L.push(Array(y.length + 1).fill(0));
+  for (let i = x.length - 1; i >= 0; i -= 1) for (let j = y.length - 1; j >= 0; j -= 1) L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = []; let i = 0, j = 0;
+  while (i < x.length || j < y.length) {
+    if (i < x.length && j < y.length && x[i] === y[j]) { out.push({ tag: "same", text: y[j] }); i += 1; j += 1; }
+    else if (i < x.length && j < y.length && L[i + 1][j + 1] === L[i][j]) { out.push({ tag: "improved", text: y[j], prev: x[i] }); i += 1; j += 1; }
+    else if (j < y.length && (i >= x.length || L[i][j + 1] >= L[i + 1][j])) { out.push({ tag: "added", text: y[j] }); j += 1; }
+    else { out.push({ tag: "removed", text: x[i] }); i += 1; }
+  }
+  return out;
+};
 
 // Master CV versions: date, offer, estimated vs real gain, differences, restore.
 export const CvVersions = ({ onRestored }) => {

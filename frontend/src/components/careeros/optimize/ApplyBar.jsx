@@ -12,7 +12,7 @@ export const ApplyBar = ({ count, sim, onApply }) => {
   return (
     <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-white/[0.07] bg-[#121520] pt-3">
       <p className="flex-1 text-xs text-slate-400" data-testid="cv-optimizer-selected">{count} modification(s) sélectionnée(s)</p>
-      <button type="button" disabled={!count || busy} onClick={() => setAsk(true)} className="flex items-center gap-1.5 rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-black hover:bg-emerald-400 disabled:opacity-40" data-testid="cv-optimizer-validate">
+      <button type="button" disabled={!count || busy || !sim || sim.error} onClick={() => setAsk(true)} className="flex items-center gap-1.5 rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-black hover:bg-emerald-400 disabled:opacity-40" data-testid="cv-optimizer-validate">
         {busy && <Loader2 className="h-4 w-4 animate-spin" />}Valider et mettre à jour mon CV maître</button>
       <AlertDialog open={ask} onOpenChange={setAsk}>
         <AlertDialogContent className="border-white/10 bg-[#121520] text-slate-100" data-testid="cv-optimizer-confirm">

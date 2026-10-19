@@ -18,6 +18,7 @@ const Row = ({ label, before, after, potential, unit, testid }) => (
 // Estimated impact BEFORE validation: compatibility + Pro strength, guaranteed vs potential, and what causes the gain.
 export const ImpactPanel = ({ sim }) => {
   if (!sim) return <p className="text-xs text-slate-500" data-testid="impact-loading">Calcul de l'impact…</p>;
+  if (sim.error) return <p className="rounded-xl border border-amber-400/30 bg-amber-500/5 p-3 text-xs text-amber-100" data-testid="impact-error">L'estimation n'a pas pu être calculée. Modifiez la sélection pour relancer le calcul ; la validation reste bloquée tant que l'impact n'est pas affiché.</p>;
   return (
     <section className="space-y-2" data-testid="impact-panel">
       <div className="grid gap-2 sm:grid-cols-2">
@@ -30,7 +31,9 @@ export const ImpactPanel = ({ sim }) => {
           <li key={p.id} className={p.potential ? "text-amber-200" : "text-slate-300"} data-testid={`impact-part-${i}`}>
             <b className="tabular-nums">{sign(p.match)} %</b> compatibilité · <b className="tabular-nums">{sign(p.ifp)}</b> indice : {p.label}{p.potential ? " (à confirmer)" : ""}</li>))}</ul>
           : <p className="text-xs text-slate-500">Sélectionnez des modifications pour voir leur effet.</p>}
-        {sim.match.after === sim.match.before && <p className="mt-1.5 text-[11px] text-slate-400" data-testid="impact-match-zero">Compatibilité inchangée par les reformulations : les compétences concernées sont déjà reconnues dans votre CV. Les reformulations les rendent plus visibles pour le recruteur et augmentent votre indice ; seules les compétences confirmées peuvent augmenter la compatibilité.</p>}
+        {sim.match.after === sim.match.before && <p className="mt-1.5 text-[11px] text-slate-400" data-testid="impact-match-zero">{sim.ifp.after > sim.ifp.before
+          ? "Compatibilité inchangée : les compétences concernées sont déjà reconnues dans votre CV. Les reformulations les rendent plus visibles pour le recruteur et augmentent votre indice ; seules les compétences confirmées peuvent augmenter la compatibilité."
+          : "Compatibilité inchangée : les compétences concernées sont déjà reconnues dans votre CV ; seules les compétences que vous confirmez peuvent l'augmenter."}</p>}
         {sim.criteria.length > 0 && <p className="mt-1.5 text-[11px] text-slate-500" data-testid="impact-criteria">Critères de l'indice qui progressent : {sim.criteria.map((c) => `${c.label} ${sign(c.delta)}`).join(" · ")}</p>}
         <p className="mt-1.5 text-[11px] text-slate-500">Estimation par les règles CareerOS (mêmes calculs que la comparaison CV ↔ offre et l'indice). Les gains ne s'additionnent pas toujours exactement.</p>
       </div>
