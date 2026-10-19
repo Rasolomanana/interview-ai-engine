@@ -1,0 +1,44 @@
+{
+  "summary": "Tested the AI budget governance (free-first fallback chain, quotas, cache and the Admin tab 'IA & quotas'). Backend: 11/11 pytest pass (tests/test_ai_budget.py). Covered: GET/PUT/reset of /api/admin/ai-budget, auth (401 without or with a wrong password), RBAC (the marketing member gets 403), 422 validation, persistence, rules_only when force_rules_only=true or daily_cap=0, and the gate on a real feature (follow-up email draft returns 503 'Règles uniquement' or 'plafond' and makes no LLM call). Reset of an exhausted provider was tested by injecting the state into Mongo. Method-level tests on a temporary DB covered the cache (30 days, 10-minute retry window, tier in the key), the free-quota gate, allow_paid, skip() and is_quota_error. Frontend: the Admin tab loads, shows the KPIs and the provider table, Save works and persists after reload, and the rules-only banner appears and disappears. Config was restored to the defaults (2000/false/false). Groq, Mistral and Gemini were not called live: their keys exist only in Render production. The deploy-export chain was code-reviewed and compiles.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "careeros/ai_budget.is_quota_error + mark_exhausted", "issue": "Any 429 marks the provider exhausted until midnight UTC, including per-minute rate limits. Gemini free tier allows about 10-15 requests per minute and Groq about 30. A burst, for example the 06:00 Radar run analysing the top 5 for many members, disables the free provider for the rest of the day. Traffic then moves to the next providers and soon to rules-only, or to paid providers if allowed. Fix: tell RPM limits apart from daily limits (Retry-After header, or 'PerMinute' / 'PerDay' in the Gemini quota id). For RPM, skip for about 60 s only.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "deploy-export/server.py company research (~l.695) and server-mode chat (~l.773)", "issue": "Both call LlmChat(...).with_model(*LLM_MODEL) directly, so they bypass the governance: no gate (cap or rules-only), no skip, no mark_exhausted and no cache. The streaming copilot (_stream_with_fallback) uses skip() but not gate(), so force_rules_only and daily_cap do not stop copilot calls, even though those calls count in used_today."},
+      {"endpoint": "ai_budget.governed cache", "issue": "A cache hit resets used_at. Repeating the same prompt within 10 minutes of a hit skips the cache. When quotas are exhausted or rules-only is on, the member then gets a 503 even though a cached answer exists. Suggested fix: serve the cache whenever gate() would fail, or do not refresh used_at on hits."},
+      {"endpoint": "radar.run_for_user", "issue": "When the gate raises QuotaReached, each offer counts as an AI failure. After 3, PE.log_error writes 'IA' entries to the Journal des erreurs and run.errors['ia'] is set on every run during rules-only or cap mode. This creates false errors. QuotaReached should be handled as an expected, silent fallback to the rules."},
+      {"endpoint": "preview backend/server.py", "issue": "Preview only: SERVER_CHAIN is (anthropic, openai) and _generate_text_raw does not call AB.skip. The Admin tab shows 'Anthropic: Désactivé (payant)' while preview still calls Anthropic. 'openai' has no LABELS entry and is not in FREE or PAID, so it shows as 'Payant' + 'Disponible'. Cosmetic; the prod deploy-export is consistent."},
+      {"endpoint": "ai-budget status", "issue": "cache_hits_today counts hits today while cache_size can be 0 (seen in preview: 1 hit, 0 entries). Harmless, but the KPI can confuse."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AiBudget.jsx", "issue": "GET /api/admin/ai-budget fires twice on mount. If the admin edits a field before the second response arrives, setCfg(x.config) overwrites the edit. This was observed once: unchecking 'Forcer Règles uniquement' right after a reload did not save. Load once, or do not reset cfg while the user is editing.", "selector": "[data-testid='ai-force-rules']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin > IA & quotas", "issues": ["The 'Réactiver' reset button has no error handling or toast when it fails.", "The chain explanation text is hard-coded (Gemini → Groq → OpenRouter → Mistral → Anthropic) and does not match the actual chain shown in the table, for example in preview."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_ai_budget.py", "/app/test_reports/pytest/pytest_ai_budget.xml"],
+  "action_items": [
+    "HIGH: Do not treat per-minute 429 as daily exhaustion. Use a short cooldown (Retry-After or 60 s) for RPM limits and keep 'until midnight' for daily quota errors only.",
+    "MEDIUM: Route company research and server-mode chat through the governed chain. Apply gate() to the copilot stream too, or document that it is exempt.",
+    "MEDIUM: In radar run_for_user, catch AB.QuotaReached separately and do not count it as an IA failure or log it to the Journal des erreurs.",
+    "LOW: Serve the cached answer when gate() would block, even inside the 10-minute retry window.",
+    "LOW: Avoid the double initial load in AiBudget.jsx (it can overwrite edits), and add a catch/toast on Réactiver."
+  ],
+  "critical_code_review_comments": [
+    "ai_budget.skip() calls config() and exhausted() (2-3 Mongo queries) for every provider of every call. Consider a short in-process TTL cache.",
+    "gate() counts ai_usage docs by comparing ISO strings with the UTC day. This works, but the cap resets at midnight UTC (19-20 h Toronto), not at local midnight. Say so in the UI.",
+    "_mem['exhausted'] is per process. A reset via the API clears only the process that handles the request; other workers rely on the DB state. This is fine with one worker.",
+    "The cache key covers system + user text across all members. This is correct for identical prompts and leaks nothing, since the CV is part of the prompt."
+  ],
+  "updated_files": ["/app/backend/tests/test_ai_budget.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "95% (tab works; minor double-load race)"},
+  "seed_data_creation": "None persistent. Temporary Mongo DBs test_ai_budget_* were dropped. An ai_provider_state doc was injected for the last chain label and then removed via the reset endpoint. Config restored to {daily_cap: 2000, allow_paid: false, force_rules_only: false}.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with: export REACT_APP_BACKEND_URL=... && pytest tests/test_ai_budget.py -p no:xdist -o addopts=''. The admin password comes from backend/.env ADMIN_PASSWORD. The Admin tab testid is admin-tab-ai-budget, with ai-* testids inside. The preview chain is anthropic/openai; the real free chain (gemini/groq/openrouter_free/mistral) is in deploy-export/backend/server.py and works only with Render keys."
+}

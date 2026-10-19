@@ -22,6 +22,7 @@ from . import radar_auto as AU
 from . import knowledge as KB
 from . import zone as Z
 from . import portal_errors as PE
+from . import ai_budget as AB
 from .decision_report import build_decision_report
 from .ips import compute_ips
 from .prompts import SYSTEM
@@ -389,6 +390,9 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                     await _analyze(doc, cv, profile)
                     run["ai_analyzed"] += 1
                     fails["n"] = 0
+                except AB.QuotaReached:  # budget / rules-only mode: not an error, offers stay rule-scored
+                    run["ai_rules_only"] = True
+                    break
                 except Exception as e:  # noqa: BLE001
                     fails["n"] += 1
                     logger.warning("radar AI analyze %s failed: %s", doc["id"], e)

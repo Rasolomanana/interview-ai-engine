@@ -364,7 +364,7 @@ async def _stream_with_fallback(system_message: str, turn_message: str, images_b
                 errors.append(f"{label}: {str(e)[:160]}")
                 logger.warning("Provider %s (%s) failed, trying next: %s", label, model, e)
                 if AB.is_quota_error(e):
-                    await AB.mark_exhausted(db, label, str(e))
+                    await AB.mark_exhausted(db, label, str(e), e)
                 if emitted:
                     yield _sse("done", {"provider": label, "model": model})
                     return
@@ -399,7 +399,7 @@ async def _generate_text_raw(system_message: str, user_text: str, tier: str = "e
                 errors.append(f"{label}: {str(e)[:160]}")
                 logger.warning("analyze provider %s (%s) failed: %s", label, model, e)
                 if AB.is_quota_error(e):
-                    await AB.mark_exhausted(db, label, str(e))
+                    await AB.mark_exhausted(db, label, str(e), e)
     logger.error("all server LLM providers failed: %s", " | ".join(errors) or "aucun fournisseur configuré")
     raise HTTPException(status_code=502, detail="Analyse indisponible (fournisseurs LLM)")
 

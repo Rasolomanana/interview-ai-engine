@@ -31,18 +31,28 @@ def _midnight_utc():
     return (_now() + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-def is_quota_error(e: Exception) -> bool:
+def quota_kind(e: Exception):
+    """None (not a quota error), 'minute' (short rate window: skip ~60 s) or 'day' (daily/credit quota: skip until midnight UTC)."""
     code = getattr(e, "status_code", None) or getattr(getattr(e, "response", None), "status_code", None)
     msg = str(e).lower()
-    return code == 429 or any(w in msg for w in ("429", "quota", "rate limit", "rate_limit", "resource_exhausted", "too many requests", "insufficient"))
+    if not (code == 429 or any(w in msg for w in ("429", "quota", "rate limit", "rate_limit", "resource_exhausted", "too many requests", "insufficient"))):
+        return None
+    headers = getattr(getattr(e, "response", None), "headers", {}) or {}
+    if headers.get("x-ratelimit-remaining-requests") == "0" or any(w in msg for w in ("perday", "per day", "per_day", "daily", "requests per day", "insufficient", "credit")):
+        return "day"
+    return "minute"
+
+
+def is_quota_error(e: Exception) -> bool:
+    return quota_kind(e) is not None
 
 
 async def config(db) -> dict:
     return {**DEFAULTS, **((await db.ai_budget_config.find_one({"_id": "config"}, {"_id": 0})) or {})}
 
 
-async def mark_exhausted(db, label: str, err: str):
-    until = _midnight_utc()
+async def mark_exhausted(db, label: str, err: str, e: Exception = None):
+    until = _now() + timedelta(seconds=60) if e is not None and quota_kind(e) == "minute" else _midnight_utc()
     _mem["exhausted"][label] = until
     await db.ai_provider_state.update_one({"label": label}, {"$set": {"exhausted_until": until.isoformat(), "last_error": err[:200], "at": _now().isoformat()}}, upsert=True)
 
@@ -82,11 +92,19 @@ def governed(db, raw, free_labels):
         key = hashlib.sha256(f"{tier}\x00{system_message}\x00{user_text}".encode()).hexdigest()
         hit = await db.ai_cache.find_one({"key": key}, {"_id": 0})
         now = _now()
-        if hit and datetime.fromisoformat(hit["used_at"]) < now - RETRY_WINDOW:
-            await db.ai_cache.update_one({"key": key}, {"$set": {"used_at": now.isoformat()}, "$inc": {"hits": 1}})
+
+        async def served():
+            await db.ai_cache.update_one({"key": key}, {"$inc": {"hits": 1}})
             await db.ai_cache_stats.update_one({"day": now.date().isoformat()}, {"$inc": {"hits": 1}}, upsert=True)
             return hit["text"]
-        await gate(db, free_labels() if callable(free_labels) else free_labels)
+        if hit and datetime.fromisoformat(hit["used_at"]) < now - RETRY_WINDOW:  # used_at = generation time (not refreshed by hits)
+            return await served()
+        try:
+            await gate(db, free_labels() if callable(free_labels) else free_labels)
+        except QuotaReached:
+            if hit:  # quotas reached: a cached answer is better than none
+                return await served()
+            raise
         txt = await raw(system_message, user_text, tier)
         await db.ai_cache.update_one({"key": key}, {"$set": {"text": txt, "used_at": now.isoformat(), "expires": now + timedelta(days=CACHE_DAYS)},
                                                     "$setOnInsert": {"hits": 0}}, upsert=True)

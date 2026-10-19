@@ -538,3 +538,12 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - NewPack : « Vérifier d'abord (gratuit) », qui appelle /radar/external ; le verdict s'efface si l'offre est modifiée. PackBody.radar_offer_id relie l'offre du Radar au pack (statut pack, application_id) pour éviter un doublon.
 - CopilotImport « CV maître » n'importe que le CV.
 - Tests : iteration_48 (backend 11/11) ; 3 bugs corrigés ensuite.
+
+## 2026-06 — Chaîne IA gratuite, quotas et cache
+- Export (production) : chaîne SERVER_CHAIN = Gemini Flash → Groq (GROQ_API_KEY, GROQ_MODEL=openai/gpt-oss-120b) → OpenRouter gratuit → Mistral (MISTRAL_API_KEY, mistral-small-latest) → [OpenRouter payant si OPENROUTER_MODEL] → Anthropic. Le module emergentintegrations embarqué gère les fournisseurs groq et mistral (compatibles OpenAI). Variables ajoutées à render.yaml.
+- careeros/ai_budget.py : fournisseurs payants bloqués sauf `allow_paid` (désactivé par défaut). Un 429 met le fournisseur en pause 60 s (limite par minute) ou jusqu'à minuit UTC (quota du jour ou crédits). gate() : forçage « Règles uniquement », plafond quotidien global (2000 par défaut) ou tous les fournisseurs gratuits épuisés → QuotaReached (503) → analyse par règles.
+- Cache des réponses `ai_cache` (sha256 de tier + système + prompt, conservé 30 jours). Une même demande moins de 10 min après sa génération repasse par l'IA (relance volontaire). La réponse en cache est servie si les quotas sont atteints.
+- Radar : QuotaReached arrête l'analyse IA du top 5 sans inscrire d'erreur au journal (`run.ai_rules_only`).
+- Admin, onglet « IA & quotas » (section finance) : appels du jour et plafond, fournisseur actuel, consommation et état par fournisseur, bouton Réactiver, réponses servies par le cache, plafond, secours payant, forçage des règles.
+- Limites connues : le Copilote en direct (streaming) respecte les pauses des fournisseurs mais pas le plafond ni le forçage ; la recherche d'entreprise et le chat en mode serveur appellent encore le premier modèle directement.
+- Tests : iteration_49 (11/11) ; corrections ensuite (pauses par minute ou par jour, cache servi quand les quotas sont atteints, Radar sans fausse erreur). La suite de tests a des effets de bord entre classes (configuration partagée) ; elle passe quand on lance chaque classe seule.
