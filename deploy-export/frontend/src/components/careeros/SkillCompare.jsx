@@ -7,6 +7,7 @@ import { compareSkills } from "@/lib/skillMatch";
 import { SkillMap } from "@/components/careeros/SkillMap";
 import { JobMap } from "@/components/careeros/JobMap";
 import { useFullscreen } from "@/components/careeros/Fullscreen";
+import { OptimizeButton } from "@/components/careeros/optimize/OptimizeButton";
 
 const TABS = [["radar", "Offre du Radar"], ["pack", "Pack existant"], ["texte", "Texte collé"], ["hist", "Historique"]];
 const FIELDS = [["offre", "Offre d'emploi"], ["description", "Description du poste"], ["linkedin", "Profil LinkedIn du recruteur"]];
@@ -70,7 +71,7 @@ export const SkillCompare = ({ profile }) => {
   }, [open]);
   const run = async (meta, text) => {
     const r = compareSkills(profile, text, meta.title, levers);
-    setRes({ ...meta, r });
+    setRes({ ...meta, r, text });
     try { await skillMatch.save({ ...meta, score: r.score, result: r }); skillMatch.history().then(setHist); } catch (e) { toast.error(e.message); }
   };
   const onPick = async (kind, x) => {
@@ -96,11 +97,15 @@ export const SkillCompare = ({ profile }) => {
           {res && (
             <div className="grid gap-4 lg:grid-cols-[1fr_320px_1fr]" data-testid="compare-result">
               <section className="min-w-0 rounded-2xl border border-sky-400/20 p-3"><p className="text-xs font-semibold uppercase tracking-wider text-sky-300">Carte des compétences réelles (du CV)</p><SkillMap profile={profile} /></section>
-              <Center r={res.r} />
+              <div className="space-y-3">
+                {res.text && <div className="flex justify-center" data-testid="compare-optimize"><OptimizeButton testid="compare-optimize-btn"
+                  offer={res.source_kind && res.source_kind !== "texte" ? { kind: res.source_kind, id: res.source_id, title: res.title, company: res.company } : { kind: "texte", title: res.title, company: res.company, text: res.text }} /></div>}
+                <Center r={res.r} /></div>
               <section className="min-w-0 rounded-2xl border border-orange-400/25 p-3"><p className="text-xs font-semibold uppercase tracking-wider text-orange-300">Carte des compétences requises</p>
                 <p className="mb-1 text-sm font-semibold text-white" data-testid="compare-job-title">{res.title}{res.company ? ` · ${res.company}` : ""}</p>
                 <JobMap domains={res.r.domains} common={res.r.common} /></section>
             </div>)}
+
         </DialogContent>
       </Dialog>
     </>

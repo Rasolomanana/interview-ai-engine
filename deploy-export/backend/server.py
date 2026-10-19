@@ -854,6 +854,8 @@ from careeros.strength import create_strength_router  # noqa: E402
 app.include_router(create_strength_router(db, current_member))
 from careeros.skill_match import create_skill_match_router  # noqa: E402
 app.include_router(create_skill_match_router(db, current_member))
+from careeros.cv_optimize import create_cv_optimize_router  # noqa: E402
+app.include_router(create_cv_optimize_router(db, current_member, _generate_text, _parse_json_object))
 app.include_router(create_followup_router(db, current_member, _generate_text, _parse_json_object, careeros_router))
 from careeros.admin_rbac import create_rbac_router, make_rbac_middleware  # noqa: E402
 from careeros.admin_insights import create_insights_router  # noqa: E402

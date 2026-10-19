@@ -1,0 +1,202 @@
+"""CV <-> offer optimisation: rule-selected weak lines, AI rewording under strict no-invention rules, rule validator,
+strength simulation, explicit apply to the master CV with full version history and restore."""
+import re
+import uuid
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from . import ai_budget as AB
+from .strength import CERTS, compute, quantified
+
+WEAK = re.compile(r"^(responsable de|participer|participation|aider|aide a|taches|tache|charge de|chargee de|s occuper|gerer les|assurer)\b")
+TITLES = ["directeur", "directrice", "vice president", "gestionnaire", "coordonnateur", "coordonnatrice", "superviseur", "superviseure", "manager",
+          "contremaitre", "chef de service", "chef de departement", "ingenieur", "analyste", "conseiller", "conseillere", "technicien", "technicienne"]
+YEARS = re.compile(r"\d+\s*\+?\s*(ans|annees|years)")
+SYSTEM = """Tu es le module d'optimisation de CV de CareerOS. Tu reformules des lignes d'expérience d'un CV pour une offre précise.
+RÈGLES ABSOLUES (toute violation rend la proposition inutilisable) :
+- n'invente JAMAIS une expérience, un poste, un employeur, une certification, un diplôme, un outil ni des années d'expérience ;
+- n'ajoute AUCUN chiffre absent du CV (tu peux réutiliser un chiffre présent ailleurs dans le CV s'il concerne clairement la même expérience) ;
+- tu peux seulement reformuler, réorganiser, préciser et nommer explicitement une compétence quand la ligne en apporte déjà la preuve ;
+- garde la langue du CV, un style CV (verbe d'action, sans « je »), une seule phrase, au plus 2 fois la longueur d'origine.
+Dans « reason », ne cite jamais de numéro de ligne ni de détail interne : explique simplement au membre ce que la reformulation met en valeur.
+Réponds UNIQUEMENT en JSON : {"items":[{"i":<numéro>,"after":"<ligne reformulée>","skills":["<compétence de l'offre mise en valeur>"],"reason":"<pourquoi, en 1 phrase, en vouvoyant le membre>"}]}.
+Si une ligne ne peut pas être améliorée sans inventer, ne la renvoie pas."""
+
+
+def _n(s: str) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9+#]+", " ", s).strip()
+
+
+class JobSkill(BaseModel):
+    label: str = Field(max_length=120)
+    aliases: List[str] = Field(default=[], max_length=20)
+    status: str = Field(pattern="^(ok|partiel|manquant)$")
+    domain_keys: List[str] = Field(default=[], max_length=60)
+    weight: float = 1
+
+
+class ProposeBody(BaseModel):
+    title: str = Field(default="", max_length=200)
+    offer_text: str = Field(default="", max_length=30000)
+    skills: List[JobSkill] = Field(default=[], max_length=80)
+
+
+class SimBody(BaseModel):
+    variants: dict = Field(default={})
+
+
+class ApplyBody(BaseModel):
+    cv_text: str = Field(min_length=20, max_length=60000)
+    offer: dict = Field(default={})
+    accepted: List[str] = Field(default=[], max_length=60)
+    estimated: dict = Field(default={})
+
+
+class RealBody(BaseModel):
+    match_after: Optional[int] = Field(default=None, ge=0, le=100)
+
+
+def _candidates(cv: str, skills: List[JobSkill]) -> list:
+    out = []
+    relevant = [a for s in skills if s.status != "manquant" for a in s.aliases] + [k for s in skills for k in s.domain_keys]
+    units = [(i, seg) for i, raw in enumerate(cv.splitlines())
+             for seg in ([raw.strip()] if len(raw.strip()) <= 320 else [x.strip() for x in re.split(r"(?<=[.;])\s+", raw) if x.strip()])]
+    for i, line in units:
+        body = line.lstrip("-•*●▪– ").strip()
+        n = f" {_n(body)} "
+        if not (25 <= len(body) <= 320) or "@" in body or body.endswith(":") or body.isupper() or len(re.findall(r"[a-zA-Zà-ÿ]", body)) < 15:
+            continue
+        rel = sum(1 for a in relevant if a and f" {a}" in n)
+        weak = (not quantified(body)) + bool(WEAK.match(_n(body))) + (len(body) < 70)
+        if rel or weak >= 2:
+            out.append((rel * 2 + weak, i, line))
+    return [(i, line) for _, i, line in sorted(out, key=lambda x: -x[0])[:8]]
+
+
+def invented(after: str, before: str, cv: str, skills: List[JobSkill]) -> str:
+    """Reason why a reworded line adds facts absent from the CV ('' = acceptable)."""
+    na, nb, ncv = f" {_n(after)} ", f" {_n(before)} ", f" {_n(cv)} "
+    digits = set(re.findall(r"\d+", re.sub(r"(?<=\d)[\s.,](?=\d{3}\b)", "", cv)))
+    for d in re.findall(r"\d+", re.sub(r"(?<=\d)[\s.,](?=\d{3}\b)", "", after)):
+        if d not in digits:
+            return f"chiffre « {d} » absent du CV"
+    if YEARS.search(na) and not YEARS.search(nb):
+        return "années d'expérience ajoutées"
+    for w in TITLES:
+        if f" {w}" in na and f" {w}" not in ncv:
+            return f"intitulé de poste « {w} » absent du CV"
+    for w in CERTS:
+        if w not in ("certif", "attestation") and f" {w}" in na and f" {w}" not in ncv:
+            return f"certification « {w} » absente du CV"
+    for s in skills:
+        for a in s.aliases:
+            if a and f" {a}" in na and f" {a}" not in ncv:
+                if s.status == "manquant" or not any(k and f" {k}" in nb for k in s.domain_keys):
+                    return f"compétence « {s.label} » sans preuve dans cette ligne"
+    if len(after) > 2.5 * len(before) + 120:
+        return "reformulation trop longue"
+    return ""
+
+
+def create_cv_optimize_router(db, current_user, generate, parse_json):
+    router = APIRouter(prefix="/api/careeros/cv-optimize")
+
+    async def _cv(uid: str) -> tuple:
+        p = await db.career_profiles.find_one({"user_id": uid}, {"_id": 0}) or {}
+        return p, (p.get("cv_text") or "")
+
+    @router.post("/propose")
+    async def propose(body: ProposeBody, user: dict = Depends(current_user)):
+        _, cv = await _cv(user["id"])
+        if len(cv.strip()) < 80:
+            raise HTTPException(status_code=400, detail="Collez d'abord votre CV maître dans la Career Memory.")
+        cands = _candidates(cv, body.skills)
+        items, rejected, ai = [], [], "ok"
+        if cands:
+            have = [s.label for s in body.skills if s.status == "ok"][:20]
+            partial = [s.label for s in body.skills if s.status == "partiel"][:12]
+            lines = "\n".join(f"{k}. {line}" for k, (_, line) in enumerate(cands))
+            prompt = (f"POSTE VISÉ : {body.title or 'non précisé'}\nCOMPÉTENCES DE L'OFFRE DÉJÀ PROUVÉES DANS LE CV : {', '.join(have) or 'aucune'}\n"
+                      f"COMPÉTENCES DE L'OFFRE À NOMMER SEULEMENT SI LA LIGNE EN APPORTE LA PREUVE : {', '.join(partial) or 'aucune'}\n\n"
+                      f"CV COMPLET (référence des faits autorisés) :\n{cv[:9000]}\n\nLIGNES À AMÉLIORER :\n{lines}")
+            try:
+                data = parse_json(await generate(SYSTEM, prompt)) or {}
+            except AB.QuotaReached:
+                data, ai = {}, "quota"
+            except Exception:  # noqa: BLE001 - provider failure: rules-only result, never a technical error for the member
+                data, ai = {}, "indisponible"
+            for it in (data.get("items") or [])[:8]:
+                try:
+                    k, after = int(it.get("i")), str(it.get("after") or "").strip()
+                except (TypeError, ValueError):
+                    continue
+                if not (0 <= k < len(cands)) or not after:
+                    continue
+                idx, before = cands[k]
+                prefix = re.match(r"^\s*[-•*●▪–]\s*", before)
+                after = (prefix.group(0) if prefix else "") + after.lstrip("-•*●▪– ")
+                if _n(after) == _n(before):
+                    continue
+                why = invented(after, before, cv, body.skills)
+                if why:
+                    rejected.append({"before": before, "reason": why})
+                    continue
+                items.append({"id": f"r{idx}-{k}", "type": "reformulation", "line": idx, "before": before, "after": after,
+                              "skills": [str(x)[:80] for x in (it.get("skills") or [])][:5], "reason": str(it.get("reason") or "")[:300]})
+        return {"items": items, "rejected": rejected, "ai": ai, "cv_text": cv}
+
+    @router.post("/simulate")
+    async def simulate(body: SimBody, user: dict = Depends(current_user)):
+        p, _ = await _cv(user["id"])
+        if len(body.variants) > 40:
+            raise HTTPException(status_code=400, detail="Trop de variantes")
+        out = {}
+        for k, cv in body.variants.items():
+            r = compute({**p, "cv_text": str(cv)[:60000]})
+            out[str(k)[:40]] = {"score": r["score"], "criteria": {c["key"]: c["score"] for c in r["criteria"]}, "labels": {c["key"]: c["label"] for c in r["criteria"]}}
+        return out
+
+    @router.post("/apply")
+    async def apply(body: ApplyBody, user: dict = Depends(current_user)):
+        p, before = await _cv(user["id"])
+        now = datetime.now(timezone.utc).isoformat()
+        ifp_before, ifp_after = compute(p)["score"], compute({**p, "cv_text": body.cv_text})["score"]
+        v = {"id": str(uuid.uuid4()), "user_id": user["id"], "at": now, "kind": "optimisation", "cv_before": before, "cv_after": body.cv_text,
+             "offer": {k: str(body.offer.get(k) or "")[:200] for k in ("title", "company", "kind", "id")}, "accepted": body.accepted,
+             "estimated": {k: body.estimated.get(k) for k in ("match_before", "match_after", "match_potential", "ifp_before", "ifp_after") if k in body.estimated},
+             "real": {"ifp_before": ifp_before, "ifp_after": ifp_after}}
+        await db.cv_versions.insert_one({**v})
+        await db.career_profiles.update_one({"user_id": user["id"]}, {"$set": {"cv_text": body.cv_text, "updated_at": now}}, upsert=True)
+        return {k: v[k] for k in ("id", "at", "real", "estimated")}
+
+    @router.post("/versions/{vid}/real")
+    async def real(vid: str, body: RealBody, user: dict = Depends(current_user)):
+        r = await db.cv_versions.update_one({"id": vid, "user_id": user["id"]}, {"$set": {"real.match_after": body.match_after}})
+        if not r.matched_count:
+            raise HTTPException(status_code=404, detail="Version introuvable")
+        return {"ok": True}
+
+    @router.get("/versions")
+    async def versions(user: dict = Depends(current_user)):
+        return {"items": [v async for v in db.cv_versions.find({"user_id": user["id"]}, {"_id": 0, "user_id": 0}).sort("at", -1).limit(100)]}
+
+    @router.post("/versions/{vid}/restore")
+    async def restore(vid: str, user: dict = Depends(current_user)):
+        v = await db.cv_versions.find_one({"id": vid, "user_id": user["id"]}, {"_id": 0})
+        if not v:
+            raise HTTPException(status_code=404, detail="Version introuvable")
+        p, cur = await _cv(user["id"])
+        now = datetime.now(timezone.utc).isoformat()
+        nv = {"id": str(uuid.uuid4()), "user_id": user["id"], "at": now, "kind": "restauration", "restored_from": vid, "cv_before": cur, "cv_after": v["cv_before"],
+              "offer": v.get("offer") or {}, "accepted": [], "estimated": {},
+              "real": {"ifp_before": compute(p)["score"], "ifp_after": compute({**p, "cv_text": v["cv_before"]})["score"]}}
+        await db.cv_versions.insert_one({**nv})
+        await db.career_profiles.update_one({"user_id": user["id"]}, {"$set": {"cv_text": v["cv_before"], "updated_at": now}})
+        return {k: nv[k] for k in ("id", "at", "real")}
+
+    return router

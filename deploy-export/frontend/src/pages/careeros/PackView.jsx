@@ -13,6 +13,7 @@ import { VersionBar, ReanalyzeDialog, CompareDialog } from "@/components/careero
 import { Pending, DecisionPanel, AtsPanel, SimulationPanel, QuestionsPanel, StarPanel, DocPanel } from "@/components/careeros/PackSections";
 import { usePageTitle } from "@/components/careeros/ThemeToggle";
 import { FollowupPanel } from "@/components/careeros/Followup";
+import { OptimizeButton } from "@/components/careeros/optimize/OptimizeButton";
 
 const TABS = [
   ["decision", "Décision & IPS"], ["ats", "Analyse ATS"], ["cv_ats", "CV ATS"], ["cv_humain", "CV humain"],
@@ -105,6 +106,7 @@ export default function PackView() {
             className="rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-slate-200 outline-none">
             {Object.entries(PIPELINE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
+          {a.status === "done" && <OptimizeButton offer={{ kind: "pack", id: a.id, title: d.poste || a.code, company: d.entreprise || "" }} compact testid="pack-optimize-btn" />}
           {a.status === "done" && <Link to={`/careeros/copilote?pack=${a.id}`} title="Ouvre le Copilote avec le CV, l'offre, le CV ATS et la lettre de ce pack déjà remplis" data-testid="prepare-interview-btn" className="flex items-center gap-1.5 rounded-full bg-indigo-500 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-400"><Mic className="h-3.5 w-3.5" />Préparer l'entrevue</Link>}
           <MoreMenu testid="pack-more-btn" items={[
             { label: "Comparer les versions", icon: GitCompareArrows, onClick: () => comparable && setDialog("compare"), testid: "compare-versions-btn" },

@@ -11,6 +11,7 @@ import { SkillMap } from "@/components/careeros/SkillMap";
 import { Foldable } from "@/components/careeros/Foldable";
 import { ProStrength } from "@/components/careeros/ProStrength";
 import { SkillCompare } from "@/components/careeros/SkillCompare";
+import { CvVersions } from "@/components/careeros/CvVersions";
 
 const inputCls = "w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white outline-none focus:border-indigo-400/60";
 const TEXT = [["full_name", "Nom complet"], ["headline", "Titre professionnel"], ["location", "Localisation"], ["country", "Pays"], ["province", "Province / région"], ["city", "Ville"], ["target_roles", "Postes visés"], ["sectors", "Secteurs visés"], ["salary_expectation", "Attentes salariales"]];
@@ -25,6 +26,7 @@ export default function Profile() {
     careeros.getProfile().then(setP).catch((e) => toast.error(e.message));
     careeros.meta().then((m) => setGoals(m.goals)).catch(() => {});
   }, []);
+  useEffect(() => { const h = () => careeros.getProfile().then(setP).catch(() => {}); window.addEventListener("careeros:cv-updated", h); return () => window.removeEventListener("careeros:cv-updated", h); }, []);
   if (!p) return <Shell><Loader2 className="h-5 w-5 animate-spin text-indigo-400" /></Shell>;
 
   const set = (k) => (e) => setP({ ...p, [k]: e.target.value });
@@ -76,6 +78,7 @@ export default function Profile() {
           <Foldable storageKey="cos.profile.cv.open" initial={!(p.cv_text || "").trim()} title="CV maître (collez ici votre CV complet : il sert de base à chaque pack)" hint={`${(p.cv_text || "").length.toLocaleString("fr-CA")} caractères`} testid="profile-cv-block">
             <textarea rows={26} value={p.cv_text || ""} onChange={set("cv_text")} className={`${inputCls} font-mono text-xs`} data-testid="profile-cv-input" aria-label="CV maître" />
           </Foldable>
+          <CvVersions onRestored={() => window.dispatchEvent(new Event("careeros:cv-updated"))} />
           <SkillMap profile={p} />
           <SkillCompare profile={p} />
           <ProStrength refreshKey={p.updated_at} />

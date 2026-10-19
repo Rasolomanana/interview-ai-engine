@@ -35,6 +35,7 @@ import { CompanySuggestions } from "@/components/careeros/CompanySuggestions";
 import { OfferMap } from "@/components/careeros/OfferMap";
 import { PackConfirm } from "@/components/careeros/PackConfirm";
 import { sourceLabel } from "@/lib/labels";
+import { OptimizeButton } from "@/components/careeros/optimize/OptimizeButton";
 
 
 const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, onSave, deepId, busy }) => (
@@ -65,6 +66,7 @@ const OfferCard = ({ o, onPack, onIgnore, onDeep, onExplain, onSave, deepId, bus
       {o.status === "pack" ? <span className="text-xs text-indigo-300">Pack généré</span> : (
         <button onClick={() => onPack(o)} disabled={busy} data-testid={`radar-pack-btn-${o.id}`} className="flex items-center gap-1.5 rounded-full bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-400 disabled:opacity-50">
           <Sparkles className="h-3.5 w-3.5" />Générer le pack</button>)}
+        <OptimizeButton offer={{ kind: "radar", id: o.id, title: o.title, company: o.company }} compact testid={`radar-optimize-btn-${o.id}`} />
       {o.method !== "ia" && o.status !== "pack" && <button onClick={() => onDeep(o)} disabled={deepId === o.id} data-testid={`radar-deep-btn-${o.id}`} className="flex items-center gap-1.5 rounded-full border border-indigo-400/40 px-3 py-1.5 text-xs text-indigo-200 hover:bg-indigo-500/10 disabled:opacity-60">
         {deepId === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Analyse approfondie</button>}
       {o.ips && <button onClick={() => onExplain(o)} data-testid={`radar-explain-btn-${o.id}`} className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:border-indigo-400/40 hover:text-white">

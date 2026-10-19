@@ -31,9 +31,7 @@ export const GuidedTour = () => {
   const s = TOUR[Math.min(tour.step, TOUR.length - 1)];
   return (
     <Dialog open onOpenChange={(o) => !o && closeTour()}>
-      <DialogContent className="max-w-lg border-white/10 bg-[#121520] text-slate-100" data-testid="guided-tour"
-        onPointerDownOutside={(e) => { if (e.detail?.originalEvent?.target?.closest?.('[data-testid="privacy-banner"]')) e.preventDefault(); }}
-        onInteractOutside={(e) => { if (e.detail?.originalEvent?.target?.closest?.('[data-testid="privacy-banner"]')) e.preventDefault(); }}>
+      <DialogContent className="max-w-lg border-white/10 bg-[#121520] text-slate-100" data-testid="guided-tour">
         <DialogHeader>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-300" data-testid="tour-progress">{end ? "Visite terminée" : `Visite guidée · étape ${tour.step + 1} sur ${TOUR.length}`}</p>
           <DialogTitle className="flex items-center gap-2 text-xl" data-testid="tour-title">{end ? <><PartyPopper className="h-5 w-5 text-emerald-400" />CareerOS est prêt</> : s.title}</DialogTitle>

@@ -146,3 +146,12 @@ export const followup = {
 export const PIPELINE_LABELS = {
   a_postuler: "À postuler", postule: "Postulé", entrevue: "Entrevue", offre: "Offre", refuse: "Refusé", abandonne: "Abandonné",
 };
+
+export const cvOptimize = {
+  propose: (b) => call("/careeros/cv-optimize/propose", { method: "POST", body: b }),
+  simulate: (variants) => call("/careeros/cv-optimize/simulate", { method: "POST", body: { variants } }),
+  apply: (b) => call("/careeros/cv-optimize/apply", { method: "POST", body: b }),
+  real: (id, match_after) => call(`/careeros/cv-optimize/versions/${id}/real`, { method: "POST", body: { match_after } }),
+  versions: () => call("/careeros/cv-optimize/versions"),
+  restore: (id) => call(`/careeros/cv-optimize/versions/${id}/restore`, { method: "POST" }),
+};
