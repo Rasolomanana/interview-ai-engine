@@ -107,8 +107,20 @@ const SectionHead = ({ title, n, tone, open, onToggle }) => {
   );
 };
 
-const Section = ({ title, items, testid, tone, ...p }) => {
+const when = (o) => o.posted_at || o.first_seen || "";
+const SORTS = { ips: ["IPS (du plus fort au plus faible)", (a, b) => ((b.ips?.score ?? -1) - (a.ips?.score ?? -1)) || when(b).localeCompare(when(a))],
+  date: ["Date de publication (plus récente d'abord)", (a, b) => when(b).localeCompare(when(a)) || ((b.ips?.score ?? -1) - (a.ips?.score ?? -1))] };
+
+const SortSelect = ({ value, onChange }) => (
+  <label className="flex items-center gap-2 text-xs text-slate-400">Trier par
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="rounded-full border border-white/10 bg-[#121520] px-3 py-1.5 text-xs text-slate-200" data-testid="radar-sort-select">
+      {Object.entries(SORTS).map(([k, [l]]) => <option key={k} value={k} data-testid={`radar-sort-${k}`}>{l}</option>)}
+    </select></label>
+);
+
+const Section = ({ title, items: raw, testid, tone, sort = "ips", ...p }) => {
   const [open, toggle] = usePersistedToggle(`cos.radar.section.${tone || testid}`, true);
+  const items = [...raw].sort(SORTS[sort][1]);
   return (
     <section className="space-y-3" data-testid={testid}>
       {tone ? <SectionHead title={title} n={items.length} tone={tone} open={open} onToggle={toggle} /> : <h2 className="text-sm font-semibold text-slate-200">{title} <span className="text-slate-500">({items.length})</span></h2>}
@@ -146,6 +158,8 @@ export default function Radar() {
     try { const r = await radar.deep(o.id); toast.success(`Analyse IA : IPS Radar ${r.ips?.score}/100 — priorité ${r.ips?.priority}`); load(); } catch (e) { toast.error(e.message); } finally { setDeepId(null); }
   };
   const [f, setF] = useState(null);
+  const [sort, setSortRaw] = useState(() => { try { return localStorage.getItem("cos.radar.sort") === "date" ? "date" : "ips"; } catch { return "ips"; } });
+  const setSort = (v) => { setSortRaw(v); try { localStorage.setItem("cos.radar.sort", v); } catch { /* ignore */ } };
   const lr = d?.last_run;
   const FILTERS = d ? {
     analyzed: ["Analysées aujourd'hui", d.analyzed_today_list || []],
@@ -212,13 +226,14 @@ export default function Radar() {
           {(d.saved || []).length > 0 && <button type="button" onClick={() => pick("saved")} className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-amber-400/25 px-3 py-1 text-xs text-amber-200 hover:bg-amber-500/10" data-testid="radar-saved-btn"><Bookmark className="h-3.5 w-3.5" />{d.saved.length} sauvegardée(s)</button>}
           {d.learning && <p className="text-[11px] text-slate-500" data-testid="radar-learning" title="Le Radar analyse d'abord les offres proches de celles que vous gardez (packs, sauvegardes, candidatures, entrevues) et s'éloigne de celles que vous ignorez. Données propres à votre compte.">
             Apprentissage du Radar : {d.learning.pos} offre(s) retenue(s) · {d.learning.neg} ignorée(s){d.learning.liked?.length ? ` · privilégie : ${d.learning.liked.slice(0, 5).join(", ")}` : ""}{d.learning.disliked?.length ? ` · évite : ${d.learning.disliked.slice(0, 4).join(", ")}` : ""}</p>}
+          <div className="flex justify-end" data-testid="radar-sort-bar"><SortSelect value={sort} onChange={setSort} /></div>
           {f ? <>
             <FilterBanner label={FILTERS[f][0]} count={FILTERS[f][1].length} onClear={() => setF(null)} testid="radar-filter-banner" />
-            <Section title={FILTERS[f][0]} items={FILTERS[f][1]} testid="radar-filtered" onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title={FILTERS[f][0]} items={FILTERS[f][1]} testid="radar-filtered" sort={sort} onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
           </> : <>
-            <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" tone="a" onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
-            <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" tone="b" onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
-            <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" tone="c" onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Top priorité A — postuler en premier" items={d.top_a} testid="radar-top-a" tone="a" sort={sort} onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Top priorité B — postuler après optimisation" items={d.top_b} testid="radar-top-b" tone="b" sort={sort} onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
+            <Section title="Opportunités ignorées ou à éviter (C)" items={d.ignored} testid="radar-ignored" tone="c" sort={sort} onPack={onPack} onIgnore={onIgnore} onSave={onSave} onDeep={onDeep} onExplain={(o) => setExplainId(o.id)} deepId={deepId} busy={busy} />
           </>}
           <RadarHistory runs={runs} />
         </div>

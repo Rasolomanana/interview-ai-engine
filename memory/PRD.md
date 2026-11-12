@@ -591,3 +591,8 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Correctif `careeros/zone.py` : codes postaux/numéros de département ignorés, codes pays ISO (FR, IN, US, CA…) reconnus en dernier segment (« , CA » = Canada), raison lisible ; VERSION 4 → toutes les offres déjà stockées sont réévaluées au prochain affichage du Radar. Test `tests/test_zone_iso_codes.py`.
 - Zone mal orthographiée (« Longeuil ») : la ville n'était pas reconnue → la zone valait toute la province. Ajout `zone.member_place()` (tolérance aux fautes, villes canadiennes) + bandeau `ZoneNotice.jsx` sur le Radar (ville non reconnue / lue comme…, bouton « Corriger mes zones »).
 - Note tests : test_radar_zone.py et test_radar_zones_multi.py partagent le compte membre.test → à lancer avec -n 0 (sinon conflits de réglages).
+
+## 2026-06 — Radar : tri des offres + historique repliable
+- Sélecteur « Trier par » (IPS du plus fort au plus faible / Date de publication, plus récente d'abord ; repli sur la date de découverte) appliqué à A, B, C et à toutes les listes filtrées ; choix mémorisé (localStorage cos.radar.sort). Un seul ordre par critère (choix utilisateur).
+- Historique des recherches : bouton Masquer/Afficher mémorisé + 5 derniers jours puis « Afficher les N jours précédents ».
+- Zone : codes postaux de tous formats (OX25 1LP…) ignorés, ~70 codes pays ISO, VERSION 5.
