@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { radar } from "@/lib/careeros";
-import { CalendarClock, CheckCircle2, ChevronDown, CircleAlert, Clock } from "lucide-react";
+import { CalendarClock, CheckCircle2, ChevronDown, CircleAlert, Clock, Eye, EyeOff } from "lucide-react";
+import { usePersistedToggle } from "@/lib/usePersistedToggle";
 import { RunOffersDialog } from "./RunOffersDialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -55,15 +56,23 @@ const RunRow = ({ r, onShow }) => {
 export const RadarHistory = ({ runs }) => {
   const [open, setOpen] = useState(0);
   const [sel, setSel] = useState(null);
+  const [shown, toggleShown] = usePersistedToggle("cos.radar.history.open", true);
+  const [all, setAll] = useState(false);
   const onShow = (run, kind) => setSel({ run, kind, when: `${day(run.at)} à ${hour(run.at)}` });
   if (!runs) return null;
   const groups = Object.values(runs.reduce((g, r) => { (g[dayKey(r.at)] ||= { key: dayKey(r.at), label: day(r.at), runs: [] }).runs.push(r); return g; }, {}));
   return (
     <section data-testid="radar-history">
-      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-white md:text-lg"><CalendarClock className="h-4 w-4 text-indigo-300" />Historique des recherches (30 jours)</h2>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-white md:text-lg"><CalendarClock className="h-4 w-4 text-indigo-300" />Historique des recherches (30 jours)</h2>
+        <span className="text-xs text-slate-500">{groups.length} jour(s)</span>
+        <button type="button" onClick={toggleShown} className="ml-auto flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300 transition-colors hover:text-white" data-testid="radar-history-visibility-btn">
+          {shown ? <><EyeOff className="h-3.5 w-3.5" />Masquer</> : <><Eye className="h-3.5 w-3.5" />Afficher</>}</button>
+      </div>
+      {shown && <>
       {groups.length === 0 && <p className="text-sm text-slate-500" data-testid="radar-history-empty">Aucune recherche pour le moment.</p>}
       <div className="space-y-2">
-        {groups.map((g, i) => (
+        {(all ? groups : groups.slice(0, 5)).map((g, i) => (
           <div key={g.key} className="rounded-2xl border border-white/[0.07] bg-[#121520]/80" data-testid={`radar-history-day-${g.key}`}>
             <button onClick={() => setOpen(open === i ? -1 : i)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm" data-testid={`radar-history-toggle-${g.key}`}>
               <span className="font-medium capitalize text-slate-200">{g.label}</span>
@@ -81,6 +90,9 @@ export const RadarHistory = ({ runs }) => {
           </div>
         ))}
       </div>
+      {groups.length > 5 && <button type="button" onClick={() => setAll(!all)} className="mt-2 text-xs text-indigo-300 hover:text-white" data-testid="radar-history-more-btn">
+        {all ? "Afficher seulement les 5 derniers jours" : `Afficher les ${groups.length - 5} jours précédents`}</button>}
+      </>}
       <RunOffersDialog sel={sel} onClose={() => setSel(null)} />
     </section>
   );

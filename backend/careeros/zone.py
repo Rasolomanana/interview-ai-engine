@@ -6,7 +6,7 @@ import re
 from careeros.geo import COUNTRIES, PROVINCES, _has, _n
 
 RADIUS_KM = 100
-VERSION = 4
+VERSION = 5
 RADII = ("25", "50", "100", "200", "province", "country")
 # city -> (lat, lon, province or "", country)
 PLACES = {
@@ -71,8 +71,11 @@ US_STATES = {"al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl", "ga", "hi", "
 ISO = {"fr": "France", "be": "Belgique", "ch": "Suisse", "us": "États-Unis", "usa": "États-Unis", "ma": "Maroc", "tn": "Tunisie", "dz": "Algérie", "sn": "Sénégal",
        "ci": "Côte d'Ivoire", "ht": "Haïti", "cm": "Cameroun", "ro": "Roumanie", "mg": "Madagascar", "gb": "Royaume-Uni", "uk": "Royaume-Uni", "mx": "Mexique",
        "in": "Inde", "ph": "Philippines", "pl": "Pologne", "ie": "Irlande", "de": "Allemagne", "es": "Espagne", "br": "Brésil", "cn": "Chine", "jp": "Japon",
-       "au": "Australie", "nl": "Pays-Bas", "it": "Italie", "pt": "Portugal", "sg": "Singapour", "ae": "Émirats arabes unis", "ca": "Canada"}
-POSTAL = re.compile(r"^([a-z]\d[a-z] ?\d[a-z]\d|\d{2,6}(-\d{3,4})?)$")
+       "au": "Australie", "nl": "Pays-Bas", "it": "Italie", "pt": "Portugal", "sg": "Singapour", "ae": "Émirats arabes unis", "ca": "Canada", "se": "Suède", "no": "Norvège", "dk": "Danemark", "fi": "Finlande", "at": "Autriche",
+       "cz": "Tchéquie", "hu": "Hongrie", "gr": "Grèce", "tr": "Turquie", "il": "Israël", "za": "Afrique du Sud", "ng": "Nigeria", "eg": "Égypte", "sa": "Arabie saoudite",
+       "kr": "Corée du Sud", "tw": "Taïwan", "hk": "Hong Kong", "my": "Malaisie", "th": "Thaïlande", "vn": "Viêt Nam", "id": "Indonésie", "nz": "Nouvelle-Zélande",
+       "ar": "Argentine", "cl": "Chili", "co": "Colombie", "pe": "Pérou", "lu": "Luxembourg", "sk": "Slovaquie", "lt": "Lituanie", "lv": "Lettonie", "ee": "Estonie", "bg": "Bulgarie", "ua": "Ukraine", "rs": "Serbie", "hr": "Croatie"}
+POSTAL = re.compile(r"^(?=.*\d)[a-z0-9]{1,4}( ?[a-z0-9]{1,4}){0,2}$")  # any short code with a digit: H3B 2Y5, OX25 1LP, 69220, 122002, 86
 REMOTE = re.compile(r"\b(remote|teletravail|a distance|work from home|virtual)\b")
 
 
@@ -105,6 +108,9 @@ def place(text: str) -> dict:
             out.update(province=prov, country="Canada")
             return out
     last = segs[-1] if len(segs) >= 2 else ""
+    if last not in ISO:  # « Bicester GB » / « London, England, United Kingdom »: country code at the end of the last segment
+        tail = last.split()[-1] if last else ""
+        last = tail if tail in ISO and tail not in ("ca", "in", "de") else last
     if last in ISO and (last == "ca" or last not in US_STATES or (len(segs) >= 3 and segs[-2] not in US_STATES)):  # ISO country code: « Paris, FR », « Gurugram, HR, IN »
         out["country"] = ISO[last]
         return out
