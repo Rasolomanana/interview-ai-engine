@@ -1,0 +1,34 @@
+{
+  "summary": "Retest Radar après correction des doublons IA. ✅ Plus aucune analyse IA en double. Test sur un membre TEST_ neuf (CV et réglages copiés de membre.test). Run 1 : status 'done' en 15,6 s (timings sources_s 10,1 / store_rules_s 1,5 / total_s 11,6), new 77, analyzed 50, ai_pending true, et 5 offres reçoivent ai_claimed_at. Relance immédiate pendant ai_pending : POST /run renvoie 200 ({started:true}). Run 2 : 'done' en 11,5 s (total_s 9,5), avec ai_pending false et ai_analyzed 0 dès le départ, car busy_ai a bien été soustrait. Après la fin des deux runs : somme des ai_analyzed = 5, 5 offres distinctes avec ai_analyzed_at, ai_today = 5, 5 offres réservées au total ; timings.ai_s = 75,3 sur le run 1. Robustesse (revue de code) : run_for_user enveloppe _run ; en cas d'exception, status passe à 'error', ai_pending à false et finished_at est renseigné. _ai_phase entoure le gather d'un try/except, et ai_pending=false est toujours écrit. Frontend (nouveau membre TEST_, puis membre.test) : le bouton affiche « Recherche en cours… » (désactivé) ; radar-last-run affiche « Recherche en cours (1 à 2 minutes environ)… » ; 'Dernière recherche' apparaît après 13,2 s. L'heure de radar-last-run (20 h 53) est identique à celle de l'historique (20 h 53, heure de Toronto). La mention « confirmation par l'IA… » disparaît seule après environ 81 s, et 5 badges « Analyse IA » sont alors visibles. GET /radar/runs est bien relancé quand ai_pending passe à false. Le tri ips/date est mémorisé après rechargement, et Masquer/Afficher de l'historique fonctionne.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "startup (radar.py ~l.1087)", "issue": "Au redémarrage, seuls les runs 'running' passent à 'interrompue'. Un run 'done' avec ai_pending=true reste ai_pending=true pour toujours dans la base. Le frontend borne l'affichage à 10 min, donc pas d'impact visible, mais il faudrait aussi mettre ai_pending:false dans cet update_many."},
+      {"endpoint": "run_for_user except", "issue": "Si l'exception survient pendant _ai_phase (après 'done', par exemple dans PE.log_error ou dans l'update final), un run déjà 'done' passe à 'error' alors que ses offres sont affichées. Cas peu probable : on pourrait ne mettre status='error' que si le status est encore 'running'."},
+      {"endpoint": "POST /api/careeros/radar/run", "issue": "Le contrôle anti-doublon (find_one 'running' puis create_task) n'est pas atomique : le run n'est inséré qu'après la lecture du profil et des réglages. Une fenêtre de course reste théoriquement possible (en iter 56, 2 POST simultanés ont tout de même donné 200 + 409)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/careeros/radar", "issues": ["Le bandeau « Que faire ensuite ? Complétez votre Career Memory » s'affiche pour membre.test alors que son CV est rempli. Hors périmètre, à vérifier.", "radar-sort-select est un <select> natif et non le Select shadcn (mineur)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_radar_ai_dedupe_iter57.py", "/app/backend/tests/mk_fresh_member_iter57.py", "/app/test_reports/pytest/iter57_dedupe.xml"],
+  "action_items": [
+    "Optionnel : dans le nettoyage au démarrage, ajouter ai_pending:false à l'update_many des runs.",
+    "Optionnel : dans run_for_user, en cas d'exception, ne passer à 'error' que si le status est encore 'running'."
+  ],
+  "critical_code_review_comments": [
+    "Mécanisme de réservation correct : le pool exclut ai_claimed_at ≥ maintenant − 15 min, busy_ai ne compte que les offres encore method='regles' (pas de double comptage avec _ai_today une fois analysées), et la réservation est posée avant l'écriture du status 'done'.",
+    "ai_claimed_at n'est jamais effacé. Si l'IA échoue (quota, 3 échecs), l'offre réservée ne redevient éligible qu'après 15 min, et busy_ai réduit le budget pendant ce temps. Comportement acceptable.",
+    "radar.py fait environ 1 100 lignes : le découper en modules (run, IA, cron, routes)."
+  ],
+  "updated_files": ["/app/backend/tests/test_radar_ai_dedupe_iter57.py", "/app/backend/tests/mk_fresh_member_iter57.py"],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "100%"},
+  "seed_data_creation": "2 membres TEST_ créés : test_radar_dedupe_56c853c2 et test_radar_ui_0730ff02. Ils ont été supprimés ensuite, avec leurs données, uniquement par leurs ids (users, radar_offers, radar_runs, radar_settings, career_profiles…). Données de membre.test non modifiées, hormis l'ajout normal de runs.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Lancer test_radar_ai_dedupe_iter57.py avec -n 0 (environ 95 s et 5 appels LLM). Il crée un membre neuf, qu'il faut supprimer ensuite par son id, car il n'existe pas d'endpoint de suppression de compte. Le quota IA de membre.test est épuisé pour aujourd'hui. Pour l'interface d'un membre neuf, fermer d'abord la visite guidée (« Passer la visite »), puis la visite du Radar (« Passer ») et le bandeau de confidentialité."
+}

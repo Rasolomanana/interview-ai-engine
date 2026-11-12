@@ -306,7 +306,8 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         except Exception:  # noqa: BLE001 - never leave a run "running" (the member would be blocked)
             logger.exception("radar run failed for %s", user_id)
             if run.get("id"):
-                await db.radar_runs.update_one({"id": run["id"]}, {"$set": {"status": "error", "ai_pending": False, "finished_at": _now().isoformat()}})
+                await db.radar_runs.update_one({"id": run["id"], "status": "running"}, {"$set": {"status": "error", "finished_at": _now().isoformat()}})
+                await db.radar_runs.update_one({"id": run["id"]}, {"$set": {"ai_pending": False}})
                 await PE.log_error(db, user_id, "radar", "Radar · recherche", "radar", "Recherche interrompue par une erreur serveur (voir logs)")
             return run
 
@@ -1085,6 +1086,7 @@ async def ensure_radar_indexes(db):
     await db.radar_cron_log.create_index("at")
     await db.radar_settings.create_index("user_id", unique=True)
     await db.radar_runs.update_many({"status": "running"}, {"$set": {"status": "interrompue"}})
+    await db.radar_runs.update_many({"ai_pending": True}, {"$set": {"ai_pending": False}})
     task = asyncio.create_task(_rescore_all(db))  # in background: never delays the server start (cold start on Render)
     _BG.add(task)
     task.add_done_callback(_BG.discard)
