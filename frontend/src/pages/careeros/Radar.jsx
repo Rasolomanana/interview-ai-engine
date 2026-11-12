@@ -144,7 +144,8 @@ export default function Radar() {
   const [runs, setRuns] = useState(null);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (!running) radar.runs(30).then(setRuns).catch(() => setRuns([])); }, [running, d?.last_run?.id]);
-  useEffect(() => { if (!running) return undefined; const t = setTimeout(load, 4000); return () => clearTimeout(t); }, [running, d, load]);
+  const aiPending = !running && d?.last_run?.ai_pending && Date.now() - new Date(d.last_run.finished_at).getTime() < 600000;
+  useEffect(() => { if (!running && !aiPending) return undefined; const t = setTimeout(load, running ? 2500 : 5000); return () => clearTimeout(t); }, [running, aiPending, d, load]);
 
   const runNow = async () => { try { await radar.run(); toast.success("Recherche lancée"); setTimeout(load, 1200); } catch (e) { toast.error(e.message); } };
   const [confirmPack, setConfirmPack] = useState(null);
@@ -219,8 +220,8 @@ export default function Radar() {
           <OfferMap zone={d.zone} points={d.map_points || []} />
           <ZoneNotice zones={d.zone?.zones || []} onFix={() => setSettings(true)} />
           {lr && (running
-            ? <p className="flex items-center gap-1.5 text-xs text-indigo-200" data-testid="radar-last-run"><Loader2 className="h-3.5 w-3.5 animate-spin" />Recherche en cours : les offres apparaissent au fur et à mesure (3 à 4 minutes environ). Vous pouvez quitter la page, la recherche continue.</p>
-            : <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernière recherche : {new Date(lr.at).toLocaleString("fr-CA", { dateStyle: "medium", timeStyle: "short" })} ({lr.trigger === "manuel" ? "lancée par vous" : "automatique"}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} seront analysées demain (50 par jour)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}</p>)}
+            ? <p className="flex items-center gap-1.5 text-xs text-indigo-200" data-testid="radar-last-run"><Loader2 className="h-3.5 w-3.5 animate-spin" />Recherche en cours (1 à 2 minutes environ) : vos offres actuelles restent consultables. Vous pouvez quitter la page, la recherche continue.</p>
+            : <p className="text-xs text-slate-500" data-testid="radar-last-run">Dernière recherche : {new Date(lr.at).toLocaleString("fr-CA", { dateStyle: "medium", timeStyle: "short" })} ({lr.trigger === "manuel" ? "lancée par vous" : "automatique"}) · {lr.fetched} offres trouvées{lr.skipped_limit ? ` · ${lr.skipped_limit} seront analysées demain (50 par jour)` : ""}{d.pending ? ` · ${d.pending} en attente d'analyse` : ""}{aiPending ? " · confirmation par l'IA des meilleures offres en cours…" : ""}</p>)}
           {Object.values(lr?.notices || {}).map((v, k) => <p key={k} className="text-[11px] text-slate-400" data-testid={`radar-notice-${k}`}>{v}</p>)}
           {d.out_zone_count > 0 && <button type="button" onClick={() => pick("out_zone")} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${f === "out_zone" ? "border-amber-400/50 bg-amber-500/15 text-amber-100" : "border-amber-400/25 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10"}`} title="Offres situées hors de votre zone de recherche : masquées automatiquement, consultables ici" data-testid="radar-out-zone-btn"><MapPinOff className="h-3.5 w-3.5" /><span className="font-semibold tabular-nums" data-testid="radar-out-zone-count">{d.out_zone_count}</span> hors zone masquée(s) · zones : {d.zone?.label}</button>}
           {(d.saved || []).length > 0 && <button type="button" onClick={() => pick("saved")} className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-amber-400/25 px-3 py-1 text-xs text-amber-200 hover:bg-amber-500/10" data-testid="radar-saved-btn"><Bookmark className="h-3.5 w-3.5" />{d.saved.length} sauvegardée(s)</button>}

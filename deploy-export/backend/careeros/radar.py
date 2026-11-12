@@ -7,11 +7,13 @@ import hashlib
 import logging
 import os
 import re
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List
 
 import httpx
+from pymongo.errors import BulkWriteError
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
@@ -211,11 +213,11 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         terms = (RR.expand_terms(kw) if st.get("expand", True) else kw[:3]) or ["analyste"]  # one Jooble query per term (joined = AND search)
         srcs, comps = _active_sources(st), [c for c in st["companies"] if c.get("enabled", True)]
         comps.sort(key=lambda co: bool(co.get("kind") and co.get("slug")))  # Jooble fallback first for companies without a readable portal
-        sem = asyncio.Semaphore(6)
+        sem = asyncio.Semaphore(16)
 
-        async def limited(coro):
+        async def limited(coro):  # a slow site never holds the whole search: 45 s max per source
             async with sem:
-                return await coro
+                return await asyncio.wait_for(coro, timeout=45)
         async with httpx.AsyncClient(timeout=S.TIMEOUT, follow_redirects=True) as c:
             tasks = []  # (label, company filter or None, coroutine)
             if "adzuna" in srcs:
@@ -301,6 +303,7 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         profile = await db.career_profiles.find_one({"user_id": user_id}, {"_id": 0}) or {}
         cv = (profile.get("cv_text") or "").strip()
         st = await _settings(user_id, profile)
+        t0 = time.monotonic()
         run = {"id": str(uuid.uuid4()), "user_id": user_id, "at": _now().isoformat(), "trigger": trigger,
                "fetched": 0, "new": 0, "known": 0, "analyzed": 0, "skipped_limit": 0, "tracked": True, "errors": {}, "sources": S.configured(),
                "selected_sources": st["sources"], "by_source": {g: {"fetched": 0, "analyzed": 0} for g in ("jooble", "workday", "boards", "adzuna")},
@@ -336,31 +339,43 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             except Exception:  # noqa: BLE001
                 logger.exception("knowledge record_run")
             await _apply_zone(user_id, st)
-            seen, fresh = set(), []
+            t_fetch = time.monotonic()
+            seen, fresh, uniq = set(), [], []
             run["out_zone"] = 0
             for o in offers:
                 k = _key(o)
-                if k in seen:
-                    continue
-                seen.add(k)
+                if k not in seen:
+                    seen.add(k)
+                    uniq.append((k, o))
+            known = {d["dedupe_key"]: d async for d in db.radar_offers.find({"user_id": user_id, "dedupe_key": {"$in": list(seen)}}, {"_id": 0, "id": 1, "status": 1, "dedupe_key": 1})}
+            if known:  # one round-trip for every offer already known
+                await db.radar_offers.update_many({"user_id": user_id, "dedupe_key": {"$in": list(known)}},
+                                                  {"$set": {"last_seen": _now().isoformat()}, "$addToSet": {"seen_runs": run["id"]}})
+            new_docs = []
+            zones = Z.zones_of(st)
+            for k, o in uniq:
                 run["by_source"][S.group(o["source"])]["fetched"] += 1
-                existing = await db.radar_offers.find_one({"user_id": user_id, "dedupe_key": k}, {"_id": 0, "id": 1, "status": 1})
+                existing = known.get(k)
                 if existing:
                     run["known"] += 1
                     run["out_zone"] += existing.get("status") == "hors_zone"
-                    await db.radar_offers.update_one({"id": existing["id"]}, {"$set": {"last_seen": _now().isoformat()}, "$addToSet": {"seen_runs": run["id"]}})
                     continue
                 doc = {"id": str(uuid.uuid4()), "user_id": user_id, "dedupe_key": k, **o, "first_seen": _now().isoformat(),
                        "last_seen": _now().isoformat(), "run_id": run["id"], "seen_runs": [run["id"]], "status": "nouvelle", "ips": None, "decision_report": None,
                        "analyzed_at": None, "application_id": None}
-                ok, why = Z.check(o.get("location"), Z.zones_of(st))
+                ok, why = Z.check(o.get("location"), zones)
                 doc["zone_reason"] = why
                 if not ok:
                     doc["status"], doc["status_before_zone"] = "hors_zone", "nouvelle"
                     run["out_zone"] += 1
-                await db.radar_offers.insert_one(dict(doc))
+                new_docs.append(dict(doc))
                 if ok:
                     fresh.append(doc)
+            if new_docs:
+                try:
+                    await db.radar_offers.insert_many(new_docs, ordered=False)
+                except BulkWriteError:  # an offer inserted meanwhile by a concurrent run: the others are stored
+                    logger.info("radar insert_many: duplicates skipped")
             run["fetched"], run["new"] = len(seen), len(fresh)
             budget = max(0, DAILY_LIMIT - await _analyzed_today(user_id))
             fresh_ids = {d["id"] for d in fresh}
@@ -375,37 +390,54 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             if queue and not budget:
                 run["errors"]["limite"] = (f"Limite de {DAILY_LIMIT} analyses par jour déjà atteinte depuis minuit (heure de Toronto) : "
                                            "les offres sont reportées au prochain passage.")
-            scored = []
-            for doc in todo:  # free deterministic pre-scoring
-                scored.append((await _rules(doc, cv, profile, st.get("keywords") or []), doc))
+            rsem = asyncio.Semaphore(10)
+
+            async def rule(doc):  # free deterministic pre-scoring, 10 at a time
+                async with rsem:
+                    return await _rules(doc, cv, profile, st.get("keywords") or [])
+            scored = list(zip(await asyncio.gather(*(rule(doc) for doc in todo)), todo))
+            for doc in todo:
                 run["by_source"][S.group(doc["source"])]["analyzed"] += 1
             run["analyzed"] = len(scored)
+            run["timings"] = {"sources_s": round(t_fetch - t0, 1), "store_rules_s": round(time.monotonic() - t_fetch, 1)}
             start = _day_start()
             pool = [d async for d in db.radar_offers.find({"user_id": user_id, "method": "regles", "analyzed_at": {"$gte": start},
                                                            "ips.knockout": False, "status": "nouvelle"}, {"_id": 0}).sort("ips.score", -1)]
             pool.sort(key=lambda d: (-(d["ips"]["score"] + 10 * _learn_bonus(d.get("title", ""), learned)), _source_rank(d)))
             ai_todo = pool[:max(0, AI_TOP - await _ai_today(user_id))]
-            fails, run["ai_analyzed"] = {"n": 0}, 0
-            for doc in ai_todo:  # AI confirmation of the best offers of the day only
-                if fails["n"] >= 3:  # AI service down: offers stay rule-scored
-                    break
+            run["ai_analyzed"], run["ai_pending"] = 0, bool(ai_todo)
+        run["status"], run["finished_at"] = "done", _now().isoformat()  # offers are shown now; AI refines the top 5 in the background
+        run["timings"] = {**run.get("timings", {}), "total_s": round(time.monotonic() - t0, 1)}
+        await db.radar_runs.update_one({"id": run["id"]}, {"$set": run})
+        if run.get("ai_pending"):
+            await _ai_phase(run, ai_todo, cv, profile, user_id)
+        return run
+
+    async def _ai_phase(run: dict, ai_todo: list, cv: str, profile: dict, user_id: str):
+        """AI confirmation of the best offers of the day, 3 at a time, after the offers are already visible."""
+        t, asem, fails = time.monotonic(), asyncio.Semaphore(3), {"n": 0, "quota": False}
+
+        async def one(doc):
+            async with asem:
+                if fails["n"] >= 3 or fails["quota"]:
+                    return 0
                 try:
                     await _analyze(doc, cv, profile)
-                    run["ai_analyzed"] += 1
-                    fails["n"] = 0
+                    return 1
                 except AB.QuotaReached:  # budget / rules-only mode: not an error, offers stay rule-scored
-                    run["ai_rules_only"] = True
-                    break
+                    fails["quota"] = True
                 except Exception as e:  # noqa: BLE001
                     fails["n"] += 1
                     logger.warning("radar AI analyze %s failed: %s", doc["id"], e)
-            if fails["n"] >= 3:
-                await PE.log_error(db, user_id, "ia", "Radar · analyse IA du top 5", "ia", "3 échecs consécutifs de l'analyse IA (voir logs serveur)")
-                run["errors"]["ia"] = ("Service IA du serveur indisponible : les meilleures offres restent pré-analysées par règles ; "
-                                       "relancez l'analyse approfondie plus tard.")
-        run["status"], run["finished_at"] = "done", _now().isoformat()
-        await db.radar_runs.update_one({"id": run["id"]}, {"$set": run})
-        return run
+                return 0
+        upd = {"ai_analyzed": sum(await asyncio.gather(*(one(d) for d in ai_todo))), "ai_pending": False, "timings.ai_s": round(time.monotonic() - t, 1)}
+        if fails["quota"]:
+            upd["ai_rules_only"] = True
+        if fails["n"] >= 3:
+            await PE.log_error(db, user_id, "ia", "Radar · analyse IA du top 5", "ia", "3 échecs consécutifs de l'analyse IA (voir logs serveur)")
+            upd["errors.ia"] = ("Service IA du serveur indisponible : les meilleures offres restent pré-analysées par règles ; "
+                                "relancez l'analyse approfondie plus tard.")
+        await db.radar_runs.update_one({"id": run["id"]}, {"$set": upd})
 
     async def _learned(user_id: str) -> dict:
         """Title-word weights learned from the member's own actions: pack / saved / applied / interview (+), ignored (-)."""
