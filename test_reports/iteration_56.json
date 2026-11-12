@@ -1,0 +1,42 @@
+{
+  "summary": "Test de la correction de lenteur du bouton Radar « Rechercher maintenant ». ✅ Le problème signalé est corrigé : la recherche passe de « running » à « done » en 10 à 16 s au lieu de 5 à 10 min. Compte membre.test (147 offres déjà connues) : 10,9 s, timings sources_s 10,5 / store_rules_s 0,0 / total_s 10,5. Nouveau membre TEST_ avec le même CV et les mêmes réglages (77 nouvelles offres) : 15,8 s, timings sources_s 9,3 / store_rules_s 1,5 / total_s 10,8. Au moment du « done », les offres sont déjà affichées avec l'IPS par règles (A 1, B 18, C 31, new_today 50, analyzed_today_list 50). La limite de 50 analyses par jour est respectée (analyzed 50, skipped_limit 27 = 77 − 50, budget 50). ai_pending vaut true au « done », puis false après environ 80 s, avec ai_analyzed 5 et timings.ai_s 79 à 81 ; 5 offres portent method 'ia' et ai_analyzed_at. Contrôle des données : aucun doublon de dedupe_key ; seen_runs contient le nouveau run pour les 147 offres trouvées ; last_seen est mis à jour ; zone_reason est présent sur chaque nouvelle offre et le statut hors_zone est appliqué (70) ; la somme de by_source correspond à fetched et à analyzed ; /runs et /runs/{id}/offers (found, new, analyzed) fonctionnent. 409 vérifié pendant la recherche : 2 POST simultanés donnent 200 + 409, et un 3e POST donne aussi 409. ❌ Un bug réel : des analyses IA en double si on relance pendant ai_pending (détail ci-dessous). Frontend vérifié : le bouton affiche « Recherche en cours… » (désactivé) ; radar-last-run affiche « Recherche en cours (1 à 2 minutes environ)… » ; les 56 cartes d'offres restent affichées pendant la recherche ; les compteurs se mettent à jour sans recharger la page (après 11 à 14 s) ; la mention « confirmation par l'IA des meilleures offres en cours… » apparaît puis disparaît seule après environ 95 s, et 5 badges « Analyse IA » sont alors visibles ; le tri IPS / Date fonctionne et reste mémorisé après rechargement ; Masquer/Afficher de l'historique fonctionne.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/careeros/radar/run (pendant ai_pending)", "issue": "Analyses IA en double, donc coût IA doublé. Le contrôle 409 ne regarde que status='running'. Une fois le run « done » mais encore ai_pending, un 2e clic lance un nouveau run (200 started). Son _ai_phase reprend les mêmes 5 offres : elles ont encore method='regles' et _ai_today ne les compte pas tant que l'IA du 1er run n'a pas fini. Mesuré : run1 ai_analyzed 5 + run2 ai_analyzed 5 = 10 appels LLM pour 5 offres distinctes (ai_today 5). Le bouton radar-run-btn reste cliquable pendant ai_pending.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "run_for_user / _ai_phase", "issue": "Aucun try/finally. Si _fetch ou une écriture Mongo lève une exception, le run reste 'running' : le membre est bloqué en 409 pendant 15 min (ou jusqu'au redémarrage) et le front interroge le serveur en continu. Si _ai_phase plante (par exemple PE.log_error), ai_pending reste true : le front interroge toutes les 5 s pendant 10 min."},
+      {"endpoint": "POST /run", "issue": "Le contrôle busy (find_one) et l'insert du run ne sont pas atomiques. Le test de 2 POST simultanés est passé (200 + 409), mais la fenêtre de course existe toujours. Il faudrait un index unique partiel ou un verrou."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Radar.jsx radar-run-btn", "issue": "Le bouton est activé pendant aiPending (disabled={running} seulement) : il permet le double lancement IA décrit plus haut.", "selector": "[data-testid='radar-run-btn']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Historique après la phase IA", "issue": "Les runs ne sont rechargés que lorsque running ou last_run.id change. ai_analyzed et ai_s n'apparaissent donc pas dans l'historique tant que la page n'est pas rechargée. Mineur.", "affected_selectors": ["[data-testid='radar-history-visibility-btn']"]}
+    ],
+    "design_issues": [
+      {"screen": "Radar", "issues": ["radar-last-run affiche l'heure dans le fuseau du navigateur (12 nov. 01 h 47), alors que l'historique affiche l'heure de Toronto (11 nov. 20 h 47). Incohérence existante, mineure.", "Portails employeurs : « 156 lues · 156 retenues » alors que Sources affiche 147 trouvées (compté avant la déduplication). Mineur."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_radar_speed_iter56.py", "/app/backend/tests/test_radar_speed_fresh_iter56.py", "/app/test_reports/pytest/radar_speed_iter56.xml", "/app/test_reports/pytest/radar_speed_fresh_iter56.xml"],
+  "action_items": [
+    "HIGH : empêcher les analyses IA en double. Au choix : (a) renvoyer 409 aussi quand le dernier run a ai_pending=true et finished_at < 10 min ; (b) marquer les offres retenues pour l'IA avant de lancer _ai_phase (par exemple ai_claimed_at = maintenant) et les exclure du pool dans run_for_user ; (c) désactiver radar-run-btn quand aiPending est vrai, avec un texte du type « Confirmation IA en cours… ».",
+    "Entourer run_for_user et _ai_phase d'un try/except/finally : status 'erreur' ou 'done' et ai_pending=false garantis.",
+    "Option : recharger radar.runs() quand ai_pending passe à false."
+  ],
+  "critical_code_review_comments": [
+    "radar.py fait 1077 lignes (> 700) : à découper (fetch / run / routes).",
+    "_ai_phase : le pool vient de method='regles' sans verrou ; la même offre peut être prise par deux runs concurrents (y compris le cron et un run manuel).",
+    "asyncio.create_task(run_for_user) : aucune référence n'est gardée sur la tâche, qui peut être supprimée par le ramasse-miettes (bonne pratique : la garder dans un set)."
+  ],
+  "updated_files": ["/app/backend/tests/test_radar_speed_iter56.py", "/app/backend/tests/test_radar_speed_fresh_iter56.py"],
+  "success_rate": {"backend": "16/17 (94 %) : 1 échec réel (analyses IA en double)", "frontend": "100 % des parcours demandés"},
+  "seed_data_creation": "2 membres TEST_ temporaires (test_radar_speed_*, test_radar_ui_*) avec le profil et les réglages copiés de membre.test. Supprimés ensuite par leur user_id (offres, runs, réglages, profils, utilisateurs). Sur membre.test, seuls 3 runs manuels ont été ajoutés ; aucune autre donnée modifiée. Le tri est remis sur IPS.",
+  "test_credentials": "membre.test@careeros.dev / CareerOS2026! (OK)",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Lancer avec -n 0 (état partagé entre tests). Le quota IA de membre.test (5) est déjà atteint aujourd'hui, donc la phase IA ne se déclenche pas sur ce compte. Pour la tester, utiliser test_radar_speed_fresh_iter56.py, qui crée un membre neuf (environ 2 min et 10 appels LLM). Après correction, test_04_no_duplicate_ai doit passer, et le POST pendant ai_pending doit renvoyer 409 ou ne pas relancer l'IA. Supprimer ensuite le membre créé par son id.",
+  "rca of the issue": "Analyses IA en double. Reproduction : POST /run, attendre status 'done' avec ai_pending=true, puis POST /run à nouveau : réponse 200. Le 2e run calcule pool = offres method='regles' du jour, triées par score, et ai_todo = pool[:5 − _ai_today]. Les 5 offres en cours d'analyse par le 1er run sont encore 'regles' et n'ont pas d'ai_analyzed_at : elles sont reprises, d'où 10 appels LLM. Correction : verrou ou marquage des offres réservées, ou 409 tant que ai_pending est vrai."
+}

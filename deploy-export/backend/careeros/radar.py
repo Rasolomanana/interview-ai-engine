@@ -300,14 +300,25 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
         return await db.radar_offers.count_documents({"user_id": user_id, "ai_analyzed_at": {"$gte": start}})
 
     async def run_for_user(user_id: str, trigger: str) -> dict:
+        run = {}
+        try:
+            return await _run(user_id, trigger, run)
+        except Exception:  # noqa: BLE001 - never leave a run "running" (the member would be blocked)
+            logger.exception("radar run failed for %s", user_id)
+            if run.get("id"):
+                await db.radar_runs.update_one({"id": run["id"]}, {"$set": {"status": "error", "ai_pending": False, "finished_at": _now().isoformat()}})
+                await PE.log_error(db, user_id, "radar", "Radar · recherche", "radar", "Recherche interrompue par une erreur serveur (voir logs)")
+            return run
+
+    async def _run(user_id: str, trigger: str, run: dict) -> dict:
         profile = await db.career_profiles.find_one({"user_id": user_id}, {"_id": 0}) or {}
         cv = (profile.get("cv_text") or "").strip()
         st = await _settings(user_id, profile)
         t0 = time.monotonic()
-        run = {"id": str(uuid.uuid4()), "user_id": user_id, "at": _now().isoformat(), "trigger": trigger,
+        run.update({"id": str(uuid.uuid4()), "user_id": user_id, "at": _now().isoformat(), "trigger": trigger,
                "fetched": 0, "new": 0, "known": 0, "analyzed": 0, "skipped_limit": 0, "tracked": True, "errors": {}, "sources": S.configured(),
                "selected_sources": st["sources"], "by_source": {g: {"fetched": 0, "analyzed": 0} for g in ("jooble", "workday", "boards", "adzuna")},
-               "status": "running"}
+               "status": "running"})
         await db.radar_runs.insert_one(dict(run))
         if len(cv) < 80:
             run["errors"]["cv"] = "Ajoutez votre CV dans la Career Memory pour activer le Radar."
@@ -401,10 +412,14 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
             run["analyzed"] = len(scored)
             run["timings"] = {"sources_s": round(t_fetch - t0, 1), "store_rules_s": round(time.monotonic() - t_fetch, 1)}
             start = _day_start()
-            pool = [d async for d in db.radar_offers.find({"user_id": user_id, "method": "regles", "analyzed_at": {"$gte": start},
-                                                           "ips.knockout": False, "status": "nouvelle"}, {"_id": 0}).sort("ips.score", -1)]
+            claimed = (_now() - timedelta(minutes=15)).isoformat()  # offers already queued for AI by a run still confirming them
+            pool = [d async for d in db.radar_offers.find({"user_id": user_id, "method": "regles", "analyzed_at": {"$gte": start}, "ips.knockout": False,
+                                                           "status": "nouvelle", "ai_claimed_at": {"$not": {"$gte": claimed}}}, {"_id": 0}).sort("ips.score", -1)]
             pool.sort(key=lambda d: (-(d["ips"]["score"] + 10 * _learn_bonus(d.get("title", ""), learned)), _source_rank(d)))
-            ai_todo = pool[:max(0, AI_TOP - await _ai_today(user_id))]
+            busy_ai = await db.radar_offers.count_documents({"user_id": user_id, "ai_claimed_at": {"$gte": claimed}, "method": "regles"})
+            ai_todo = pool[:max(0, AI_TOP - await _ai_today(user_id) - busy_ai)]
+            if ai_todo:
+                await db.radar_offers.update_many({"id": {"$in": [d["id"] for d in ai_todo]}}, {"$set": {"ai_claimed_at": _now().isoformat()}})
             run["ai_analyzed"], run["ai_pending"] = 0, bool(ai_todo)
         run["status"], run["finished_at"] = "done", _now().isoformat()  # offers are shown now; AI refines the top 5 in the background
         run["timings"] = {**run.get("timings", {}), "total_s": round(time.monotonic() - t0, 1)}
@@ -430,7 +445,12 @@ def create_radar_router(db, current_user, generate_text, parse_json, careeros_ro
                     fails["n"] += 1
                     logger.warning("radar AI analyze %s failed: %s", doc["id"], e)
                 return 0
-        upd = {"ai_analyzed": sum(await asyncio.gather(*(one(d) for d in ai_todo))), "ai_pending": False, "timings.ai_s": round(time.monotonic() - t, 1)}
+        try:
+            n = sum(await asyncio.gather(*(one(d) for d in ai_todo)))
+        except Exception:  # noqa: BLE001
+            logger.exception("radar AI phase")
+            n = 0
+        upd = {"ai_analyzed": n, "ai_pending": False, "timings.ai_s": round(time.monotonic() - t, 1)}
         if fails["quota"]:
             upd["ai_rules_only"] = True
         if fails["n"] >= 3:
