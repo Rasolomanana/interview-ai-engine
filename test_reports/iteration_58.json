@@ -1,0 +1,26 @@
+{
+  "summary": "Frontend test of Copilote FR/EN language feature. All requested checks PASS: dictation-lang-toggle toggles FR<->EN, stores careeros_mic_lang (fr-FR/en-US), persists after reload; mic-toggle-btn title shows 'Dictée vocale (en-US)'; AutoListen bar mic-lang-fr/en synced both ways with dictation toggle and persists after reload. Mode Candidat English question (real AI) -> English STAR bullets, candidate-translation 'FR · Parlez-moi d'une situation...' and candidate-answer-translation 'TRADUCTION · ...' rendered; no TRAD bullet. French question -> French answer, no translation blocks. parseCandidate unit check via node: FR/TRAD/• TRAD lines parsed correctly and excluded from bullets.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Copilote input bar (light theme)", "issues": ["dictation-lang-toggle uses text-emerald-300 on near-white background -> low contrast FR/EN label in light theme; use a darker emerald (e.g. text-emerald-700 in light mode)."]}
+    ]
+  },
+  "test_report_links": ["/app/tests/parse_candidate_check.js"],
+  "action_items": [
+    "Minor: improve contrast of dictation-lang-toggle label in light theme.",
+    "Minor (robustness): parse.js transMatch does not accept a bullet prefix ('• 🌐 FR : ...' stays a bullet), unlike tradMatch; align regex to /^[•\\-*]?\\s*🌐?\\s*FR\\s*:/ for consistency."
+  ],
+  "critical_code_review_comments": [
+    "useAutoListen: changing language while live listening is active only updates micLangRef; the running SpeechRecognition keeps its old lang until it restarts (dictation toggle restarts voice, but not auto-listen). Consider restarting rec on micLang change when active.",
+    "FR regex /^🌐?\\s*FR\\s*:/i is case-insensitive; a bullet-less answer line starting with 'Fr:' would be swallowed as translation (low risk)."
+  ],
+  "updated_files": ["/app/tests/parse_candidate_check.js"],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "seed_data_creation": "Created 1 Copilote session ('Nouvelle session', CANDIDAT) for membre.test with 2 questions; not deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Copilote at /careeros/copilote. Set localStorage privacyAcceptedV2=1 and copilotTourDone=1 to skip overlays. Login via /connexion auth-email-input/auth-password-input/auth-submit-btn. Candidate flow: activate-candidat-btn -> message-input -> send-btn; wait until barge-in-btn disappears (~20-40s)."
+}

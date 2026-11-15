@@ -601,3 +601,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Avant : 5-10 min. Après : offres affichées en ~11-16 s (preview), IA top 5 en arrière-plan (~80 s, 3 en parallèle, champ last_run.ai_pending + mention à l'écran, rafraîchissement auto).
 - Sources : 16 en parallèle (au lieu de 6), 45 s max par source ; base : 1 lecture + update_many + insert_many au lieu de 2 requêtes par offre ; règles 10 en parallèle ; last_run.timings (sources_s, store_rules_s, total_s, ai_s).
 - Anti-doublon IA : ai_claimed_at (15 min) + budget moins les offres en cours de confirmation. run_for_user protégé (status error, ai_pending false). Heure du dernier passage en heure de Toronto.
+
+## 2026-06 — Copilote entrevue bilingue FR/EN
+- Langue d'écoute/dictée FR/EN partagée (micro vert + barre Écoute), mémorisée (localStorage `careeros_mic_lang`).
+- Réponse dans la langue du recruteur + traduction FR de la question (🌐 FR) et de la réponse (🌐 TRAD → bloc « Traduction »).
+- Testé iteration_58 : 100 % frontend (preview).
+- Backlog : retest des 2 derniers ajustements perf Radar ; compteurs 156/147 ; bandeau Career Memory faussement affiché.
