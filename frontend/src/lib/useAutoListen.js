@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { transcribeBlob } from "./api";
+import { useMicLang } from "./micLang";
 
 const wc = (t) => (t || "").trim().split(/\s+/).filter(Boolean).length;
 
@@ -23,11 +24,11 @@ export function useAutoListen({ onQuestion }) {
   const [transcript, setTranscript] = useState("");
   const [busy, setBusy] = useState(false);
   const [auto, setAuto] = useState(true);
-  const [micLang, setMicLang] = useState("fr-FR");
+  const [micLang, setMicLang] = useMicLang();
 
   const activeRef = useRef(false);
   const autoRef = useRef(true);
-  const micLangRef = useRef("fr-FR");
+  const micLangRef = useRef(micLang);
   const streamRef = useRef(null);
   const recRef = useRef(null);
   const speechRef = useRef(null);

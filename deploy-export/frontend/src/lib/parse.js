@@ -4,11 +4,14 @@ export function parseCandidate(text) {
   let alert = null;
   let response = null; // vision [RÉPONSE : X]
   let translation = null; // 🌐 FR : ... (question translated when recruiter speaks another language)
+  let answerTranslation = null; // 🌐 TRAD : ... (French translation of a non-French answer)
   const bullets = [];
   for (const line of raw) {
     const alertMatch = line.match(/^\[ALERTE\s*:\s*(.+?)\]$/i);
     const respMatch = line.match(/^\[R[ÉE]PONSE\s*:\s*(.+?)\]$/i);
     const transMatch = line.match(/^🌐?\s*FR\s*:\s*(.+)$/i);
+    const tradMatch = line.match(/^[•\-*]?\s*🌐?\s*TRAD\s*:\s*(.+)$/i);
+    if (tradMatch) { answerTranslation = tradMatch[1].trim(); continue; }
     if (alertMatch) { alert = alertMatch[1]; continue; }
     if (respMatch) { response = respMatch[1]; continue; }
     if (transMatch) { translation = transMatch[1].trim(); continue; }
@@ -22,7 +25,7 @@ export function parseCandidate(text) {
       bullets.push(line);
     }
   }
-  return { alert, response, translation, bullets };
+  return { alert, response, translation, answerTranslation, bullets };
 }
 
 // Split a bullet on **bold** markers into segments {text, bold}.

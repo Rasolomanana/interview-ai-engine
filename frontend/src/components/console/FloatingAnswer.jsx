@@ -4,7 +4,7 @@ import { parseCandidate, segmentsFor } from "@/lib/parse";
 // Teams/Zoom/WhatsApp). Shows the current answer in large, readable text to place
 // right under the webcam.
 export default function FloatingAnswer({ content, streaming, mode, listening, transcript }) {
-  const { alert, response, translation, bullets } = parseCandidate(content || "");
+  const { alert, response, translation, answerTranslation, bullets } = parseCandidate(content || "");
   const isCandidate = mode === "CANDIDAT" || bullets.length > 0;
 
   return (
@@ -54,6 +54,11 @@ export default function FloatingAnswer({ content, streaming, mode, listening, tr
             </li>
           ))}
           {streaming && bullets.length === 0 && <li style={{ color: "#64748b" }}>Génération…</li>}
+          {answerTranslation && (
+            <li data-testid="floating-answer-translation" style={{ marginTop: 4, borderRadius: 8, border: "1px solid rgba(56,189,248,.25)", background: "rgba(8,47,73,.3)", padding: "6px 10px", fontSize: 13, color: "#bae6fd" }}>
+              🌐 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 11, textTransform: "uppercase", color: "#38bdf8" }}>Traduction · </span>{answerTranslation}
+            </li>
+          )}
         </ul>
       ) : (
         <p style={{ fontSize: 18, lineHeight: 1.5, color: "#e2e8f0" }}>{content}{streaming ? " …" : ""}</p>

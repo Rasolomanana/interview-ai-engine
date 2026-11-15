@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from "react";
+import { readMicLang } from "./micLang";
 
 // Web Speech API live transcription + lightweight client-side prosodic analysis.
 // Produces [STATE_CANDIDAT] and [VOICE_CONFIDENCE] required by BLOC 2.1.
@@ -104,7 +105,7 @@ export function useVoice() {
 
     if (SR) {
       const rec = new SR();
-      rec.lang = "fr-FR";
+      rec.lang = readMicLang();
       rec.continuous = true;
       rec.interimResults = true;
       rec.onresult = (e) => {

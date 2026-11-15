@@ -9,6 +9,7 @@ import { Brain,
 import * as api from "@/lib/api";
 import { useVoice } from "@/lib/useVoice";
 import { useAutoListen } from "@/lib/useAutoListen";
+import { useMicLang } from "@/lib/micLang";
 import SessionSidebar from "@/components/console/SessionSidebar";
 import ContextPanel from "@/components/console/ContextPanel";
 import { skillMatch } from "@/lib/careeros";
@@ -58,6 +59,7 @@ export default function InterviewConsole() {
   const listen = useAutoListen({ onQuestion: (q) => autoQRef.current?.(q) });
 
   const voice = useVoice();
+  const [dictLang, setDictLang] = useMicLang();
   const controllerRef = useRef(null);
   const threadRef = useRef(null);
   const fileRef = useRef(null);
@@ -606,10 +608,18 @@ export default function InterviewConsole() {
                 onClick={() => (voice.listening ? voice.stop() : voice.start())}
                 data-testid="mic-toggle-btn"
                 disabled={!voice.supported}
-                title={voice.supported ? "Dictée vocale (fr-FR)" : "Reconnaissance vocale non supportée"}
+                title={voice.supported ? `Dictée vocale (${dictLang})` : "Reconnaissance vocale non supportée"}
                 className={`rounded-xl border p-2.5 transition-colors ${voice.listening ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400" : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-white"} disabled:opacity-40`}
               >
                 {voice.listening ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+              </button>
+              <button
+                data-testid="dictation-lang-toggle"
+                onClick={() => { const next = dictLang === "fr-FR" ? "en-US" : "fr-FR"; setDictLang(next); if (voice.listening) { voice.stop(); setTimeout(() => voice.start(), 300); } }}
+                title="Langue de la dictée et de l'écoute (mémorisée)"
+                className="self-center rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[11px] font-bold text-emerald-300 hover:bg-white/[0.08]"
+              >
+                {dictLang === "en-US" ? "EN" : "FR"}
               </button>
 
               <textarea
