@@ -607,3 +607,9 @@ Vision : CareerOS = cerveau stratégique ; Interview AI Engine = moteur d'exécu
 - Réponse dans la langue du recruteur + traduction FR de la question (🌐 FR) et de la réponse (🌐 TRAD → bloc « Traduction »).
 - Testé iteration_58 : 100 % frontend (preview).
 - Backlog : retest des 2 derniers ajustements perf Radar ; compteurs 156/147 ; bandeau Career Memory faussement affiché.
+
+## 2026-06 — Icône d'app mobile (écran d'accueil)
+- `public/site.webmanifest` (séparé du `manifest.json` de l'extension Chrome), start_url `/`, display standalone.
+- Icônes générées depuis favicon.svg : icons/app-192.png, app-512.png, app-maskable-512.png, apple-touch-icon.png (180).
+- Balises manifest/apple-touch ajoutées à index.html preview ET export (l'index export reste sans scripts Emergent/PostHog).
+- Vérifié curl preview : manifeste + icônes servis (200).
